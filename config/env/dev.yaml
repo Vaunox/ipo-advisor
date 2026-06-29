@@ -1,0 +1,6 @@
+# Development overrides (env=dev). Merged on top of default.yaml.
+logging:
+  level: DEBUG
+
+notify:
+  enabled: false

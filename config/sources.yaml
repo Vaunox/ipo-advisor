@@ -1,0 +1,27 @@
+# Source URLs + scrape settings. Adapters (Phase 1) are the ONLY code that reads this
+# and the only code that imports a source client (Ground Rule 1).
+# Chittorgarh is a convenient aggregator but NOT authoritative — official figures
+# (NSE/BSE) are the check (Deep Dive #1).
+
+sources:
+  nse:
+    base_url: "https://www.nseindia.com"
+    authoritative: true
+    enabled: true
+  bse:
+    base_url: "https://www.bseindia.com"
+    authoritative: true
+    enabled: true
+  sebi:
+    base_url: "https://www.sebi.gov.in"
+    authoritative: true
+    enabled: true
+  chittorgarh:
+    base_url: "https://www.chittorgarh.com"
+    authoritative: false   # fast path only; cross-check against NSE/BSE
+    enabled: true
+  # GMP trackers deferred to Phase 5 (Deep Dive #5); listed disabled for now.
+  investorgain:
+    base_url: "https://www.investorgain.com"
+    authoritative: false
+    enabled: false

@@ -1,0 +1,33 @@
+# Pre-commit hooks — the same gate CI enforces, run locally before every commit.
+# Ground Rule 6: the committed tree is always green (lint + types + tests).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.6
+          - pydantic-settings>=2.2
+          - types-PyYAML
+        args: [--config-file=pyproject.toml]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true

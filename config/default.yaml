@@ -1,0 +1,64 @@
+# Base configuration. Layered: default.yaml <- config/env/<env>.yaml <- IPO_ env vars.
+# Ground Rule 2: every tunable parameter lives here, never hard-coded in logic.
+# Secrets NEVER appear in config — see core/secrets.py.
+
+env: dev
+
+logging:
+  level: INFO        # DEBUG | INFO | WARNING | ERROR | CRITICAL
+  json: true         # structured key/value output (Ground Rule 8)
+
+storage:
+  data_dir: data_store        # local parquet cache (gitignored)
+  calibrator_dir: data_store/calibrators
+
+scrape:
+  # Polite-scraper contract (Deep Dive #1, Module 3).
+  rate_limit_per_sec: 0.5
+  backoff_factor: 2.0
+  max_retries: 4
+  user_agent: "ipo-advisor/0.1 (research; advisory-only; no order execution)"
+  cadence_minutes_default: 360          # background refresh cadence
+  cadence_minutes_subscription_window: 30   # denser while a book is open (GMP moves)
+
+verdict_thresholds:
+  # Placeholder cutoffs — EARNED and re-tuned against backtested outcomes in Phase 4.
+  apply: 0.65
+  marginal: 0.50
+
+calibration:
+  # Calibration is SACRED. These govern the Phase-4 reliability gate.
+  method: isotonic                # isotonic | platt
+  reliability_tolerance: 0.10     # max |predicted - observed| per bucket
+  n_buckets: 10
+  min_training_samples: 100       # >=100 labeled mainboard IPOs required
+  random_seed: 17                 # determinism (Ground Rule 7)
+
+# NSE delivery (CNC) listing-day SELL costs, verified June 2026.
+# Constants are structural (core/constants.py); the RATES are tunable and live here.
+sell_costs:
+  brokerage: 0.0
+  stt_rate: 0.001            # 0.1% on the sell value (dominant cost)
+  dp_charge_per_isin: 15.34  # flat, per ISIN per sell-day
+  exchange_rate: 0.0000297   # ~0.00297%
+  gst_rate: 0.18             # on (brokerage + exchange)
+  sebi_rate: 0.000001        # Rs 10 per crore
+  stamp_rate_sell: 0.0       # nil on the sell leg
+
+feature_weights:
+  # Transparent weighted baseline (Phase 3). PLACEHOLDER values — tuned in Phase 4.
+  # GMP sets direction, not certainty (Inviolable Rule 5).
+  gmp_level: 0.30
+  gmp_slope: 0.10
+  qib_sub: 0.20
+  nii_sub: 0.10
+  retail_sub: 0.05
+  anchor_quality: 0.10
+  relative_valuation: 0.10
+  ofs_fraction: -0.05
+  market_regime: 0.10
+
+notify:
+  enabled: false
+  channel: none        # none | push | telegram | email
+  threshold_verdict: APPLY

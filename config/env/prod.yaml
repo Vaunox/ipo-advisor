@@ -1,0 +1,7 @@
+# Production overrides (env=prod). Merged on top of default.yaml.
+logging:
+  level: WARNING
+
+notify:
+  enabled: true
+  channel: push

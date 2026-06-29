@@ -1,0 +1,36 @@
+# Secrets & local config
+.env
+.env.*
+secrets/
+
+# Data store / scraped artifacts (raw caches, parquet)
+data_store/
+*.parquet
+*.raw
+raw_cache/
+
+# Build / packaging
+dist/
+build/
+*.spec.bak
+*.exe
+*.apk
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
