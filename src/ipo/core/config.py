@@ -120,6 +120,56 @@ class IngestConfig(_Section):
     official_required_fields: list[str] = Field(default_factory=list)
 
 
+class GmpFeatureConfig(_Section):
+    """GMP normalization knobs (Deep Dive #2)."""
+
+    winsor_max_pct: float = 100.0
+    saturation_scale_pct: float = 25.0
+    slope_days: int = 2
+    slope_scale_pct: float = 15.0
+
+
+class SubscriptionFeatureConfig(_Section):
+    """Subscription-multiple normalization knobs."""
+
+    winsor_max_x: float = 200.0
+    saturation_scale_x: float = 20.0
+
+
+class AnchorFeatureConfig(_Section):
+    """Anchor-quality composite weights and the maintained recognized-anchor list."""
+
+    recognized: list[str] = Field(default_factory=list)
+    weight_marquee: float = 0.5
+    weight_lockin: float = 0.3
+    weight_full_placement: float = 0.2
+    lockin_reference_days: int = 90
+
+
+class ValuationFeatureConfig(_Section):
+    """Relative-valuation policy, including the 'no listed peers' case."""
+
+    peerless_policy: str = "neutral_flag"  # neutral_flag | mild_negative
+
+
+class RegimeFeatureConfig(_Section):
+    """Market-regime blend weights (trend vs volatility)."""
+
+    trend_weight: float = 0.6
+    vol_weight: float = 0.4
+
+
+class FeaturesConfig(_Section):
+    """Feature-construction configuration (Layer 2)."""
+
+    gmp: GmpFeatureConfig = Field(default_factory=GmpFeatureConfig)
+    subscription: SubscriptionFeatureConfig = Field(default_factory=SubscriptionFeatureConfig)
+    anchor: AnchorFeatureConfig = Field(default_factory=AnchorFeatureConfig)
+    valuation: ValuationFeatureConfig = Field(default_factory=ValuationFeatureConfig)
+    regime: RegimeFeatureConfig = Field(default_factory=RegimeFeatureConfig)
+    critical_features: list[str] = Field(default_factory=lambda: ["gmp_level", "qib_sub"])
+
+
 class AppConfig(BaseModel):
     """The fully-merged, validated configuration for one run."""
 
@@ -133,6 +183,7 @@ class AppConfig(BaseModel):
     calibration: CalibrationConfig = Field(default_factory=CalibrationConfig)
     sell_costs: SellCosts = Field(default_factory=SellCosts)
     feature_weights: dict[str, float] = Field(default_factory=dict)
+    features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     notify: NotifyConfig = Field(default_factory=NotifyConfig)
     ingest: IngestConfig = Field(default_factory=IngestConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)

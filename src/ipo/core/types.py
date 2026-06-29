@@ -186,6 +186,10 @@ class IPOFeatures(_Frozen):
     # True once the subscription book has closed as of `asof`.
     book_closed: bool = False
 
+    # Construction flags surfaced to the reason generator (e.g. "no_listed_peer",
+    # "book_not_closed"). Never silent: a flagged condition is explained, not hidden.
+    flags: tuple[str, ...] = ()
+
 
 class Verdict(_Frozen):
     """The engine's complete output for one IPO (Layer 3 output contract).

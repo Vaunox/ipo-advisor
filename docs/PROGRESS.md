@@ -7,7 +7,7 @@ green (lint + types + tests) at every phase commit.
 |---|---|---|---|---|---|
 | 2026-06-29 | P0 | ☑ done | `feat(p0): foundation & scaffolding` / `gate-0-foundation` | 38 passing | Foundation built; GATE 0 met. See details below. |
 | 2026-06-29 | P1 | ☑ done | `feat(p1): official ingestion + labels` / `gate-1-ingest` | 78 passing | Ingestion + labels; GATE 1 met. Sample feasibility confirmed; two DD#1 decisions made. |
-| | P2 | ☐ todo | | | Features + point-in-time leakage suite. |
+| 2026-06-29 | P2 | ☑ done | `feat(p2): feature layer + point-in-time correctness` / `gate-2-features` | 105 passing | Point-in-time features + leakage suite; GATE 2 met. |
 | | P3 | ☐ todo | | | Scoring core (port `ipo_advisor.py`). |
 | | P4 | ☐ todo | | | **Calibration — load-bearing gate.** Needs ≥100 labeled IPOs. |
 | | P5 | ☐ todo | | | GMP integration + re-calibration gate. |
@@ -15,7 +15,7 @@ green (lint + types + tests) at every phase commit.
 | | P7 | ☐ todo | | | Windows `.exe` + Android APK. |
 | | P8 | — | | | Operate & maintain (ongoing). |
 
-**Gate status:** 0 ☑ · 1 ☑ · 2 ☐ · 3 ☐ · 4 ☐ · 5 ☐ · 6 ☐ · 7 ☐
+**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☐ · 4 ☐ · 5 ☐ · 6 ☐ · 7 ☐
 
 ---
 
@@ -83,5 +83,35 @@ Mainboard IPO counts (NSE/BSE): 2021=63, 2022=40, 2023=57, 2024=93, 2025=104 →
 - NSE returns 403 to a bare client and Chittorgarh 403s the generic fetch tool — confirming the design split: `fetch` (network, operator-run with browser headers/session) is isolated from `parse` (pure, fixture-tested). The live HTML scrapers' bulk parsing beyond the microdata subset is left for the operator to calibrate against live responses (or superseded by the curated CSV / official APIs).
 
 ### Follow-ups
-- Phase 2 (features) consumes `IPORecord` + the as-of clock; point-in-time leakage suite next. Anchor-book parsing and broader official adapters (NSE/BSE subscription JSON) can be added incrementally behind `DataSource` without touching downstream layers.
+- Anchor-book parsing and broader official adapters (NSE/BSE subscription JSON) can be added incrementally behind `DataSource` without touching downstream layers.
 - **≥100-IPO backfill — DECISION (operator, 2026-06-29): defer to pre-Phase-4.** Keep the 7-row plumbing seed; build Phases 2–3 on it (they don't need 100 rows); do the backfill as a dedicated task right before Phase 4, when feature needs are locked. Robots check done: Chittorgarh `User-agent: *` is `Allow: /` (only `/ipo/ipo_discussions.asp` blocked; AI-training bots blocked) → polite rate-limited detail-page scraping is permitted. Planned mechanism: extend `ChittorgarhSource` from microdata-only to per-IPO **detail-page** parsing (issue price, listing open/close, QIB/NII/retail, issue P/E, peer P/E, OFS), polite bulk pull of 2021–2025, then verify a sample against official NSE/BSE before it enters the backtest.
+
+---
+
+## Phase 2 — Feature layer + point-in-time correctness (done)
+
+**Goal:** the leakage-free feature vector, computed identically in backtest and live.
+
+### Deliverables built
+- **`features/normalize.py`** — pure recipes: `clamp`, `winsorize`, `saturate` (`1-exp(-x/scale)`), `signed_saturate` (`tanh`). Scales live in config; applied by the scorer (Phase 3).
+- **`features/gmp.py`** — `GmpQuote` + point-in-time `gmp_level_pct` / `gmp_slope_pct` (placeholder data until the Phase-5 scraper; quotes after `asof` ignored by construction).
+- **`features/subscription.py`** — QIB/NII/retail multiples, gated on `book_closed` (open book → `None`).
+- **`features/valuation.py`** — `issue_pe / peer_median_pe`; "no listed peers" → neutral-with-a-flag.
+- **`features/anchor.py`** — 0..1 composite (marquee fraction × value-weighted lock-in × placement); recognized-anchor list in config, never in code; missing data → `None`.
+- **`features/regime.py`** — −1..+1 trend/vol blend (pure; live index data injected later).
+- **`features/build.py`** — `build_features(record, asof, *, gmp_series, market_regime, config)`: the Layer-2 output contract. Point-in-time by construction; missing features are explicit `None`s with `flags`.
+- **`features/leakage.py`** — the firewall: `future_mutated_record` + `is_point_in_time_safe`, reusable by the Phase-4 backtest.
+- Added `IPOFeatures.flags`; added the `features` config section (gmp/subscription/anchor/valuation/regime + `critical_features`).
+
+### GATE 2 — met
+- **Features build for a past IPO using only as-of data:** `test_features.py` + integration `test_features_pit.py` (ingested Tata Tech / LIC at subscription close).
+- **Leakage suite fails on a leaky feature, passes otherwise:** `test_leakage.py` — `is_point_in_time_safe` is **True** for the real builder and **False** for one that peeks at the listing price; future GMP quotes ignored; label never changes features.
+- **CI green:** ruff + black + mypy (strict) + **105 tests**.
+
+### Decisions / notes
+- **IPOFeatures stores raw point-in-time values**; normalization is applied in the scorer (Phase 3) so reasons can cite human-readable values ("QIB 203×"). Recipes live in `features/normalize.py`.
+- **Critical features = `gmp_level`, `qib_sub`** (config) → missing/unclosed book ⇒ `INSUFFICIENT_SIGNAL` in Layer 3.
+- For Phase 4: Deep Dive #4 prefers **Platt/sigmoid** as the default for ~100 IPOs (config currently `isotonic`); switch when wiring Phase 4.
+
+### Follow-ups
+- Phase 3 (scoring core): weighted score (normalize recipes + `feature_weights`), kill-flags, verdict thresholds + abstention, grounded reason. Calibrator stays the marked placeholder until Phase 4.

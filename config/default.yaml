@@ -45,6 +45,48 @@ sell_costs:
   sebi_rate: 0.000001        # Rs 10 per crore
   stamp_rate_sell: 0.0       # nil on the sell leg
 
+features:
+  # Construction + normalization knobs (Deep Dive #2). Tuned empirically in Phase 4.
+  gmp:
+    winsor_max_pct: 100.0       # clip GMP% before any transform (one bad print can't swing)
+    saturation_scale_pct: 25.0  # diminishing returns past ~25% (applied in the scorer)
+    slope_days: 2               # final-days slope window
+    slope_scale_pct: 15.0       # signed-saturation scale for the slope
+  subscription:
+    winsor_max_x: 200.0         # clip oversubscription multiple
+    saturation_scale_x: 20.0    # 40x and 80x both mean "very strong"
+  anchor:
+    # Recognized marquee anchors — MAINTAINED HERE, never hardcoded in code.
+    recognized:
+      - "SBI"
+      - "ICICI Prudential"
+      - "HDFC"
+      - "Nippon"
+      - "Axis"
+      - "Kotak"
+      - "Aditya Birla Sun Life"
+      - "Mirae"
+      - "Government of Singapore"
+      - "Abu Dhabi Investment Authority"
+      - "Norges"
+      - "Government Pension Fund"
+      - "Nomura"
+      - "Morgan Stanley"
+      - "Goldman Sachs"
+    weight_marquee: 0.5
+    weight_lockin: 0.3
+    weight_full_placement: 0.2
+    lockin_reference_days: 90    # lock-in at/above this scores full on that component
+  valuation:
+    peerless_policy: neutral_flag   # neutral_flag | mild_negative
+  regime:
+    trend_weight: 0.6
+    vol_weight: 0.4
+  # Missing either critical feature (or an unclosed book) -> INSUFFICIENT_SIGNAL (Layer 3).
+  critical_features:
+    - gmp_level
+    - qib_sub
+
 feature_weights:
   # Transparent weighted baseline (Phase 3). PLACEHOLDER values — tuned in Phase 4.
   # GMP sets direction, not certainty (Inviolable Rule 5).
