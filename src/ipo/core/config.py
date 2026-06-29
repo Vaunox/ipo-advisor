@@ -95,6 +95,13 @@ class SellCosts(_Section):
     stamp_rate_sell: float = 0.0
 
 
+class KillFlagConfig(_Section):
+    """Hard-override thresholds (Deep Dive #3) — sanity bounds, not return-tuned."""
+
+    gmp_collapse_slope_pct: float = -10.0
+    near_total_ofs: float = Field(default=0.95, ge=0, le=1)
+
+
 class NotifyConfig(_Section):
     """Notifier channel and the verdict threshold that triggers a push."""
 
@@ -184,6 +191,7 @@ class AppConfig(BaseModel):
     sell_costs: SellCosts = Field(default_factory=SellCosts)
     feature_weights: dict[str, float] = Field(default_factory=dict)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
+    killflags: KillFlagConfig = Field(default_factory=KillFlagConfig)
     notify: NotifyConfig = Field(default_factory=NotifyConfig)
     ingest: IngestConfig = Field(default_factory=IngestConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)

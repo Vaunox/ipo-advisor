@@ -88,7 +88,9 @@ features:
     - qib_sub
 
 feature_weights:
-  # Transparent weighted baseline (Phase 3). PLACEHOLDER values — tuned in Phase 4.
+  # Transparent weighted baseline (Phase 3). PLACEHOLDER priors — tuned in Phase 4.
+  # Weights are POSITIVE MAGNITUDES; the scorer owns each feature's sign semantics
+  # (GMP/subscription/anchor/regime add; valuation/OFS are brakes that subtract).
   # GMP sets direction, not certainty (Inviolable Rule 5).
   gmp_level: 0.30
   gmp_slope: 0.10
@@ -96,9 +98,14 @@ feature_weights:
   nii_sub: 0.10
   retail_sub: 0.05
   anchor_quality: 0.10
-  relative_valuation: 0.10
-  ofs_fraction: -0.05
+  relative_valuation: 0.10   # brake: subtracted when issue P/E > peer median
+  ofs_fraction: 0.05         # brake: subtracted as OFS fraction rises
   market_regime: 0.10
+
+killflags:
+  # Hard overrides -> forced SKIP (Deep Dive #3). Sanity bounds, NOT return-tuned.
+  gmp_collapse_slope_pct: -10.0   # GMP falling >= 10% of band over the final days
+  near_total_ofs: 0.95            # >= 95% OFS = pure promoter exit, no fresh capital
 
 notify:
   enabled: false

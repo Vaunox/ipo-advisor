@@ -8,14 +8,14 @@ green (lint + types + tests) at every phase commit.
 | 2026-06-29 | P0 | ☑ done | `feat(p0): foundation & scaffolding` / `gate-0-foundation` | 38 passing | Foundation built; GATE 0 met. See details below. |
 | 2026-06-29 | P1 | ☑ done | `feat(p1): official ingestion + labels` / `gate-1-ingest` | 78 passing | Ingestion + labels; GATE 1 met. Sample feasibility confirmed; two DD#1 decisions made. |
 | 2026-06-29 | P2 | ☑ done | `feat(p2): feature layer + point-in-time correctness` / `gate-2-features` | 105 passing | Point-in-time features + leakage suite; GATE 2 met. |
-| | P3 | ☐ todo | | | Scoring core (port `ipo_advisor.py`). |
+| 2026-06-29 | P3 | ☑ done | `feat(p3): scoring core` / `gate-3-scoring` | 132 passing | Scorer/killflags/verdict/reason; GATE 3 met. Calibrator = marked placeholder. |
 | | P4 | ☐ todo | | | **Calibration — load-bearing gate.** Needs ≥100 labeled IPOs. |
 | | P5 | ☐ todo | | | GMP integration + re-calibration gate. |
 | | P6 | ☐ todo | | | Advisory service (API / scheduler / notifier). |
 | | P7 | ☐ todo | | | Windows `.exe` + Android APK. |
 | | P8 | — | | | Operate & maintain (ongoing). |
 
-**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☐ · 4 ☐ · 5 ☐ · 6 ☐ · 7 ☐
+**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☐ · 5 ☐ · 6 ☐ · 7 ☐
 
 ---
 
@@ -115,3 +115,30 @@ Mainboard IPO counts (NSE/BSE): 2021=63, 2022=40, 2023=57, 2024=93, 2025=104 →
 
 ### Follow-ups
 - Phase 3 (scoring core): weighted score (normalize recipes + `feature_weights`), kill-flags, verdict thresholds + abstention, grounded reason. Calibrator stays the marked placeholder until Phase 4.
+
+---
+
+## Phase 3 — Scoring core (done)
+
+**Goal:** features → verdict + grounded reason, with abstention and kill-flags. (No `ipo_advisor.py` skeleton existed in the repo; built fresh from Deep Dive #3.)
+
+### Deliverables built
+- **`model/scorer.py`** — `WeightedScorer` (implements `ScoringModel`): named, signed contributions over normalized feature values; weights are positive magnitudes, the scorer owns signs (GMP/subscription/anchor/regime add; valuation/OFS are brakes). `score = sum(contributions)`.
+- **`model/killflags.py`** — `kill_flags(record, features, config)`: SME segment, collapsing GMP (slope ≤ threshold), near-total OFS, promoter litigation. Separate from the score on purpose.
+- **`model/verdict.py`** — `evaluate(record, features, *, scorer, calibrator, config)`: **abstention first** (missing critical feature / unclosed book → `INSUFFICIENT_SIGNAL`), then kill-flag override → `SKIP`, then threshold the probability → APPLY/MARGINAL/SKIP.
+- **`model/reason.py`** — grounded reason from the top contributions (cites values, e.g. "GMP +40%, QIB 200×"), watch-items from negatives, kill-flag notes, and the uncalibrated banner.
+- **`model/calibrator_placeholder.py`** — `PlaceholderCalibrator` (logistic squash), `passes_reliability_gate = False`, version tagged `NOT FOR RELEASE`.
+- Added `killflags` config section; `feature_weights` are now positive magnitudes.
+
+### GATE 3 — met (verified live)
+- `strong → APPLY` | prob withheld + banner | "Driven by GMP +40%, QIB 200×, anchor quality 1.00" | watch: OFS 20%.
+- `fading-GMP → SKIP` | "Kill-flag override: collapsing_gmp" | watch: GMP slope −20%.
+- `unclosed book → INSUFFICIENT_SIGNAL` | "missing qib_sub, book_closed".
+- Calibrator is the marked placeholder; **no probability is shown** (probability `None`, banner present). CI green: ruff + black + mypy (strict) + **132 tests**.
+
+### Decisions / notes
+- **Probability is gated on `calibrator.passes_reliability_gate`** — until Phase 4, `Verdict.probability is None` and the reason carries the "UNCALIBRATED — not for decisions" banner; the verdict is still shown (Deep Dive #3, "overconfidence trap").
+- `evaluate` takes the **record + features** (kill-flags need record-level context — segment, promoter litigation — that isn't in the feature vector).
+
+### Follow-ups
+- Phase 4 (calibration, the load-bearing gate) needs the ≥100-IPO backfill first (deferred decision above). Then: walk-forward backtest using `build_features` as-of + the leakage firewall, Platt fit on held-out folds, reliability diagram + ECE/Brier + the 6-point reliability gate, threshold tuning, and `docs/CALIBRATION.md`. Switch the calibrator default to `platt` and replace `PlaceholderCalibrator` only after the gate + look-ahead test pass.
