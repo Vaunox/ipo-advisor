@@ -108,6 +108,18 @@ class KillFlagConfig(_Section):
     near_total_ofs: float = Field(default=0.95, ge=0, le=1)
 
 
+class GmpConfig(_Section):
+    """Grey-market premium reconstruction settings (Deep Dive #5)."""
+
+    winsor_min: float = -100.0
+    winsor_max: float = 1000.0
+    divergence_band_frac: float = Field(default=0.5, ge=0)
+    collapse_drop_frac: float = Field(default=0.4, ge=0, le=1)
+    min_coverage_days: int = Field(default=3, ge=1)
+    sources: list[str] = Field(default_factory=list)
+    primary: str = "investorgain"
+
+
 class NotifyConfig(_Section):
     """Notifier channel and the verdict threshold that triggers a push."""
 
@@ -199,6 +211,7 @@ class AppConfig(BaseModel):
     feature_weights: dict[str, float] = Field(default_factory=dict)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     killflags: KillFlagConfig = Field(default_factory=KillFlagConfig)
+    gmp: GmpConfig = Field(default_factory=GmpConfig)
     notify: NotifyConfig = Field(default_factory=NotifyConfig)
     ingest: IngestConfig = Field(default_factory=IngestConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)

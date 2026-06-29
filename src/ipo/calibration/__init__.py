@@ -22,6 +22,7 @@ from ipo.calibration.calibrate import (
     make_calibrator,
     save_calibrator,
 )
+from ipo.calibration.gmp_gate import GmpGateResult, gmp_recalibration_gate
 from ipo.calibration.label import is_positive, net_listing_return
 from ipo.calibration.reliability import ReliabilityReport, evaluate_reliability
 
@@ -43,4 +44,6 @@ __all__ = [
     "net_listing_return",
     "ReliabilityReport",
     "evaluate_reliability",
+    "GmpGateResult",
+    "gmp_recalibration_gate",
 ]

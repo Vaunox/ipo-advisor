@@ -114,6 +114,17 @@ killflags:
   gmp_collapse_slope_pct: -10.0   # GMP falling >= 10% of band over the final days
   near_total_ofs: 0.95            # >= 95% OFS = pure promoter exit, no fresh capital
 
+gmp:
+  # Grey-market premium reconstruction (Deep Dive #5) — unofficial, noisy, deferred.
+  # Live capture is easy (free trackers); historical reconstruction is the hard part.
+  winsor_min: -100.0             # clip absurd rupee-premium prints before any use
+  winsor_max: 1000.0
+  divergence_band_frac: 0.5      # sources differ by > 50% of the median -> low confidence
+  collapse_drop_frac: 0.4        # peak-to-close drop > 40% -> spike-collapse pattern
+  min_coverage_days: 3           # min GMP days in the window before the feature is "present"
+  sources: ["investorgain", "ipowatch", "chittorgarh"]
+  primary: "investorgain"
+
 notify:
   enabled: false
   channel: none        # none | push | telegram | email

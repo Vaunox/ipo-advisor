@@ -10,7 +10,8 @@ green (lint + types + tests) at every phase commit.
 | 2026-06-29 | P2 | ☑ done | `feat(p2): feature layer + point-in-time correctness` / `gate-2-features` | 105 passing | Point-in-time features + leakage suite; GATE 2 met. |
 | 2026-06-29 | P3 | ☑ done | `feat(p3): scoring core` / `gate-3-scoring` | 132 passing | Scorer/killflags/verdict/reason; GATE 3 met. Calibrator = marked placeholder. |
 | 2026-06-29 | P4 | ☑ done | `feat(p4): backtest + calibration` / `gate-4-calibration` | 154 passing | **Reliability gate PASSED** on 311 official NSE IPOs. AUC 0.81, ECE 0.073, look-ahead 0.47. |
-| | P5 | ☐ todo | | | GMP integration + re-calibration gate. |
+| 2026-06-29 | P4+ | ☑ done | `test(p4): benchmark...` | 158 passing | Model **ties** equal-selectivity QIB rule (83.7% vs 84.3%); value = calibration, not precision. |
+| 2026-06-29 | P5 | ◐ framework | `feat(p5): GMP framework + re-calibration gate` | 168 passing | GMP machinery + gate built & validated (keeps informative, rejects noise). **Historical GMP data deferred** (operator decision); `gate-5` runs when sourced. |
 | | P6 | ☐ todo | | | Advisory service (API / scheduler / notifier). |
 | | P7 | ☐ todo | | | Windows `.exe` + Android APK. |
 | | P8 | — | | | Operate & maintain (ongoing). |
@@ -181,4 +182,32 @@ Both gates CI-enforced: `test_calibration_gate.py` (reproduces the pass on commi
 - The strong official result (AUC 0.81) reflects 2021–2025 being a hot IPO market (base rate 69%); the look-ahead shuffle (0.47) confirms it's real signal, not leakage. Small-sample caveat stated in the report.
 
 ### Follow-ups
-- Phase 5 (GMP): reconstruct historical GMP (level + slope) from trackers, wire into features, re-add `gmp_level` to critical, **re-run this exact calibration**, and keep GMP only if it improves ECE/Brier (the GMP re-calibration gate).
+- Phase 5 (GMP): reconstruct historical GMP, wire into features, re-add `gmp_level` to critical, **re-run this exact calibration**, keep GMP only if it improves calibration. (Framework done — see Phase 5 below.)
+
+---
+
+## Phase 5 — GMP integration (framework done; historical gate deferred)
+
+**Goal:** add GMP, but only if it *earns* its weight (Deep Dive #5, the second sacred gate).
+
+### Data-source decision (operator, 2026-06-29) — build framework now, defer the noisy historical pull
+Investigated GMP feasibility and pricing:
+- **No clean historical source.** Trackers JS-render GMP (investorgain), Chittorgarh paywalls it, ipowatch is live-only.
+- **ipoalerts.in** API: `gmp` object is `sources:[{name,gmpPrice}]` + median — *exactly* our reconciler — but **current GMP only (no history)**, GMP is a paid add-on. **Ideal for LIVE going forward, not the backtest.**
+- **IPOMatrix Pro ₹25k+GST/yr**: the only confirmed historical GMP (2021–2026), but a web platform (scrape logged-in), ~all-redundant with our free NSE data, and GMP may fail its own gate → **poor value; don't buy.**
+- **Decision:** build the GMP framework (shaped to ingest ipoalerts' format for live), keep the historical re-calibration gate deferred; run it only if historical GMP is ever sourced.
+
+### Deliverables built
+- **`data/sources/gmp.py`** — `GMPPoint`, `GMPHistory` protocol, `reconcile` (median across sources + divergence/low-confidence flag), winsorization, `detect_spike_collapse` (manipulation → kill-flag), `has_sufficient_coverage` (coverage floor → abstain), `from_aggregator_rows` (ingests ipoalerts' shape), `CsvGmpHistory` (the operator/deferred-historical path), `to_quotes` (bridge to `features.gmp`).
+- **`calibration/gmp_gate.py`** — `gmp_recalibration_gate`: runs the **same** walk-forward with vs without GMP and keeps GMP only if it worsens **neither** calibration (ECE) **nor** discrimination (AUC). The AUC guard is essential — a pure-noise feature can look "calibrated" by predicting the base rate.
+- Added `gmp` config section; `GmpConfig`.
+
+### GATE 5 — framework validated; real gate deferred
+- The gate **mechanism is proven** on controlled data: `test_gmp_framework.py` shows an *informative* GMP is **kept** and a *pure-noise* GMP is **rejected** (discrimination collapses). Reconciliation/median, divergence-flagging, spike-collapse, and coverage-floor all tested.
+- **`gate-5` is NOT tagged:** the real GMP re-calibration needs *historical* GMP for the 311 IPOs, which is deferred. It runs (and `gmp_level` returns to `critical_features`) once that data is sourced — feed it as a `gmp.csv` via `CsvGmpHistory`, or wire ipoalerts for live.
+- ruff + black + mypy + **168 tests** green.
+
+### Follow-ups
+- **To run the real GMP gate later:** source historical GMP → `CsvGmpHistory` → build with-GMP items via `build_features(gmp_series=...)` → `gmp_recalibration_gate` vs the official-only items. If kept, re-add `gmp_level` to `critical_features` and re-persist the calibrator.
+- **Live GMP (Phase 6 service):** wire ipoalerts' `gmp` object through `from_aggregator_rows` → `reconcile` → `to_quotes` at the subscription close.
+- Phases 6 (service/API/notifier) and 7 (Windows `.exe` + Android APK) remain.
