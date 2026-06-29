@@ -23,6 +23,7 @@ from ipo.core.interfaces import (
 from ipo.core.types import (
     IPOFeatures,
     IPORecord,
+    ListingLabel,
     PartialRecord,
     RawResponse,
     Segment,
@@ -51,14 +52,26 @@ class FakeRepository:
     def __init__(self) -> None:
         self._store: dict[str, IPORecord] = {}
 
+        self._labels: list[ListingLabel] = []
+
     def upsert(self, record: IPORecord) -> None:
         self._store[record.ipo_id] = record
+
+    def upsert_many(self, records: list[IPORecord]) -> None:
+        for record in records:
+            self._store[record.ipo_id] = record
 
     def get(self, ipo_id: str) -> IPORecord | None:
         return self._store.get(ipo_id)
 
     def list_all(self) -> list[IPORecord]:
         return list(self._store.values())
+
+    def save_labels(self, labels: list[ListingLabel]) -> None:
+        self._labels = list(labels)
+
+    def load_labels(self) -> list[ListingLabel]:
+        return list(self._labels)
 
 
 class FakeScoringModel:

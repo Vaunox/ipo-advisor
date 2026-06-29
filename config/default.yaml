@@ -62,3 +62,21 @@ notify:
   enabled: false
   channel: none        # none | push | telegram | email
   threshold_verdict: APPLY
+
+ingest:
+  # History depth for the Phase-4 calibration sample (~357 mainboard IPOs available
+  # since 2021; >=100 required). 2021+ keeps the data shape consistent (NII sNII/bNII
+  # split is post-2022) and excludes pre-2020 COVID microstructure distortions.
+  backfill_start_date: "2021-01-01"
+  seed_csv: "seed/mainboard_ipos.csv"   # curated historical seed (committed, real)
+  raw_cache_dir: "data_store/raw_cache"  # immutable hashed raw responses (gitignored)
+  # Label/backtest-critical fields that must be CROSS-CHECKED against official NSE/BSE
+  # and are never taken from an aggregator alone (Deep Dive #1).
+  official_required_fields:
+    - listing_open
+    - listing_close
+    - qib_sub
+    - nii_sub
+    - retail_sub
+    - price_band_high
+    - segment

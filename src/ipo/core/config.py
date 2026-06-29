@@ -111,6 +111,15 @@ class SourceConfig(_Section):
     enabled: bool = True
 
 
+class IngestConfig(_Section):
+    """Ingestion settings: backfill window, seed path, raw cache, trust policy."""
+
+    backfill_start_date: str = "2021-01-01"
+    seed_csv: str = "seed/mainboard_ipos.csv"
+    raw_cache_dir: str = "data_store/raw_cache"
+    official_required_fields: list[str] = Field(default_factory=list)
+
+
 class AppConfig(BaseModel):
     """The fully-merged, validated configuration for one run."""
 
@@ -125,6 +134,7 @@ class AppConfig(BaseModel):
     sell_costs: SellCosts = Field(default_factory=SellCosts)
     feature_weights: dict[str, float] = Field(default_factory=dict)
     notify: NotifyConfig = Field(default_factory=NotifyConfig)
+    ingest: IngestConfig = Field(default_factory=IngestConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)
 
 

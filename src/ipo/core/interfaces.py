@@ -17,6 +17,7 @@ from typing import Protocol, runtime_checkable
 from ipo.core.types import (
     IPOFeatures,
     IPORecord,
+    ListingLabel,
     PartialRecord,
     RawResponse,
     Verdict,
@@ -56,12 +57,24 @@ class Repository(Protocol):
         """Insert or update one record, keyed on ``ipo_id`` (idempotent)."""
         ...
 
+    def upsert_many(self, records: list[IPORecord]) -> None:
+        """Insert or update many records with a single flush (idempotent)."""
+        ...
+
     def get(self, ipo_id: str) -> IPORecord | None:
         """Return the record for ``ipo_id``, or ``None`` if absent."""
         ...
 
     def list_all(self) -> list[IPORecord]:
         """Return every stored record."""
+        ...
+
+    def save_labels(self, labels: list[ListingLabel]) -> None:
+        """Persist the listing-label table (the supervised target)."""
+        ...
+
+    def load_labels(self) -> list[ListingLabel]:
+        """Load the listing-label table (empty if none persisted)."""
         ...
 
 

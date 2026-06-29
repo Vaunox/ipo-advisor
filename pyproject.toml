@@ -15,6 +15,9 @@ dependencies = [
     "pydantic-settings>=2.2",
     "pyyaml>=6.0",
     "tzdata>=2024.1",  # IANA tz database for zoneinfo (required on Windows)
+    "pyarrow>=15.0",  # Parquet store (Layer 1 output contract)
+    "requests>=2.31",  # polite HTTP client for live source adapters
+    "beautifulsoup4>=4.12",  # HTML parsing for the Chittorgarh microdata adapter
 ]
 
 [project.optional-dependencies]
@@ -24,6 +27,7 @@ dev = [
     "mypy>=1.9",
     "pytest>=8.0",
     "types-PyYAML",
+    "types-requests",
     "pre-commit>=3.6",
 ]
 
@@ -63,7 +67,7 @@ python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
-files = ["src", "tests"]
+files = ["src", "tests", "scripts"]
 warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = true
