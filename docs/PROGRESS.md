@@ -211,3 +211,24 @@ Investigated GMP feasibility and pricing:
 - **To run the real GMP gate later:** source historical GMP → `CsvGmpHistory` → build with-GMP items via `build_features(gmp_series=...)` → `gmp_recalibration_gate` vs the official-only items. If kept, re-add `gmp_level` to `critical_features` and re-persist the calibrator.
 - **Live GMP (Phase 6 service):** wire ipoalerts' `gmp` object through `from_aggregator_rows` → `reconcile` → `to_quotes` at the subscription close.
 - Phases 6 (service/API/notifier) and 7 (Windows `.exe` + Android APK) remain.
+
+---
+
+## Regime stress-test & cold-market flag (analysis, post-Phase-4)
+
+Stress-tested the calibrated model by market regime (Nifty 3-month trend/drawdown at listing). Honest findings (full detail in [REGIME_STRESS.md](REGIME_STRESS.md), [REGIME_FIX.md](REGIME_FIX.md), [REGIME_SKWORLD.md](REGIME_SKWORLD.md)):
+- **Ranking/selection edge survives ordinary cold** (cold APPLY ~83% vs cold base ~60%); on the larger independent 214-IPO cold sample, **cold ECE 0.083 (within tolerance)** — the earlier cold-ECE alarm was partly thin-sample.
+- **Wiring `market_regime` in did not improve cold calibration OOS** (single 0.139, per-regime 0.115, both > 0.10; cold folds too thin). Landed outcome: **flag, don't force** — verdict appends "cold market — ranking reliable, probability less certain" at `market_regime ≤ −0.3`.
+- **Deep-cold (2011–13 IPO winter, n=54, AUC ≈0.50)** logged as a known **unvalidated** limitation; system deliberately does **not** auto-abstain (would be a threshold fit to n≈1).
+- The cold flag is **pure annotation** (read-only w.r.t. the decision); the `−0.3` threshold is an **untuned prior**. Kaggle (skworld) used **only** as independent replication — never in the calibrator.
+
+---
+
+## Phase 6 — Advisory service (NOT STARTED) — carry-forward prerequisites
+
+Record so they don't get lost (logged, not implemented):
+
+1. **Activate the cold-market flag — it is currently DORMANT in production.** `build_features` does not populate `market_regime`, so `features.market_regime` is `None` and the flag fires on **zero live verdicts** today. Status: **coded and documented but INACTIVE.** Phase 6 must wire `market_regime` into the **live** feature build (the deterministic past-Nifty transform, `NiftyRegime.market_regime_feature(close_date)`, point-in-time as-of the close) for the flag to activate.
+2. **Re-examine the `−0.3` cold-flag prior when it goes live.** It governs nothing today, but once active it shapes **every** cold-market verdict. At that point, **sanity-check the threshold against the larger 214-IPO cold sample (read-only — do NOT tune it to outcomes)** and confirm "reasonable prior" still holds. Sensitivity measured: at −0.2/−0.3/−0.4 → 20%/17%/13% of IPOs flagged (~6% sit in the band where the cutoff flips them).
+
+Other Phase 6 work: REST API (`/ipos`, `/ipo/{id}`, `/verdict/{id}`), windowed scheduler, `Notifier` push/Telegram/email; reads the Parquet store + persisted calibrator; live GMP via ipoalerts (see Phase 5 follow-ups).
