@@ -31,8 +31,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _COLUMNS = [
     "ipo_id", "name", "segment", "price_band_low", "price_band_high",
     "lot_size", "issue_size_cr", "ofs_fraction", "open_date", "close_date",
-    "listing_date", "qib_sub", "nii_sub", "retail_sub", "issue_pe",
-    "peer_median_pe", "promoter_litigation", "listing_open", "listing_close",
+    "listing_date", "qib_sub", "nii_sub", "retail_sub", "total_sub",
+    "issue_pe", "peer_median_pe", "promoter_litigation", "listing_open", "listing_close",
 ]  # fmt: skip
 
 
@@ -108,6 +108,7 @@ def main() -> None:
                 "qib_sub": sub.qib if sub.qib is not None else "",
                 "nii_sub": sub.nii if sub.nii is not None else "",
                 "retail_sub": sub.retail if sub.retail is not None else "",
+                "total_sub": sub.total if sub.total is not None else "",
                 "issue_pe": "",
                 "peer_median_pe": "",
                 "promoter_litigation": "false",
