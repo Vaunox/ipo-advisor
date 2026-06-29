@@ -9,13 +9,13 @@ green (lint + types + tests) at every phase commit.
 | 2026-06-29 | P1 | ☑ done | `feat(p1): official ingestion + labels` / `gate-1-ingest` | 78 passing | Ingestion + labels; GATE 1 met. Sample feasibility confirmed; two DD#1 decisions made. |
 | 2026-06-29 | P2 | ☑ done | `feat(p2): feature layer + point-in-time correctness` / `gate-2-features` | 105 passing | Point-in-time features + leakage suite; GATE 2 met. |
 | 2026-06-29 | P3 | ☑ done | `feat(p3): scoring core` / `gate-3-scoring` | 132 passing | Scorer/killflags/verdict/reason; GATE 3 met. Calibrator = marked placeholder. |
-| | P4 | ☐ todo | | | **Calibration — load-bearing gate.** Needs ≥100 labeled IPOs. |
+| 2026-06-29 | P4 | ☑ done | `feat(p4): backtest + calibration` / `gate-4-calibration` | 154 passing | **Reliability gate PASSED** on 311 official NSE IPOs. AUC 0.81, ECE 0.073, look-ahead 0.47. |
 | | P5 | ☐ todo | | | GMP integration + re-calibration gate. |
 | | P6 | ☐ todo | | | Advisory service (API / scheduler / notifier). |
 | | P7 | ☐ todo | | | Windows `.exe` + Android APK. |
 | | P8 | — | | | Operate & maintain (ongoing). |
 
-**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☐ · 5 ☐ · 6 ☐ · 7 ☐
+**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ · 5 ☐ · 6 ☐ · 7 ☐
 
 ---
 
@@ -141,4 +141,44 @@ Mainboard IPO counts (NSE/BSE): 2021=63, 2022=40, 2023=57, 2024=93, 2025=104 →
 - `evaluate` takes the **record + features** (kill-flags need record-level context — segment, promoter litigation — that isn't in the feature vector).
 
 ### Follow-ups
-- Phase 4 (calibration, the load-bearing gate) needs the ≥100-IPO backfill first (deferred decision above). Then: walk-forward backtest using `build_features` as-of + the leakage firewall, Platt fit on held-out folds, reliability diagram + ECE/Brier + the 6-point reliability gate, threshold tuning, and `docs/CALIBRATION.md`. Switch the calibrator default to `platt` and replace `PlaceholderCalibrator` only after the gate + look-ahead test pass.
+- Phase 4 (calibration, the load-bearing gate) needs the ≥100-IPO backfill first. Then: walk-forward, Platt fit, reliability gate, look-ahead, report. (Done — see Phase 4 below.)
+
+---
+
+## Phase 4 — Backtest & Calibration, the load-bearing gate (done — GATE PASSED)
+
+**Goal:** a trustworthy probability and earned thresholds, validated out-of-sample.
+
+### Data backfill (the ≥100-IPO sample) — official, near-zero data caveat
+Built an **official NSE source** ([`data/sources/nse.py`](src/ipo/data/sources/nse.py)) via the browser cookie-handshake (the same technique behind bhavcopy). All exact/official:
+- master list + mainboard flag — `public-past-issues`; subscription **QIB/NII/retail** — `ipo-active-category` (works for past issues); listing **open/close** (label) — bhavcopy archive (old + UDiFF formats).
+- [`scripts/run_backfill.py`](scripts/run_backfill.py): polite (rate-limited, cached, resumable), deduped → **311 mainboard IPOs (2021+)** written to [data/backfill/mainboard_ipos.csv](data/backfill/mainboard_ipos.csv) (committed, reproducible). 293 OOS-eligible (mainboard + closed book + QIB + label).
+- **Kite not used** (no IPO-subscription endpoint; bhavcopy already free). **No paid subscription, no manual entry** — operator's questions answered.
+
+### Calibration package + the gate
+- [`calibration/label.py`](src/ipo/calibration/label.py) — net-of-cost label (exit at listing-day open; STT/DP/exchange/GST).
+- [`calibration/reliability.py`](src/ipo/calibration/reliability.py) — reliability bins + ECE + Brier + AUC (rank-based).
+- [`calibration/calibrate.py`](src/ipo/calibration/calibrate.py) — `PlattCalibrator` (Newton) + `IsotonicCalibrator` (PAV); versioned persist/load with feature-hash + label-def.
+- [`calibration/backtest.py`](src/ipo/calibration/backtest.py) — walk-forward (no random folds), the 6-point gate, and the look-ahead shuffle.
+- [`calibration/dataset.py`](src/ipo/calibration/dataset.py) + [`scripts/run_calibrate.py`](scripts/run_calibrate.py) → persisted [models/calibrator.json](models/calibrator.json) + [docs/CALIBRATION.md](docs/CALIBRATION.md).
+
+### GATE 4 — PASSED (official-only model, GMP still Phase 5)
+| Check | Result |
+|---|---|
+| discrimination | AUC **0.812** (floor 0.55) |
+| calibration | ECE **0.073** (bound 0.10) |
+| beats base rate | APPLY precision **83.7%** vs base **69.1%** |
+| time-stable | early ECE 0.110 / late 0.087 |
+| **look-ahead collapses** | shuffled AUC **0.472** (~0.5 → no leakage) |
+| abstention excluded | yes |
+
+Both gates CI-enforced: `test_calibration_gate.py` (reproduces the pass on committed data) and `test_layer3_calibrated.py` (Layer 3 loads the persisted calibrator → shows a probability, no banner). ruff + black + mypy + **154 tests** green.
+
+### Decisions / notes
+- Calibrator default switched to **Platt** (Deep Dive #4 for ~100 IPOs).
+- **`critical_features` now `[qib_sub]`** for the official-only model (was `[gmp_level, qib_sub]`); Phase 5 re-adds `gmp_level` when GMP is integrated + recalibrated. The calibrator is valid for the subscription-driven feature configuration it was fit on.
+- `IPORecord.lot_size`/`issue_size_cr` made optional (NSE doesn't provide them; not features).
+- The strong official result (AUC 0.81) reflects 2021–2025 being a hot IPO market (base rate 69%); the look-ahead shuffle (0.47) confirms it's real signal, not leakage. Small-sample caveat stated in the report.
+
+### Follow-ups
+- Phase 5 (GMP): reconstruct historical GMP (level + slope) from trackers, wire into features, re-add `gmp_level` to critical, **re-run this exact calibration**, and keep GMP only if it improves ECE/Brier (the GMP re-calibration gate).

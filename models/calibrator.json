@@ -1,0 +1,15 @@
+{
+  "method": "platt",
+  "version": "platt-1",
+  "params": {
+    "a": 9.777776562909118,
+    "b": -0.9010728195610269
+  },
+  "passes_reliability_gate": true,
+  "meta": {
+    "feature_code_hash": "d01815d61aec4d33",
+    "label_definition": "net_of_cost(listing_open) > 0",
+    "sample_size": 293,
+    "base_rate": 0.6909871244635193
+  }
+}

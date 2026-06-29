@@ -28,11 +28,17 @@ verdict_thresholds:
 
 calibration:
   # Calibration is SACRED. These govern the Phase-4 reliability gate.
-  method: isotonic                # isotonic | platt
-  reliability_tolerance: 0.10     # max |predicted - observed| per bucket
+  method: platt                   # platt | isotonic (Platt default for ~100 IPOs, DD#4)
+  reliability_tolerance: 0.10     # max |predicted - observed| per bucket (ECE bound)
   n_buckets: 10
   min_training_samples: 100       # >=100 labeled mainboard IPOs required
   random_seed: 17                 # determinism (Ground Rule 7)
+  exit_price: open                # listing-day flip exits at the open (DD#4 Module A)
+  nominal_application_value: 15000  # to amortize the flat DP charge into the net label
+  walk_forward_initial: 60        # initial training window before first OOS block
+  walk_forward_step: 20           # roll size
+  min_auc: 0.55                   # discrimination floor (gate check 1)
+  base_rate_margin: 0.05          # APPLY precision must beat base rate by this (check 3)
 
 # NSE delivery (CNC) listing-day SELL costs, verified June 2026.
 # Constants are structural (core/constants.py); the RATES are tunable and live here.
@@ -82,9 +88,10 @@ features:
   regime:
     trend_weight: 0.6
     vol_weight: 0.4
-  # Missing either critical feature (or an unclosed book) -> INSUFFICIENT_SIGNAL (Layer 3).
+  # Missing a critical feature (or an unclosed book) -> INSUFFICIENT_SIGNAL (Layer 3).
+  # Phase 4 is the official-only model (no GMP yet), so QIB is the critical signal.
+  # Phase 5 re-adds `gmp_level` here once the GMP scraper is integrated and recalibrated.
   critical_features:
-    - gmp_level
     - qib_sub
 
 feature_weights:

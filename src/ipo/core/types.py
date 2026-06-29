@@ -85,8 +85,9 @@ class IPORecord(_Frozen):
 
     price_band_low: float = Field(gt=0)
     price_band_high: float = Field(gt=0)
-    lot_size: int = Field(gt=0)
-    issue_size_cr: float = Field(gt=0)
+    # Metadata, not features; not every source provides them (e.g. NSE past-issues).
+    lot_size: int | None = Field(default=None, gt=0)
+    issue_size_cr: float | None = Field(default=None, gt=0)
     ofs_fraction: float | None = Field(default=None, ge=0, le=1)
 
     open_date: date

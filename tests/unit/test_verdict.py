@@ -86,7 +86,13 @@ def test_unclosed_book_abstains(config: AppConfig) -> None:
     assert v.probability is None
 
 
-def test_missing_gmp_abstains(config: AppConfig) -> None:
+def test_missing_gmp_abstains_when_gmp_is_critical() -> None:
+    # GMP is critical only once integrated (Phase 5). With that config, missing GMP abstains.
+    config = load_config(
+        env="dev",
+        environ={},
+        overrides={"features": {"critical_features": ["gmp_level", "qib_sub"]}},
+    )
     v = evaluate(
         _record(),
         _feats(gmp_level=None),
@@ -95,6 +101,18 @@ def test_missing_gmp_abstains(config: AppConfig) -> None:
         config=config,
     )
     assert v.verdict is VerdictType.INSUFFICIENT_SIGNAL
+
+
+def test_official_model_does_not_abstain_on_missing_gmp(config: AppConfig) -> None:
+    # Phase-4 default: GMP is NOT critical, so a closed book with QIB still scores.
+    v = evaluate(
+        _record(),
+        _feats(gmp_level=None),
+        scorer=_scorer(config),
+        calibrator=PlaceholderCalibrator(),
+        config=config,
+    )
+    assert v.verdict is not VerdictType.INSUFFICIENT_SIGNAL
 
 
 # --- evaluate: kill-flag override ------------------------------------------

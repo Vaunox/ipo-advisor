@@ -1,0 +1,120 @@
+[
+ {
+  "company": "Advit Jewels Limited",
+  "htmSym": "rambhajo",
+  "ipoEndDate": "25-JUN-2026",
+  "ipoStartDate": "23-JUN-2026",
+  "issuePrice": "-",
+  "linkRemovalDate": "26-JUN-2026",
+  "listingDate": "-",
+  "priceRange": "Rs.130 to Rs.138",
+  "securityType": "EQ",
+  "symbol": "RAMBHAJO"
+ },
+ {
+  "company": "Waterways Leisure Tourism Limited",
+  "htmSym": "cordelia",
+  "ipoEndDate": "25-JUN-2026",
+  "ipoStartDate": "23-JUN-2026",
+  "issuePrice": "-",
+  "linkRemovalDate": "26-JUN-2026",
+  "listingDate": "-",
+  "priceRange": "Rs.769 to Rs.808 ",
+  "securityType": "EQ",
+  "symbol": "CORDELIA"
+ },
+ {
+  "company": "Turtlemint Fintech Solutions Limited",
+  "htmSym": "turtlemint",
+  "ipoEndDate": "23-JUN-2026",
+  "ipoStartDate": "19-JUN-2026",
+  "issuePrice": "   152",
+  "linkRemovalDate": "24-JUN-2026",
+  "listingDate": "29-JUN-2026",
+  "priceRange": "Rs.144 to Rs.152",
+  "securityType": "EQ",
+  "symbol": "TURTLEMINT"
+ },
+ {
+  "company": "CMR Green Technologies Limited",
+  "htmSym": "cmrgreen",
+  "ipoEndDate": "05-JUN-2026",
+  "ipoStartDate": "03-JUN-2026",
+  "issuePrice": "   192",
+  "linkRemovalDate": "06-JUN-2026",
+  "listingDate": "10-JUN-2026",
+  "priceRange": "Rs.182 to Rs.192",
+  "securityType": "EQ",
+  "symbol": "CMRGREEN"
+ },
+ {
+  "company": "Onemi Technology Solutions Limited",
+  "htmSym": "kissht",
+  "ipoEndDate": "05-MAY-2026",
+  "ipoStartDate": "30-APR-2026",
+  "issuePrice": "   171",
+  "linkRemovalDate": "06-MAY-2026",
+  "listingDate": "08-MAY-2026",
+  "priceRange": "Rs.162 to Rs.171",
+  "securityType": "EQ",
+  "symbol": "KISSHT"
+ },
+ {
+  "company": "Amir Chand Jagdish Kumar (Exports) Limited",
+  "htmSym": "amirchand",
+  "ipoEndDate": "27-MAR-2026",
+  "ipoStartDate": "24-MAR-2026",
+  "issuePrice": "   212",
+  "linkRemovalDate": "28-MAR-2026",
+  "listingDate": "02-APR-2026",
+  "priceRange": "Rs.201 to Rs.212",
+  "securityType": "EQ",
+  "symbol": "AMIRCHAND"
+ },
+ {
+  "company": "Sai Parenteral's Limited",
+  "htmSym": "saiparent",
+  "ipoEndDate": "27-MAR-2026",
+  "ipoStartDate": "24-MAR-2026",
+  "issuePrice": "   392",
+  "linkRemovalDate": "28-MAR-2026",
+  "listingDate": "02-APR-2026",
+  "priceRange": "Rs.372 to Rs.392",
+  "securityType": "EQ",
+  "symbol": "SAIPARENT"
+ },
+ {
+  "company": "Powerica Limited",
+  "htmSym": "powerica",
+  "ipoEndDate": "27-MAR-2026",
+  "ipoStartDate": "24-MAR-2026",
+  "issuePrice": "   395",
+  "linkRemovalDate": "28-MAR-2026",
+  "listingDate": "02-APR-2026",
+  "priceRange": "Rs.375 to Rs.395",
+  "securityType": "EQ",
+  "symbol": "POWERICA"
+ },
+ {
+  "companyName": "Shreedhar Spinners Limited",
+  "ipoEndDate": "25-JUN-2026",
+  "ipoStartDate": "23-JUN-2026",
+  "issuePrice": "-",
+  "listingDate": "-",
+  "priceRange": "Rs.51 to Rs.53",
+  "securityType": "SME",
+  "symbol": "SHREEDHAR",
+  "company": "Shreedhar Spinners Limited"
+ },
+ {
+  "companyName": "Avience Biomedicals Limited",
+  "ipoEndDate": "22-JUN-2026",
+  "ipoStartDate": "18-JUN-2026",
+  "issuePrice": "208",
+  "listingDate": "25-JUN-2026",
+  "priceRange": "Rs.196 to Rs.208",
+  "securityType": "SME",
+  "symbol": "AVIENCE",
+  "company": "Avience Biomedicals Limited"
+ }
+]

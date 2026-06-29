@@ -30,8 +30,6 @@ _REQUIRED_COLUMNS = (
     "segment",
     "price_band_low",
     "price_band_high",
-    "lot_size",
-    "issue_size_cr",
     "open_date",
     "close_date",
 )

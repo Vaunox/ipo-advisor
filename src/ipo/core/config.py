@@ -76,11 +76,17 @@ class VerdictThresholds(_Section):
 class CalibrationConfig(_Section):
     """Settings governing the SACRED Phase-4 reliability gate."""
 
-    method: str = "isotonic"
+    method: str = "platt"
     reliability_tolerance: float = Field(default=0.10, gt=0, le=1)
     n_buckets: int = Field(default=10, gt=1)
     min_training_samples: int = Field(default=100, ge=1)
     random_seed: int = 17
+    exit_price: str = "open"
+    nominal_application_value: float = Field(default=15000.0, gt=0)
+    walk_forward_initial: int = Field(default=60, ge=10)
+    walk_forward_step: int = Field(default=20, ge=1)
+    min_auc: float = Field(default=0.55, ge=0.5, le=1)
+    base_rate_margin: float = Field(default=0.05, ge=0, le=1)
 
 
 class SellCosts(_Section):
@@ -174,7 +180,8 @@ class FeaturesConfig(_Section):
     anchor: AnchorFeatureConfig = Field(default_factory=AnchorFeatureConfig)
     valuation: ValuationFeatureConfig = Field(default_factory=ValuationFeatureConfig)
     regime: RegimeFeatureConfig = Field(default_factory=RegimeFeatureConfig)
-    critical_features: list[str] = Field(default_factory=lambda: ["gmp_level", "qib_sub"])
+    # Phase 4 official-only model: QIB is critical; Phase 5 re-adds "gmp_level".
+    critical_features: list[str] = Field(default_factory=lambda: ["qib_sub"])
 
 
 class AppConfig(BaseModel):

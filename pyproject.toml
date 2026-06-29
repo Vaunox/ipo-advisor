@@ -18,6 +18,7 @@ dependencies = [
     "pyarrow>=15.0",  # Parquet store (Layer 1 output contract)
     "requests>=2.31",  # polite HTTP client for live source adapters
     "beautifulsoup4>=4.12",  # HTML parsing for the Chittorgarh microdata adapter
+    "numpy>=1.26",  # calibration math (reliability, Platt/isotonic, walk-forward)
 ]
 
 [project.optional-dependencies]

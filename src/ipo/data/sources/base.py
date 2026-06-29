@@ -189,6 +189,38 @@ class PoliteClient:
                 self._sleep(delay)
         raise SourceError(f"failed to fetch {url} after {self._max_retries} attempts") from last_exc
 
+    def fetch_bytes(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> bytes:
+        """Fetch a binary resource (e.g. a bhavcopy zip) politely; returns raw bytes.
+
+        Same rate-limit/backoff as ``fetch`` but returns ``resp.content`` (no caching;
+        the caller decides how to cache the decoded payload).
+
+        Raises:
+            SourceError: if all retries fail.
+        """
+        request_headers = {"User-Agent": self._ua}
+        if headers:
+            request_headers.update(headers)
+
+        last_exc: Exception | None = None
+        for attempt in range(self._max_retries):
+            self._throttle()
+            try:
+                resp = self._session.get(url, headers=request_headers, timeout=self._timeout)
+                resp.raise_for_status()
+                return resp.content
+            except requests.RequestException as exc:
+                last_exc = exc
+                self._sleep(self._backoff * (2**attempt))
+        raise SourceError(
+            f"failed to fetch bytes {url} after {self._max_retries} attempts"
+        ) from last_exc
+
     def get_or_fetch(
         self,
         cache: RawCache,
