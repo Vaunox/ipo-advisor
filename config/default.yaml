@@ -25,6 +25,10 @@ verdict_thresholds:
   # Placeholder cutoffs — EARNED and re-tuned against backtested outcomes in Phase 4.
   apply: 0.65
   marginal: 0.50
+  # Regime stress-test outcome: the probability does not calibrate in cold markets, so
+  # below this market_regime the verdict is FLAGGED (ranking reliable, probability less
+  # certain) rather than the number being forced. See docs/REGIME_FIX.md.
+  cold_regime_flag: -0.3
 
 calibration:
   # Calibration is SACRED. These govern the Phase-4 reliability gate.

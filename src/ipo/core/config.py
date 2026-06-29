@@ -71,6 +71,9 @@ class VerdictThresholds(_Section):
 
     apply: float = Field(default=0.65, ge=0, le=1)
     marginal: float = Field(default=0.50, ge=0, le=1)
+    # Below this market_regime, flag the verdict "cold market — probability less certain"
+    # (the regime stress-test landed on gate/flag, not forcing the cold probability).
+    cold_regime_flag: float = Field(default=-0.3, ge=-1, le=1)
 
 
 class CalibrationConfig(_Section):

@@ -46,3 +46,19 @@ def test_insufficient_history_is_not_cold(tmp_path: Path) -> None:
     info = regime.regime_at(date(2020, 1, 1) + timedelta(days=20))
     assert info.trend_3m is None
     assert info.is_cold is False
+
+
+def test_market_regime_feature_sign_and_bounds(tmp_path: Path) -> None:
+    rising = tmp_path / "up.csv"
+    _write_nifty(rising, [100.0 + i for i in range(130)])
+    up = NiftyRegime(rising).market_regime_feature(date(2020, 1, 1) + timedelta(days=120))
+    assert up is not None and 0.0 < up <= 1.0  # positive trend -> positive regime
+
+    falling = tmp_path / "down.csv"
+    _write_nifty(falling, [100.0 + i for i in range(65)] + [165.0 - 1.5 * i for i in range(65)])
+    down = NiftyRegime(falling).market_regime_feature(date(2020, 1, 1) + timedelta(days=128))
+    assert down is not None and -1.0 <= down < 0.0  # negative trend -> negative regime
+
+    short = tmp_path / "short.csv"
+    _write_nifty(short, [100.0 + i for i in range(30)])
+    assert NiftyRegime(short).market_regime_feature(date(2020, 1, 1) + timedelta(days=20)) is None

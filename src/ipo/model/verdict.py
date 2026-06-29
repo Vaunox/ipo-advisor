@@ -87,6 +87,14 @@ def evaluate(
         probability=probability,
     )
 
+    # Regime stress-test outcome: in a cold market the *ranking* is reliable but the
+    # *probability* does not calibrate out-of-sample, so flag rather than force it.
+    if (
+        features.market_regime is not None
+        and features.market_regime <= config.verdict_thresholds.cold_regime_flag
+    ):
+        watch.append("cold market — ranking reliable, probability less certain")
+
     return Verdict(
         ipo_id=features.ipo_id,
         verdict=verdict,

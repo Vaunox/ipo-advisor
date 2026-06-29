@@ -15,7 +15,12 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from ipo.features.normalize import clamp
+
 _TRADING_DAYS_3M = 63  # ~3 months of trading days
+# A ±8% 3-month Nifty move maps to the ±1 regime extreme. Chosen a priori as a
+# typical quarterly index swing — NOT fit to listing outcomes (no tuning to the slice).
+_REGIME_FEATURE_SCALE = 0.08
 
 
 @dataclass(frozen=True)
@@ -60,3 +65,15 @@ class NiftyRegime:
     def is_cold(self, day: date) -> bool:
         """Convenience: True if ``day`` falls in a cold regime."""
         return self.regime_at(day).is_cold
+
+    def market_regime_feature(self, asof: date) -> float | None:
+        """Return the point-in-time ``market_regime`` feature in [-1, 1] as of ``asof``.
+
+        A deterministic transform of the trailing 3-month Nifty trend (no fitting), so
+        it is leakage-free by construction: it uses only index data up to ``asof`` (the
+        decision-time clock). ``None`` if there is insufficient history.
+        """
+        trend = self.regime_at(asof).trend_3m
+        if trend is None:
+            return None
+        return clamp(trend / _REGIME_FEATURE_SCALE, -1.0, 1.0)

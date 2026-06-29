@@ -143,6 +143,29 @@ def test_probability_hidden_while_uncalibrated(config: AppConfig) -> None:
     assert "UNCALIBRATED" in v.reason
 
 
+def test_cold_market_is_flagged(config: AppConfig) -> None:
+    # Regime stress-test outcome: cold market -> flag, not a forced probability.
+    v = evaluate(
+        _record(),
+        _feats(market_regime=-0.6),
+        scorer=_scorer(config),
+        calibrator=PlaceholderCalibrator(),
+        config=config,
+    )
+    assert any("cold market" in w for w in v.watch)
+
+
+def test_hot_market_not_flagged(config: AppConfig) -> None:
+    v = evaluate(
+        _record(),
+        _feats(market_regime=0.5),
+        scorer=_scorer(config),
+        calibrator=PlaceholderCalibrator(),
+        config=config,
+    )
+    assert not any("cold market" in w for w in v.watch)
+
+
 def test_weak_issue_skips(config: AppConfig) -> None:
     weak = _feats(
         gmp_level=2.0,
