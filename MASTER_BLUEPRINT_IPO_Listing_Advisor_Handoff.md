@@ -203,6 +203,8 @@ A single **PWA** dashboard (IPO list with verdict badge, probability, reason, wa
 
 # PART IV — THE BUILD PROGRAM (phases; one commit each)
 
+> **Note:** the GMP recorder is a separate, always-on data-collection project (its own repo), not a phase here. It must be deployed early and run in parallel, because GMP can only be collected forward in time. Phase 5 depends on its output.
+
 ## PHASE 0 — Foundation & scaffolding
 **Goal:** skeleton, config/secrets, logging, NSE calendar, core contracts.
 **Deliverables:** repo with the Part-I structure; `pyproject.toml`, pre-commit, CI; `core/config.py` (layered loader) + `core/secrets.py`; `core/logging.py`; `core/calendar.py` (NSE trading-day/IST); `core/types.py` + `core/interfaces.py` (`DataSource`, `Repository`, `ScoringModel`, `Calibrator`, `Notifier` Protocols); the `IPORecord` + `IPOFeatures` data models.
@@ -229,6 +231,13 @@ A single **PWA** dashboard (IPO list with verdict badge, probability, reason, wa
 **GATE 4:** the reliability diagram shows the predicted-vs-actual buckets tracking the diagonal within tolerance (e.g. the 0.6–0.8 bucket lists positive within a stated band); the overfit-dummy and look-ahead checks behave; the calibrator is persisted and loaded by Layer 3. **No user-facing release before this passes.** Tag `gate-4-calibration`.
 
 ## PHASE 5 — GMP integration
+
+> **⚠️ Phase 5 prerequisite — the GMP recorder (separate, parallel project).**
+>
+> This phase cannot execute until real, point-in-time, day-by-day GMP data exists, and that data can only be collected going forward — no usable historical archive exists (a level-only screen on a leaky public set gave an inflated +0.133 AUC upper bound over total subscription; inconclusive, see Phase 5 notes). GMP is gathered by a standalone always-on recorder deployed on AWS, maintained as its own repository outside this build program (it records only — never scores or ranks; append-only, timestamped, multi-source; see its own README).
+>
+> **Sequencing:** deploy the recorder early and run it in parallel with the rest of the build — every delayed month is un-rederivable GMP history. Phase 5 proper runs only once the recorder has banked ~75+ mainboard IPOs of point-in-time GMP, at which point GMP (level and slope) is tested against the re-calibration gate and must beat the official-only baseline (~84% APPLY precision / current calibration) to stay in. Until then the shipping model is official-only, which already passes its gates.
+
 **Goal:** add the messiest, most-weighted feature — after the official-data model already works.
 **Deliverables:** `data/sources/gmp_*` scraper(s) reconstructing historical GMP series (level + final-days slope) from trackers; wire GMP into `features/`; **re-run Phase 4 calibration** with GMP included and compare reliability/Brier with and without it; document GMP source disagreement and noise.
 **GATE 5:** GMP series reconstruct for past IPOs; the recalibrated model is **at least as well-calibrated** as the official-only model; GMP enters as a sentiment/direction feature, not a magnitude oracle. Tag `gate-5-gmp`.
