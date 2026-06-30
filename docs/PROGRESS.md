@@ -13,11 +13,11 @@ green (lint + types + tests) at every phase commit.
 | 2026-06-29 | P4+ | ☑ done | `test(p4): benchmark...` | 158 passing | Model **ties** equal-selectivity QIB rule (83.7% vs 84.3%); value = calibration, not precision. |
 | 2026-06-29 | P5 | ◐ framework | `feat(p5): GMP framework + re-calibration gate` | 168 passing | GMP machinery + gate built & validated (keeps informative, rejects noise). **Historical GMP data deferred** (operator decision); `gate-5` runs when sourced. |
 | 2026-06-30 | P5+ | ◐ gate run | `test(p5): GMP gate on real IPOMatrix GMP` | 174 passing | **Real gate RAN** on 99 point-in-time 2025-26 IPOs (IPOMatrix trial). **GMP NOT earned** — clean as-of-close AUC lift ~0 (leaky +0.133 collapsed); keep/cut flips with split. Official-only ships; recorder keeps banking (esp. cold). See [GMP_GATE.md](GMP_GATE.md). |
-| | P6 | ☐ todo | | | Advisory service (API / scheduler / notifier). |
-| | P7 | ☐ todo | | | Windows `.exe` + Android APK. |
+| 2026-06-30 | P6 | ☑ done | `feat(p6-s6): service composition root + GATE 6` / `gate-6-service` | 197 passing | **GATE 6 PASSED** — advisory service (engine/API/scheduler/notify) composed; all five invariants survive end-to-end. Cold flag now LIVE (prereqs #1/#2 resolved); live GMP stays None. |
+| | P7 | ☐ todo | | | Windows `.exe` native shell (APK deferred). |
 | | P8 | — | | | Operate & maintain (ongoing). |
 
-**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ · 5 ☐ · 6 ☐ · 7 ☐
+**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ · 5 ☐ · 6 ☑ · 7 ☐
 
 ---
 
@@ -251,14 +251,39 @@ Stress-tested the calibrated model by market regime (Nifty 3-month trend/drawdow
 
 ---
 
-## Phase 6 — Advisory service (NOT STARTED) — carry-forward prerequisites
+## Phase 6 — Advisory service (done — GATE 6 PASSED)
 
-Record so they don't get lost (logged, not implemented):
+**Goal:** fresh verdicts + windowed scoring + advisory push alerts, composed from the proven
+layers. Built in six reviewed steps (each landed green on its own branch, merged on approval):
 
-1. **Activate the cold-market flag — it is currently DORMANT in production.** `build_features` does not populate `market_regime`, so `features.market_regime` is `None` and the flag fires on **zero live verdicts** today. Status: **coded and documented but INACTIVE.** Phase 6 must wire `market_regime` into the **live** feature build (the deterministic past-Nifty transform, `NiftyRegime.market_regime_feature(close_date)`, point-in-time as-of the close) for the flag to activate.
-2. **Re-examine the `−0.3` cold-flag prior when it goes live.** It governs nothing today, but once active it shapes **every** cold-market verdict. At that point, **sanity-check the threshold against the larger 214-IPO cold sample (read-only — do NOT tune it to outcomes)** and confirm "reasonable prior" still holds. Sensitivity measured: at −0.2/−0.3/−0.4 → 20%/17%/13% of IPOs flagged (~6% sit in the band where the cutoff flips them).
+1. **`market_regime` wired FLAG-ONLY** ([`regime.py`](../src/ipo/calibration/regime.py), [`dataset.py`](../src/ipo/calibration/dataset.py), config `market_regime: 0.0`) — the cold flag activates in the live build, but its scorer weight is **0**, so the probability never moves (byte-equality proven). Append-only `update_nifty_csv` preserves the as-of clock. **Prereq #1 RESOLVED** (flag is LIVE), **prereq #2 RESOLVED** (`−0.3` re-checked read-only → flags 20% of all / 58% of known-cold; **unchanged**, [REGIME_RECHECK.md](REGIME_RECHECK.md)).
+2. **`VerdictEngine`** ([`engine.py`](../src/ipo/service/engine.py)) — repo + calibrator + scorer + regime → verdicts, scored as-of the close (decision clock).
+3. **Read-only REST API** ([`api.py`](../src/ipo/service/api.py)) — `GET /health|/ipos|/ipo/{id}|/verdict/{id}`; a thin reader, never re-derives the probability.
+4. **`ScoringScheduler`** ([`scheduler.py`](../src/ipo/service/scheduler.py)) — windowed cadence (30 min in the subscription window, else 360), idempotent cycles, transition-tracked `became_apply`.
+5. **`service/notify/`** — `Notifier` impls (Null/Log/Push; Telegram/email deferred behind config, **fail loud**) + `notify_crossings` firing once per APPLY crossing.
+6. **`service/runner.py`** — `build_service` composition root + `main()` (scheduler loop + uvicorn).
 
-Other Phase 6 work: REST API (`/ipos`, `/ipo/{id}`, `/verdict/{id}`), windowed scheduler, `Notifier` push/Telegram/email; reads the Parquet store + persisted calibrator; live GMP via ipoalerts (see Phase 5 follow-ups).
+### GATE 6 — PASSED (all five invariants survive composition)
+End-to-end on the composed service ([`test_service_gate6.py`](../tests/integration/test_service_gate6.py)):
+
+| # | Invariant | Evidence |
+|---|---|---|
+| 1 | Happy path | ingest(refresh)→score **311**→serve API→fire **185** APPLY crossings (185 pushed), windowed cadence |
+| 2 | Calibration-sacred | cold flag fires on **58** IPOs, yet **MAX \|prob_service − prob_official\| = 0.0** |
+| 3 | Reliability gate | gated → blessed number over API (0.3113); un-gated → `None` over API **and** number-free in all 293 notifications |
+| 4 | Idempotent | 2nd cycle → identical verdicts, **0** dup alerts, **0** dup pushes |
+| 5 | Advisory-only | API methods `GET` only; no mutating verbs / action paths |
+
+Tag `gate-6-service`. **197 tests green; ruff/black/mypy (full tree) clean.** Scope held: **live GMP `None`** (out of the score until it earns its place, [GMP_GATE.md](GMP_GATE.md)); apps deferred to Phase 7.
+
+### Decisions / notes
+- **A feature stays out of the number until calibration earns it** — `market_regime` weight 0 (flag-only), `gmp_level` `None` live; symmetric, principled. The Phase-4 calibrator is byte-for-byte unchanged.
+- Engine gained additive read-only `get_record` / `records` accessors (for the API / scheduler); existing behavior unchanged.
+- Process: full `mypy` (incl. `tests/`) is the gate — an earlier `mypy src scripts` habit missed a test-only typing error (fixed, `f792236`); now always run the full tree.
+
+### Follow-ups
+- **Live GMP** (ipoalerts) stays out of the score until a **cold-market re-run of the Phase-5 gate** earns it; the recorder keeps banking.
+- **Phase 7:** Windows `.exe` native shell (APK deferred).
 
 ---
 
