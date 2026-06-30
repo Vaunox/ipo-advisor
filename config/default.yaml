@@ -111,7 +111,11 @@ feature_weights:
   anchor_quality: 0.10
   relative_valuation: 0.10   # brake: subtracted when issue P/E > peer median
   ofs_fraction: 0.05         # brake: subtracted as OFS fraction rises
-  market_regime: 0.10
+  # FLAG-ONLY: market_regime is kept OUT of the calibrated number (weight 0). The cold-market
+  # flag reads the feature, but it must not move the probability the Phase-4 calibrator was fit
+  # on — REGIME_FIX landed on "flag, don't force". A feature stays out of the number until
+  # calibration earns it (same principle as GMP; see docs/GMP_GATE.md, docs/REGIME_FIX.md).
+  market_regime: 0.0
 
 killflags:
   # Hard overrides -> forced SKIP (Deep Dive #3). Sanity bounds, NOT return-tuned.

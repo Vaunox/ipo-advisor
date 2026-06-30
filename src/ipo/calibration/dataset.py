@@ -8,7 +8,8 @@ a closed book, or a listing label are excluded (honest abstention, Deep Dive #4)
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import date, datetime
 from pathlib import Path
 
 from ipo.calibration.backtest import ScoredItem
@@ -42,8 +43,15 @@ def scored_items_from_records(
     features_config: FeaturesConfig,
     sell_costs: SellCosts,
     nominal_application_value: float,
+    market_regime_of: Callable[[date], float | None] | None = None,
 ) -> list[ScoredItem]:
-    """Build dated (score, net-positive-label) items for the eligible mainboard IPOs."""
+    """Build dated (score, net-positive-label) items for the eligible mainboard IPOs.
+
+    ``market_regime_of`` is **off by default**: the Phase-4 calibrator is fit on
+    regime-free scores and must stay that way. It exists only so live-parity / the
+    weight-0 equality guard can populate ``market_regime`` (as-of the close) without
+    changing the trained calibrator — proving the regime feature is flag-only.
+    """
     items: list[ScoredItem] = []
     for rec in records:
         if rec.segment is not Segment.MAINBOARD or rec.listing_open is None or rec.qib_sub is None:
@@ -53,7 +61,8 @@ def scored_items_from_records(
         asof = datetime(
             rec.close_date.year, rec.close_date.month, rec.close_date.day, 18, tzinfo=IST
         )
-        feats = build_features(rec, asof, config=features_config)
+        regime = market_regime_of(rec.close_date) if market_regime_of is not None else None
+        feats = build_features(rec, asof, market_regime=regime, config=features_config)
         score = scorer.score(feats)
         net = net_listing_return(
             rec.issue_price,

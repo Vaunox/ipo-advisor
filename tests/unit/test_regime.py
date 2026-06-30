@@ -6,7 +6,7 @@ import csv
 from datetime import date, timedelta
 from pathlib import Path
 
-from ipo.calibration.regime import NiftyRegime
+from ipo.calibration.regime import NiftyRegime, merge_nifty_closes, update_nifty_csv
 
 
 def _write_nifty(path: Path, closes: list[float]) -> None:
@@ -62,3 +62,32 @@ def test_market_regime_feature_sign_and_bounds(tmp_path: Path) -> None:
     short = tmp_path / "short.csv"
     _write_nifty(short, [100.0 + i for i in range(30)])
     assert NiftyRegime(short).market_regime_feature(date(2020, 1, 1) + timedelta(days=20)) is None
+
+
+def test_merge_nifty_closes_is_append_only() -> None:
+    existing = [(date(2020, 1, 1), 100.0), (date(2020, 1, 2), 101.0)]
+    new = [
+        (date(2020, 1, 2), 999.0),  # conflicts with an existing date -> MUST be ignored
+        (date(2020, 1, 3), 102.0),  # genuinely new -> added
+    ]
+    assert merge_nifty_closes(existing, new) == [
+        (date(2020, 1, 1), 100.0),
+        (date(2020, 1, 2), 101.0),  # preserved, NOT overwritten by 999.0
+        (date(2020, 1, 3), 102.0),
+    ]
+
+
+def test_refresh_preserves_past_regime(tmp_path: Path) -> None:
+    # The as-of clock: appending FUTURE closes must never change a PAST IPO's regime.
+    path = tmp_path / "nifty.csv"
+    _write_nifty(path, [100.0 + i for i in range(130)])
+    past_day = date(2020, 1, 1) + timedelta(days=120)
+    before = NiftyRegime(path).market_regime_feature(past_day)
+    assert before is not None
+
+    # Refresh with 30 future closes of an arbitrary (here: crashing) shape.
+    future = [(date(2020, 1, 1) + timedelta(days=130 + i), 230.0 - 5.0 * i) for i in range(30)]
+    assert update_nifty_csv(path, future) == 30  # all new dates added
+
+    after = NiftyRegime(path).market_regime_feature(past_day)
+    assert after == before  # byte-for-byte: a future close cannot bleed into a past regime

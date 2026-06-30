@@ -1,10 +1,17 @@
-"""Market-regime classification for the regime stress-test (Nifty trend / drawdown).
+"""Market-regime classification (Nifty trend / drawdown).
 
-Defines 'cold' objectively from the Nifty index at the listing date: a negative
-3-month trend or a drawdown off the 3-month high. This is an *analysis* axis for
-slicing backtest results by market condition — it is not fed to the model (the
-backfill's ``market_regime`` feature was absent), so segmenting by it introduces no
-look-ahead into the model's out-of-sample probabilities.
+Defines 'cold' objectively from the Nifty index: a negative 3-month trend or a
+drawdown off the 3-month high. Two consumers, kept strictly separate:
+
+* **Analysis** (regime stress-test): slices backtest results by market condition.
+* **Live cold-market FLAG** (Phase 6): ``market_regime_feature`` is fed into the live
+  feature build, but its scorer weight is **0** — it drives the annotation only and
+  must NOT move the calibrated probability (REGIME_FIX: "flag, don't force"). The
+  calibrator's training set stays regime-free.
+
+Point-in-time by construction: ``regime_at(day)`` reads only closes at/before ``day``
+(``bisect`` ≤ day), so refreshing the series with future closes can never change a
+past IPO's regime — ``merge_nifty_closes`` enforces this by being append-only.
 """
 
 from __future__ import annotations
@@ -77,3 +84,45 @@ class NiftyRegime:
         if trend is None:
             return None
         return clamp(trend / _REGIME_FEATURE_SCALE, -1.0, 1.0)
+
+
+def merge_nifty_closes(
+    existing: list[tuple[date, float]], new: list[tuple[date, float]]
+) -> list[tuple[date, float]]:
+    """Append-only union of Nifty ``(date, close)`` rows, sorted ascending.
+
+    Existing closes are **never** overwritten — only genuinely new dates are added.
+    Combined with ``regime_at`` reading only closes at/before the decision day, this
+    guarantees a later refresh cannot retroactively alter a past IPO's ``market_regime``:
+    the as-of clock is preserved. This function is the safety gate; the caller fetches.
+    """
+    by_date: dict[date, float] = dict(existing)
+    for day, close in new:
+        by_date.setdefault(day, close)  # keep existing; add only new dates
+    return sorted(by_date.items())
+
+
+def update_nifty_csv(csv_path: Path, new_closes: list[tuple[date, float]]) -> int:
+    """Append-only refresh of the Nifty CSV; returns the count of new dates added.
+
+    Reads the existing ``date,close`` series, merges ``new_closes`` append-only (never
+    mutating a stored close), and writes the union back sorted. Existing history — and thus
+    every past IPO's regime — is invariant to the refresh.
+    """
+    existing: list[tuple[date, float]] = []
+    if csv_path.is_file():
+        with csv_path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    existing.append((date.fromisoformat(row["date"]), float(row["close"])))
+                except (KeyError, ValueError):
+                    continue
+    existing_dates = {day for day, _ in existing}
+    merged = merge_nifty_closes(existing, new_closes)
+    added = sum(1 for day, _ in merged if day not in existing_dates)
+    with csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["date", "close"])
+        for day, close in merged:
+            writer.writerow([day.isoformat(), close])
+    return added
