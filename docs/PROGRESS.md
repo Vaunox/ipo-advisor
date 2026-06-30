@@ -12,6 +12,7 @@ green (lint + types + tests) at every phase commit.
 | 2026-06-29 | P4 | ☑ done | `feat(p4): backtest + calibration` / `gate-4-calibration` | 154 passing | **Reliability gate PASSED** on 311 official NSE IPOs. AUC 0.81, ECE 0.073, look-ahead 0.47. |
 | 2026-06-29 | P4+ | ☑ done | `test(p4): benchmark...` | 158 passing | Model **ties** equal-selectivity QIB rule (83.7% vs 84.3%); value = calibration, not precision. |
 | 2026-06-29 | P5 | ◐ framework | `feat(p5): GMP framework + re-calibration gate` | 168 passing | GMP machinery + gate built & validated (keeps informative, rejects noise). **Historical GMP data deferred** (operator decision); `gate-5` runs when sourced. |
+| 2026-06-30 | P5+ | ◐ gate run | `test(p5): GMP gate on real IPOMatrix GMP` | 174 passing | **Real gate RAN** on 99 point-in-time 2025-26 IPOs (IPOMatrix trial). **GMP NOT earned** — clean as-of-close AUC lift ~0 (leaky +0.133 collapsed); keep/cut flips with split. Official-only ships; recorder keeps banking (esp. cold). See [GMP_GATE.md](GMP_GATE.md). |
 | | P6 | ☐ todo | | | Advisory service (API / scheduler / notifier). |
 | | P7 | ☐ todo | | | Windows `.exe` + Android APK. |
 | | P8 | — | | | Operate & maintain (ongoing). |
@@ -186,7 +187,7 @@ Both gates CI-enforced: `test_calibration_gate.py` (reproduces the pass on commi
 
 ---
 
-## Phase 5 — GMP integration (framework done; historical gate deferred)
+## Phase 5 — GMP integration (framework done; gate RUN on hot-market data → GMP not earned)
 
 **Goal:** add GMP, but only if it *earns* its weight (Deep Dive #5, the second sacred gate).
 
@@ -207,8 +208,34 @@ Investigated GMP feasibility and pricing:
 - **`gate-5` is NOT tagged:** the real GMP re-calibration needs *historical* GMP for the 311 IPOs, which is deferred. It runs (and `gmp_level` returns to `critical_features`) once that data is sourced — feed it as a `gmp.csv` via `CsvGmpHistory`, or wire ipoalerts for live.
 - ruff + black + mypy + **168 tests** green.
 
+### GMP re-calibration gate — RUN on real point-in-time GMP (2026-06-30)
+
+**Phase-5 GMP gate run on real point-in-time IPOMatrix data (2025–26, hot market, single source,
+N≈99 / 39 OOS) → no significant marginal lift over the official QIB-led model → GMP stays out of
+the shipped model, provisionally; revisit with cold-market point-in-time GMP from the recorder.**
+
+- **Data:** point-in-time, day-by-day GMP for **99 of 101** mainboard 2025–26 IPOs (~1,817
+  reconciled day-points), pulled from IPOMatrix/Chittorgarh's private JSON API. **Trial-only
+  research pull — NOT a sanctioned ongoing source;** the AWS recorder remains the durable,
+  multi-source, forward collection path. Raw GMP gitignored; only the derived report committed.
+- **Method:** same IPOs scored **with vs without** GMP (level + as-of-close slope; the
+  Allotted/Listed rows excluded by construction → not leaky), walk-forward, **3 splits** +
+  paired-bootstrap CI on the AUC lift ([`scripts/run_gmp_gate.py`](../scripts/run_gmp_gate.py),
+  `gmp_recalibration_gate`).
+- **Result:** AUC lift **+0.008…+0.022 — every 95% CI straddles 0**; keep/cut **flips** across
+  splits; APPLY precision ~unchanged (67%→71%). The leaky nikhilraj screen's inflated **+0.133
+  collapsed to ~0** on clean data — the apparent GMP edge was mostly leakage; as-of-close GMP is
+  largely redundant with QIB in a hot market. Full report: [GMP_GATE.md](GMP_GATE.md).
+- **Decision:** **do NOT promote GMP into the score;** `critical_features` stays `[qib_sub]`.
+  Boundaries: hot-market only (base 62%), single-source, small N; the spike-collapse kill-flag is
+  untested here. Re-run the same gate when the recorder banks cold-regime point-in-time GMP.
+- **174 tests green** (ruff + black + mypy strict).
+
 ### Follow-ups
-- **To run the real GMP gate later:** source historical GMP → `CsvGmpHistory` → build with-GMP items via `build_features(gmp_series=...)` → `gmp_recalibration_gate` vs the official-only items. If kept, re-add `gmp_level` to `critical_features` and re-persist the calibrator.
+- **Real GMP gate — DONE (2026-06-30, hot-market data only):** ran on 99 point-in-time 2025-26
+  IPOs → **GMP not earned** (see subsection above). `gmp_level` stays OUT of `critical_features`;
+  the calibrator is unchanged. **Re-run** `scripts/run_gmp_gate.py` when the recorder banks
+  cold-regime point-in-time GMP — that, not more hot-market data, is the open question.
 - **Live GMP (Phase 6 service):** wire ipoalerts' `gmp` object through `from_aggregator_rows` → `reconcile` → `to_quotes` at the subscription close.
 - Phases 6 (service/API/notifier) and 7 (Windows `.exe` + Android APK) remain.
 
