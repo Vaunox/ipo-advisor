@@ -259,3 +259,13 @@ Record so they don't get lost (logged, not implemented):
 2. **Re-examine the `−0.3` cold-flag prior when it goes live.** It governs nothing today, but once active it shapes **every** cold-market verdict. At that point, **sanity-check the threshold against the larger 214-IPO cold sample (read-only — do NOT tune it to outcomes)** and confirm "reasonable prior" still holds. Sensitivity measured: at −0.2/−0.3/−0.4 → 20%/17%/13% of IPOs flagged (~6% sit in the band where the cutoff flips them).
 
 Other Phase 6 work: REST API (`/ipos`, `/ipo/{id}`, `/verdict/{id}`), windowed scheduler, `Notifier` push/Telegram/email; reads the Parquet store + persisted calibrator; live GMP via ipoalerts (see Phase 5 follow-ups).
+
+---
+
+## Housekeeping backlog (address in a dedicated pass AFTER Phase 6 — not mid-step)
+
+- **Benign third-party test warning (Phase 6 step 3, the REST API):** `starlette.testclient`
+  emits `StarletteDeprecationWarning: Using \`httpx\` with \`starlette.testclient\` is
+  deprecated; install \`httpx2\``. It originates from FastAPI's TestClient import only — our
+  code is unaffected and all tests pass. Resolve by pinning/migrating (httpx2, or a starlette
+  pin) in a housekeeping pass; deliberately **not** addressed mid-step.
