@@ -91,3 +91,7 @@ class VerdictEngine:
     def verdicts(self, *, asof: datetime | None = None) -> list[Verdict]:
         """Compute verdicts for every stored IPO."""
         return [self.verdict_for(record, asof=asof) for record in self._repo.list_all()]
+
+    def get_record(self, ipo_id: str) -> IPORecord | None:
+        """Look up a stored IPO record by id (read-through to the repository, for the API)."""
+        return self._repo.get(ipo_id)
