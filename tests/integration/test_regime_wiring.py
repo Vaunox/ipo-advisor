@@ -41,14 +41,20 @@ def test_regime_populated_leaves_oos_probabilities_byte_identical() -> None:
     scorer = WeightedScorer(config.feature_weights, config.features)
     regime = NiftyRegime(_NIFTY)
 
-    common = {
-        "features_config": config.features,
-        "sell_costs": config.sell_costs,
-        "nominal_application_value": cal.nominal_application_value,
-    }
-    items_baseline = scored_items_from_records(records, scorer, **common)  # regime absent
+    items_baseline = scored_items_from_records(  # regime absent
+        records,
+        scorer,
+        features_config=config.features,
+        sell_costs=config.sell_costs,
+        nominal_application_value=cal.nominal_application_value,
+    )
     items_regime = scored_items_from_records(
-        records, scorer, market_regime_of=regime.market_regime_feature, **common
+        records,
+        scorer,
+        features_config=config.features,
+        sell_costs=config.sell_costs,
+        nominal_application_value=cal.nominal_application_value,
+        market_regime_of=regime.market_regime_feature,
     )
 
     # Guard against a vacuous pass: regime must actually be exercised — some IPOs non-None,
