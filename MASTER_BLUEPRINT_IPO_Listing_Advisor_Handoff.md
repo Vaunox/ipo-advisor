@@ -2,7 +2,7 @@
 
 ### Claude Build Handoff Document
 
-*A single, self-contained specification for building a modular, grounded, **calibrated IPO listing-gains advisory system** for Indian **mainboard** IPOs. It ingests official + grey-market data, computes point-in-time features, runs a calibrated model that outputs a decisive **verdict** (APPLY / MARGINAL / SKIP / INSUFFICIENT_SIGNAL), a **calibrated probability** of a positive listing, and a **grounded reason** — then surfaces all of it through a cross-platform app (**Windows `.exe` + Android APK**). The system is **purely advisory**: both legs are manual — the operator places the IPO bid and sells on listing day by hand, and the system never places an order. Written to be handed to Claude (running long sessions on a Claude Max plan) and built phase by phase. Grounded June 2026.*
+*A single, self-contained specification for building a modular, grounded, **calibrated IPO listing-gains advisory system** for Indian **mainboard** IPOs. It ingests official + grey-market data, computes point-in-time features, runs a calibrated model that outputs a decisive **verdict** (APPLY / MARGINAL / SKIP / INSUFFICIENT_SIGNAL), a **calibrated probability** of a positive listing, and a **grounded reason** — then surfaces all of it through a **Windows `.exe`** desktop app. The system is **purely advisory**: both legs are manual — the operator places the IPO bid and sells on listing day by hand, and the system never places an order. Written to be handed to Claude (running long sessions on a Claude Max plan) and built phase by phase. Grounded June 2026.*
 
 ---
 
@@ -69,10 +69,9 @@ ipo-advisor/
 │   │   ├── api.py                #   REST: /ipos, /ipo/{id}, /verdict/{id}
 │   │   ├── scheduler.py          #   periodic ingest+score during subscription windows
 │   │   └── notify/               #   Notifier protocol + push/Telegram/email
-│   └── apps/                     # LAYER 6 — Cross-platform front end
-│       ├── pwa/                  #   the dashboard (one UI, two packagings)
-│       ├── desktop/              #   PyInstaller spec → Windows .exe (bundles service + webview)
-│       └── android/              #   TWA/Capacitor wrapper → APK
+│   └── apps/                     # LAYER 6 — Desktop app (front end)
+│       ├── pwa/                  #   the dashboard (PWA/React UI)
+│       └── desktop/              #   native shell (Electron) → Windows .exe (bundles the engine sidecar)
 ├── scripts/                      # run_ingest.py, run_backtest.py, run_calibrate.py, run_service.py
 ├── tests/{unit,integration}/
 └── data_store/                   # local parquet cache (gitignored)
@@ -117,7 +116,7 @@ A service that, for each live/upcoming **mainboard** IPO, ingests official and g
 2. **Probability** — calibrated P(stock lists at a profit), 0–100%
 3. **Reason** — plain language, every claim traced to a feature value, plus watch-items and kill-flags
 
-…surfaced through a Windows `.exe` and an Android APK, with push alerts when a verdict crosses a threshold. The operator places the bid manually; the system optionally fires the listing-day sell.
+…surfaced through a **Windows `.exe`** desktop app, with push alerts when a verdict crosses a threshold. The operator places the bid manually; the system optionally fires the listing-day sell.
 
 ## Realistic-expectations frame (keep visible)
 - A listing pop is a **1–2 day demand/sentiment event**, not a fundamental repricing — which is why the model uses *relative* valuation, never DCF.
@@ -128,7 +127,7 @@ A service that, for each live/upcoming **mainboard** IPO, ingests official and g
 ```
  SOURCES → INGEST (official + GMP) → FEATURES (point-in-time)
         → SCORE (weighted → calibrated) → VERDICT + REASON (+ kill-flags / abstention)
-        → SERVICE (schedule, API, push) → APPS (.exe + APK)
+        → SERVICE (schedule, API, push) → APP (Windows .exe)
 ```
 
 ## Locked decisions
@@ -141,7 +140,7 @@ A service that, for each live/upcoming **mainboard** IPO, ingests official and g
 | Sell leg | **Manual** (operator sells on listing day) | Advisory by choice — the system signals the call; the operator executes. No order automation in scope. |
 | Model | **Transparent weighted baseline → calibrated classifier** | Interpretable; every reason is a feature value; confidence is *earned* via calibration. |
 | Storage | **Parquet** (+ optional DuckDB) | Matches the operator's existing stack; data volume is tiny. |
-| App stack | **FastAPI service + PWA → Windows `.exe` (PyInstaller) + Android APK (TWA/Capacitor)** | Reuses the operator's proven hardware-monitor pattern; one UI, two packagings. |
+| App stack | **FastAPI engine + PWA → Windows `.exe` native shell (Electron; engine as a bundled sidecar)** | Genuine native desktop software (Discord/Steam class); a single Windows target. |
 
 ## The data constraint map (what you can and cannot get — verified June 2026)
 | Data | Free / available? | Source | Notes |
@@ -192,12 +191,10 @@ Label ≥100 past mainboard IPOs with their actual listing-day return; run **wal
 **Goal:** keep verdicts fresh and push them out.
 FastAPI app: a **scheduler** that ingests + scores on a cadence (denser — e.g. every ~30 min — during open subscription windows, since GMP moves then), a small **REST API** (`/ipos`, `/ipo/{id}`, `/verdict/{id}`), and a `Notifier` that pushes when a verdict crosses a threshold ("StrongCo → APPLY, 72%"). Stateless reads off the Parquet store + calibrator. **Output contract:** a running service the apps consume.
 
-## Layer 6 — Cross-platform apps (the "does everything" deliverable)
-**Goal:** one dashboard, shipped as a Windows `.exe` and an Android APK.
-A single **PWA** dashboard (IPO list with verdict badge, probability, reason, watch/kill flags, gross & net listing-gain estimate, subscription/GMP timeline). Two packagings of the same UI:
-- **Windows `.exe`** — PyInstaller bundles the FastAPI service + the PWA served locally + a webview shell; self-contained, runs the whole pipeline on the desktop.
-- **Android APK** — wrap the PWA (TWA via Bubblewrap, or Capacitor) pointing at the operator's service endpoint; receives push notifications.
-**Output contract:** installable `.exe` and signed `.apk`, both showing live verdicts.
+## Layer 6 — The app (Windows desktop)
+**Goal:** ship the dashboard as **genuine native desktop software** — a Windows `.exe` (Discord/Steam class).
+A single **PWA/React** dashboard (IPO list with verdict badge, probability, reason, watch/kill flags, gross & net listing-gain estimate, subscription timeline). The UI is designed in **Figma first**, then built and wrapped in a **native desktop shell (Electron)** that bundles the Python FastAPI engine as a **sidecar** it launches, health-checks, and stops — not a webview. GMP is **not** a scoring input (it failed its Phase-5 gate) and is not shown as one.
+**Output contract:** an installable Windows `.exe` that installs and behaves like genuine software (Program Files, shortcuts, uninstaller, system-tray, native notifications) and shows live verdicts.
 
 ---
 
@@ -247,10 +244,12 @@ A single **PWA** dashboard (IPO list with verdict badge, probability, reason, wa
 **Deliverables:** `service/api.py` (REST), `service/scheduler.py` (windowed ingest+score cadence), `service/notify/` (`Notifier` + push/Telegram/email); the service reads the Parquet store + persisted calibrator; health/status endpoint.
 **GATE 6:** the service runs on a schedule, serves current verdicts over the API, and fires a push when a verdict crosses a threshold. Tag `gate-6-service`.
 
-## PHASE 7 — Cross-platform apps (Windows `.exe` + Android APK)
-**Goal:** the "does everything" front end on both platforms.
-**Deliverables:** `apps/pwa/` (the dashboard: IPO list, verdict badge, calibrated probability, grounded reason, watch/kill flags, gross & net listing-gain estimate, subscription/GMP timeline); `apps/desktop/` (PyInstaller spec bundling the FastAPI service + locally-served PWA + webview shell → **Windows `.exe`**); `apps/android/` (TWA via Bubblewrap or Capacitor wrapper → **signed APK** pointing at the operator's endpoint, with push). Signing keys are the operator's, never Claude's.
-**GATE 7:** the `.exe` launches the whole pipeline and shows live verdicts offline-capable on Windows; the APK installs and shows the same verdicts with push working. Tag `gate-7-apps`.
+## PHASE 7 — The app (Windows `.exe`, genuine native software)
+**Goal:** the `.exe` as installable native software (Discord/Steam class), with the UI designed iteratively in Figma before any front-end code.
+**Deliverables:** (1) an approved **Figma design** via the design loop — AI proposes a full first direction, operator refines until approved; (2) the approved design built as the **PWA/React front end** (`apps/pwa/`); (3) a **native desktop shell — Electron** (chosen over Tauri for build-path certainty — no new language toolchain, deepest Python-sidecar prior art, most-proven; rationale in Deep Dive #6, Module D) wrapping the UI, with our Python FastAPI engine as a bundled **sidecar** the shell launches/health-checks/stops — **not pywebview**; (4) **genuine-software packaging** — installer (Program Files, Start Menu/desktop shortcuts, registered uninstaller), app icon, clean native window (no browser chrome), system-tray, native OS notifications for APPLY crossings, remembered window state.
+**GATE 7:** the `.exe` installs like real software, launches the bundled Phase-6 engine, shows live verdicts, fires native notifications on APPLY crossings, and honors all five inherited invariants (no recomputation; reliability gate holds in the UI; cold flag is annotation-only; advisory-only — no order/action control; GMP not a scoring input). Tag `gate-7-app`.
+
+*Full process + the Figma design loop: see the Phase 7 mini-blueprint ([docs/deep_dives/07_Phase7_App.md](docs/deep_dives/07_Phase7_App.md)).*
 
 ## PHASE 8 — Operate & maintain *(ongoing)*
 Re-run Phase 4 calibration each quarter and after market-regime shifts (listing-gain base rates drift). Monitor source-site changes (scrapers break silently). Watch for SEBI's "when-listed" platform — adopt it as the official GMP substitute if it launches. Honest periodic audit: did APPLY verdicts actually list positive at the calibrated rate? If not, recalibrate or narrow scope. The program is maintained, never "finished."
