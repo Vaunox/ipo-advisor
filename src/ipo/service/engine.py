@@ -95,3 +95,7 @@ class VerdictEngine:
     def get_record(self, ipo_id: str) -> IPORecord | None:
         """Look up a stored IPO record by id (read-through to the repository, for the API)."""
         return self._repo.get(ipo_id)
+
+    def records(self) -> list[IPORecord]:
+        """All stored IPO records (read-through, for the scheduler's cadence/iteration)."""
+        return self._repo.list_all()
