@@ -26,6 +26,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from ipo.core.types import Verdict
 from ipo.service.calibration import load_calibration_view
@@ -41,6 +42,16 @@ def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = 
     bins (it never fabricates a calibration curve).
     """
     app = FastAPI(title="IPO Listing-Gains Advisor", version="0.1.0")
+
+    # The engine is a local sidecar bound to 127.0.0.1 and read-only (GET only, no credentials),
+    # so permissive CORS is safe and lets the Electron renderer (file:// / dev localhost) reach it
+    # cross-origin on the sidecar's chosen free port. It is NOT a public server.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET"],
+        allow_headers=["*"],
+    )
 
     @app.get("/health")
     def health() -> dict[str, str]:

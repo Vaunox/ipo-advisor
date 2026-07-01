@@ -91,11 +91,21 @@ def build_service(
 
 
 def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server)
-    """Build the service from config + artifacts and run it (scheduler loop + API server)."""
+    """Build the service from config + artifacts and run it (scheduler loop + API server).
+
+    ``--port`` / ``--host`` let the desktop shell spawn the engine on a free port it picked (never
+    a hardcoded port that could collide). Bound to 127.0.0.1 by default — the sidecar is local only.
+    """
+    import argparse
     import threading
     import time
 
     import uvicorn
+
+    parser = argparse.ArgumentParser(description="Run the IPO Advisor engine (API + scheduler).")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args()
 
     config = load_config()
     service = build_service(
@@ -112,7 +122,7 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
             time.sleep(service.scheduler.next_cadence_minutes() * 60)
 
     threading.Thread(target=loop, daemon=True).start()
-    uvicorn.run(service.api, host="127.0.0.1", port=8000)
+    uvicorn.run(service.api, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
