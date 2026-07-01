@@ -11,18 +11,18 @@ advisory only (Inviolable Rule 6).
 Endpoints:
 * ``GET /health``           — liveness.
 * ``GET /ipos``             — verdicts for all stored IPOs.
-* ``GET /ipo/{ipo_id}``     — the record plus its verdict.
+* ``GET /ipo/{ipo_id}``     — the record + verdict + point-in-time features + signed
+  contributions (read-only enrichment for the detail view; the verdict is verbatim).
 * ``GET /verdict/{ipo_id}`` — the verdict alone.
 """
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import FastAPI, HTTPException
 
 from ipo.core.types import Verdict
 from ipo.service.engine import VerdictEngine
+from ipo.service.views import IPODetail
 
 
 def create_app(engine: VerdictEngine) -> FastAPI:
@@ -47,12 +47,17 @@ def create_app(engine: VerdictEngine) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"unknown ipo_id: {ipo_id}")
         return engine.verdict_for(record)
 
-    @app.get("/ipo/{ipo_id}")
-    def ipo(ipo_id: str) -> dict[str, Any]:
-        """Return the stored record together with its engine verdict, or 404."""
+    @app.get("/ipo/{ipo_id}", response_model=IPODetail)
+    def ipo(ipo_id: str) -> IPODetail:
+        """Return the record + verdict + point-in-time features + signed contributions, or 404.
+
+        Enriched (read-only) so the detail view can render the contribution breakdown, the feature
+        values, and the cold-market flag. The ``verdict`` field is verbatim ``verdict_for`` — the
+        extra fields are the *same* computation's inputs/explanation, never a re-score.
+        """
         record = engine.get_record(ipo_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"unknown ipo_id: {ipo_id}")
-        return {"record": record, "verdict": engine.verdict_for(record)}
+        return engine.detail(record)
 
     return app

@@ -95,6 +95,29 @@ def test_unknown_ipo_returns_404() -> None:
     assert client.get("/ipo/NONEXISTENT-9999-99-99").status_code == 404
 
 
+def test_ipo_detail_is_enriched_and_consistent() -> None:
+    client, _ = _client(load_calibrator(_CAL))
+    records = load_records_from_csv(_CSV)
+    rec = next(r for r in records if r.qib_sub is not None and r.listing_open is not None)
+
+    resp = client.get(f"/ipo/{rec.ipo_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    # Enriched shape: record + verdict + point-in-time features + signed contributions.
+    assert {"record", "verdict", "features", "contributions"} <= set(body)
+    assert body["features"]["ipo_id"] == rec.ipo_id
+    assert "qib_sub" in body["features"]
+
+    # Contributions are the scorer's named signed breakdown — non-empty for a scored record.
+    contribs = body["contributions"]
+    assert isinstance(contribs, dict) and contribs
+    assert all(isinstance(v, (int, float)) for v in contribs.values())
+
+    # NO recomputation / no second scoring path: the detail's verdict is byte-for-byte /verdict.
+    assert body["verdict"] == client.get(f"/verdict/{rec.ipo_id}").json()
+
+
 def test_gate_survives_serialization() -> None:
     records = load_records_from_csv(_CSV)
     rec = next(r for r in records if r.qib_sub is not None and r.listing_open is not None)
