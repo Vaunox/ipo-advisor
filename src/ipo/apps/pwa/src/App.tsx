@@ -6,6 +6,7 @@ import { TopBar } from './components/TopBar'
 import type { View } from './nav'
 import { recalibrationCount } from './recalib'
 import { Detail } from './screens/Detail'
+import { History } from './screens/History'
 import { Live } from './screens/Live'
 
 const TITLES: Record<View, [string, string]> = {
@@ -75,6 +76,8 @@ export function App() {
             <Detail id={detailId} onBack={() => setDetailId(null)} />
           ) : view === 'live' ? (
             <Live onOpen={setDetailId} />
+          ) : view === 'history' ? (
+            <History />
           ) : (
             <Placeholder label={title} />
           )}
