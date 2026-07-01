@@ -132,6 +132,15 @@ export function Settings() {
         </div>
       </div>
 
+      <div className="card">
+        <h3 className="sec">Keyboard shortcuts</h3>
+        <div className="set-row"><div className="k">Search / command palette</div><span><kbd>Ctrl K</kbd><kbd>/</kbd></span></div>
+        <div className="set-row"><div className="k">Go to Live · Upcoming</div><span><kbd>g l</kbd><kbd>g u</kbd></span></div>
+        <div className="set-row"><div className="k">Go to History · Settings</div><span><kbd>g h</kbd><kbd>g s</kbd></span></div>
+        <div className="set-row"><div className="k">Toggle light / dark</div><kbd>t</kbd></div>
+        <div className="set-row"><div className="k">Show all shortcuts</div><kbd>?</kbd></div>
+      </div>
+
       <div className="card full">
         <h3 className="sec">About</h3>
         <div className="about">

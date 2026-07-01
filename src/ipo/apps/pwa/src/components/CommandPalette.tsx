@@ -28,7 +28,7 @@ export function CommandPalette({
   }, [])
 
   const ql = q.toLowerCase()
-  const ipoItems: Item[] = board
+  const ipoItems: Item[] = (board ?? [])
     .filter((r) => r.name.toLowerCase().includes(ql))
     .slice(0, 8)
     .map((r) => ({

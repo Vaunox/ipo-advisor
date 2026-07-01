@@ -9,7 +9,7 @@ export function AlertCenter({ board, onOpenIpo }: { board: IPOListRow[]; onOpenI
   const [open, setOpen] = useState(false)
   const [read, setRead] = useState(false)
   const wrap = useRef<HTMLDivElement>(null)
-  const alerts = board.filter((r) => r.verdict === 'APPLY')
+  const alerts = (board ?? []).filter((r) => r.verdict === 'APPLY')
 
   useEffect(() => {
     const onDoc = (e: globalThis.MouseEvent) => {

@@ -125,7 +125,10 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               {r.segment} · Issue {r.issue_size_cr != null ? `₹${r.issue_size_cr.toLocaleString('en-IN')} cr` : '—'} · Band {band}
             </div>
             {showNumber && (
-              <div className="gate">
+              <div
+                className="gate"
+                data-tip="The calibrator passed its out-of-sample reliability check (the 70% bucket lists positive ~70% of the time), so this probability is trustworthy. Until it passes, no number is shown."
+              >
                 <Check /> RELIABILITY GATE PASSED
               </div>
             )}
@@ -173,15 +176,15 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
           <h3 className="sec">Subscription (final)</h3>
           <div className="kv">
             <div className="r">
-              <span className="k">QIB</span>
+              <span className="k gl" data-tip="Qualified Institutional Buyers — banks, mutual funds, insurers. Their subscription multiple is the strongest institutional-confidence signal.">QIB</span>
               <span className="v" style={{ color: 'var(--apply)' }}>{x(r.qib_sub)}</span>
             </div>
             <div className="r">
-              <span className="k">NII</span>
+              <span className="k gl" data-tip="Non-Institutional Investors (HNIs). Split into small (sNII, ₹2–10L) and big (bNII, over ₹10L) buckets.">NII</span>
               <span className="v">{x(r.nii_sub)}</span>
             </div>
             <div className="r">
-              <span className="k">Retail</span>
+              <span className="k gl" data-tip="Retail Individual Investors — bids up to ₹2 lakh. A retail-led book is a weaker signal than a QIB-led one.">Retail</span>
               <span className="v">{x(r.retail_sub)}</span>
             </div>
           </div>
@@ -190,11 +193,11 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
           </h3>
           <div className="kv">
             <div className="r">
-              <span className="k">Fresh / OFS</span>
+              <span className="k gl" data-tip="Fresh = new capital raised for the company. OFS = Offer For Sale, existing holders cashing out. A high OFS share is a mild negative.">Fresh / OFS</span>
               <span className="v">{fresh}</span>
             </div>
             <div className="r">
-              <span className="k">Anchor quality</span>
+              <span className="k gl" data-tip="A 0–1 score of the anchor investors' reputation and lock-in length. Higher means stronger institutional endorsement before the book opens.">Anchor quality</span>
               <span className="v" style={{ color: 'var(--apply)' }}>
                 {f.anchor_quality != null ? f.anchor_quality.toFixed(2) : '—'}
               </span>
