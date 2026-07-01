@@ -167,3 +167,13 @@ class VerdictEngine:
     def records(self) -> list[IPORecord]:
         """All stored IPO records (read-through, for the scheduler's cadence/iteration)."""
         return self._repo.list_all()
+
+    @property
+    def calibrator_version(self) -> str:
+        """The loaded calibrator's pinned version (read-through, for the calibration view)."""
+        return self._calibrator.version
+
+    @property
+    def calibrator_gate_passed(self) -> bool:
+        """Whether the loaded calibrator passed the reliability gate (read-through)."""
+        return self._calibrator.passes_reliability_gate

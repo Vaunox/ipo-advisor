@@ -63,6 +63,7 @@ def build_service(
     repository: Repository,
     calibrator: Calibrator,
     nifty_path: Path,
+    calibration_report_path: Path | None = None,
     push_transport: Callable[[str], None] | None = None,
     refresh: Callable[[], None] | None = None,
     clock: Callable[[], datetime] = now_ist,
@@ -85,7 +86,7 @@ def build_service(
         engine=engine,
         scheduler=scheduler,
         notifier=notifier,
-        api=create_app(engine),
+        api=create_app(engine, calibration_report_path=calibration_report_path),
     )
 
 
@@ -102,6 +103,7 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         repository=ParquetRepository(Path(config.storage.data_dir)),
         calibrator=load_calibrator(_REPO_ROOT / "models" / "calibrator.json"),
         nifty_path=_REPO_ROOT / "data" / "backfill" / "nifty.csv",
+        calibration_report_path=_REPO_ROOT / "models" / "reliability.json",
     )
 
     def loop() -> None:

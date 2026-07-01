@@ -31,6 +31,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CSV = _REPO_ROOT / "data" / "backfill" / "mainboard_ipos.csv"
 _NIFTY = _REPO_ROOT / "data" / "backfill" / "nifty.csv"
 _CAL = _REPO_ROOT / "models" / "calibrator.json"
+_REPORT = _REPO_ROOT / "models" / "reliability.json"
 
 pytestmark = pytest.mark.skipif(
     not (_CSV.is_file() and _NIFTY.is_file() and _CAL.is_file()),
@@ -60,7 +61,9 @@ class _ListRepo:
         return []
 
 
-def _client(calibrator: Calibrator) -> tuple[TestClient, list[IPORecord]]:
+def _client(
+    calibrator: Calibrator, *, calibration_report_path: Path | None = None
+) -> tuple[TestClient, list[IPORecord]]:
     config = load_config(env="dev", environ={})
     records = load_records_from_csv(_CSV)
     engine = VerdictEngine(
@@ -70,7 +73,8 @@ def _client(calibrator: Calibrator) -> tuple[TestClient, list[IPORecord]]:
         config=config,
         regime=NiftyRegime(_NIFTY),
     )
-    return TestClient(create_app(engine)), records
+    app = create_app(engine, calibration_report_path=calibration_report_path)
+    return TestClient(app), records
 
 
 def test_health() -> None:
@@ -145,6 +149,32 @@ def test_history_pairs_asof_verdict_with_actual_outcome() -> None:
 
     # Point-in-time / no second scoring path: the history verdict equals /verdict for that ipo.
     assert r0["verdict"] == client.get(f"/verdict/{r0['ipo_id']}").json()["verdict"]
+
+
+@pytest.mark.skipif(not _REPORT.is_file(), reason="reliability report not generated")
+def test_calibration_serves_heldout_reliability() -> None:
+    client, _ = _client(load_calibrator(_CAL), calibration_report_path=_REPORT)
+    resp = client.get("/calibration")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    # Live gate/version from the calibrator; held-out (walk-forward OOS) metrics + bins.
+    assert body["gate_passed"] is True
+    assert body["version"]
+    assert "out-of-sample" in body["source"]
+    assert body["n"] > 0 and body["ece"] is not None and body["auc"] is not None
+    assert isinstance(body["bins"], list) and body["bins"]
+    assert {"mean_predicted", "observed_rate", "count"} <= set(body["bins"][0])
+
+
+def test_calibration_degrades_without_report() -> None:
+    client, _ = _client(load_calibrator(_CAL))  # no report path wired
+    body = client.get("/calibration").json()
+    # No fabricated curve: empty bins, null metrics, and an explicit source note...
+    assert body["source"] == "report not generated"
+    assert body["bins"] == [] and body["ece"] is None and body["base_rate"] is None
+    # ...but the gate/version still serialize live from the calibrator.
+    assert body["gate_passed"] is True and body["version"]
 
 
 def test_gate_survives_serialization() -> None:

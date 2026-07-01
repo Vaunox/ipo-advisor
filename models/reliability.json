@@ -1,0 +1,47 @@
+{
+  "version": "platt-1",
+  "gate_passed": true,
+  "source": "walk-forward out-of-sample",
+  "n": 233,
+  "base_rate": 0.6909871244635193,
+  "ece": 0.07272923952419429,
+  "brier": 0.16396909191835962,
+  "auc": 0.8115079365079365,
+  "bins": [
+    {
+      "mean_predicted": 0.37607309043405934,
+      "observed_rate": 0.4074074074074074,
+      "count": 27
+    },
+    {
+      "mean_predicted": 0.4478477791609032,
+      "observed_rate": 0.3684210526315789,
+      "count": 38
+    },
+    {
+      "mean_predicted": 0.5302748387691704,
+      "observed_rate": 0.4444444444444444,
+      "count": 9
+    },
+    {
+      "mean_predicted": 0.6590161298385089,
+      "observed_rate": 0.5714285714285714,
+      "count": 14
+    },
+    {
+      "mean_predicted": 0.7419140065013381,
+      "observed_rate": 0.75,
+      "count": 16
+    },
+    {
+      "mean_predicted": 0.8653039208305969,
+      "observed_rate": 0.7457627118644068,
+      "count": 59
+    },
+    {
+      "mean_predicted": 0.9157047992700417,
+      "observed_rate": 0.9714285714285714,
+      "count": 70
+    }
+  ]
+}

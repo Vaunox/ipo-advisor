@@ -51,3 +51,32 @@ class HistoryRow(BaseModel):
     net_return: float
     gross_return: float
     listed_positive: bool
+
+
+class ReliabilityBinView(BaseModel):
+    """One reliability-diagram bucket: mean predicted probability vs observed rate and count."""
+
+    mean_predicted: float
+    observed_rate: float
+    count: int
+
+
+class CalibrationView(BaseModel):
+    """The calibration the History reliability diagram + scorecard render (read-only).
+
+    The metrics and ``bins`` are the **held-out** walk-forward out-of-sample reliability (generated
+    by scripts/run_reliability_export.py) — never an in-sample recompute, so the diagram shows the
+    honest calibration (Inviolable Rule 1). ``version`` and ``gate_passed`` come live from the
+    loaded calibrator. When no report has been generated, the metrics are ``None`` and ``bins`` is
+    empty (``source`` says so) — the UI degrades gracefully rather than inventing a curve.
+    """
+
+    version: str
+    gate_passed: bool
+    source: str
+    n: int
+    base_rate: float | None
+    ece: float | None
+    brier: float | None
+    auc: float | None
+    bins: list[ReliabilityBinView]

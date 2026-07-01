@@ -16,19 +16,29 @@ Endpoints:
 * ``GET /verdict/{ipo_id}`` — the verdict alone.
 * ``GET /history``          — every listed IPO's point-in-time verdict + actual net-of-cost
   outcome (read-only accountability for the History view / calibration scorecard).
+* ``GET /calibration``      — the held-out (walk-forward OOS) reliability report + live gate/
+  version, for the History reliability diagram. Held-out, never an in-sample recompute.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 
 from ipo.core.types import Verdict
+from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
-from ipo.service.views import HistoryRow, IPODetail
+from ipo.service.views import CalibrationView, HistoryRow, IPODetail
 
 
-def create_app(engine: VerdictEngine) -> FastAPI:
-    """Build the read-only advisory API over a composed ``VerdictEngine``."""
+def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = None) -> FastAPI:
+    """Build the read-only advisory API over a composed ``VerdictEngine``.
+
+    ``calibration_report_path`` points at the persisted held-out reliability report
+    (``models/reliability.json``); when absent, ``/calibration`` serves gate/version with empty
+    bins (it never fabricates a calibration curve).
+    """
     app = FastAPI(title="IPO Listing-Gains Advisor", version="0.1.0")
 
     @app.get("/health")
@@ -70,5 +80,18 @@ def create_app(engine: VerdictEngine) -> FastAPI:
         verbatim ``verdict_for`` (point-in-time), the outcome is the model's own net-of-cost label.
         """
         return engine.history()
+
+    @app.get("/calibration", response_model=CalibrationView)
+    def calibration() -> CalibrationView:
+        """The held-out (walk-forward OOS) reliability report + live gate/version (read-only).
+
+        The bins/metrics are the honest out-of-sample calibration (never in-sample); the gate and
+        version are read live from the calibrator. Powers the History reliability diagram.
+        """
+        return load_calibration_view(
+            calibration_report_path,
+            version=engine.calibrator_version,
+            gate_passed=engine.calibrator_gate_passed,
+        )
 
     return app
