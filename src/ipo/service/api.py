@@ -14,6 +14,8 @@ Endpoints:
 * ``GET /ipo/{ipo_id}``     — the record + verdict + point-in-time features + signed
   contributions (read-only enrichment for the detail view; the verdict is verbatim).
 * ``GET /verdict/{ipo_id}`` — the verdict alone.
+* ``GET /history``          — every listed IPO's point-in-time verdict + actual net-of-cost
+  outcome (read-only accountability for the History view / calibration scorecard).
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from fastapi import FastAPI, HTTPException
 
 from ipo.core.types import Verdict
 from ipo.service.engine import VerdictEngine
-from ipo.service.views import IPODetail
+from ipo.service.views import HistoryRow, IPODetail
 
 
 def create_app(engine: VerdictEngine) -> FastAPI:
@@ -59,5 +61,14 @@ def create_app(engine: VerdictEngine) -> FastAPI:
         if record is None:
             raise HTTPException(status_code=404, detail=f"unknown ipo_id: {ipo_id}")
         return engine.detail(record)
+
+    @app.get("/history", response_model=list[HistoryRow])
+    def history() -> list[HistoryRow]:
+        """Every listed IPO's point-in-time verdict paired with its actual net-of-cost outcome.
+
+        Read-only accountability data for the History view + calibration scorecard: the verdict is
+        verbatim ``verdict_for`` (point-in-time), the outcome is the model's own net-of-cost label.
+        """
+        return engine.history()
 
     return app

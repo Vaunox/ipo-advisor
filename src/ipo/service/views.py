@@ -9,9 +9,11 @@ path. Every field is verbatim engine output — the ``verdict`` here is byte-for
 
 from __future__ import annotations
 
+from datetime import date
+
 from pydantic import BaseModel
 
-from ipo.core.types import IPOFeatures, IPORecord, Verdict
+from ipo.core.types import IPOFeatures, IPORecord, Verdict, VerdictType
 
 
 class IPODetail(BaseModel):
@@ -28,3 +30,24 @@ class IPODetail(BaseModel):
     verdict: Verdict
     features: IPOFeatures
     contributions: dict[str, float]
+
+
+class HistoryRow(BaseModel):
+    """One past IPO: its point-in-time verdict paired with the actual net-of-cost outcome.
+
+    ``verdict``/``probability`` are what the engine would have emitted at the decision clock
+    (subscription-close EOD) from as-of features only — the listing label is never read into a
+    feature (Inviolable Rule 2), so predicted and actual stay independent. ``net_return`` is the
+    model's own target basis (net-of-cost listing-day return, the flip exit at the listing open),
+    and ``listed_positive`` its binary label. This is the honest "predicted vs actual" the
+    History view and the calibration scorecard are built from.
+    """
+
+    ipo_id: str
+    name: str
+    listing_date: date | None
+    verdict: VerdictType
+    probability: float | None
+    net_return: float
+    gross_return: float
+    listed_positive: bool

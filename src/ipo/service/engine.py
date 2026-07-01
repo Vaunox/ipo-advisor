@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 
+from ipo.calibration.label import is_positive, net_listing_return
 from ipo.calibration.regime import NiftyRegime
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig
@@ -29,7 +30,7 @@ from ipo.core.interfaces import Calibrator, Repository, ScoringModel
 from ipo.core.types import IPOFeatures, IPORecord, Verdict
 from ipo.features.build import build_features
 from ipo.model.verdict import evaluate
-from ipo.service.views import IPODetail
+from ipo.service.views import HistoryRow, IPODetail
 
 _CLOSE_EOD_HOUR = 18  # decision clock = end of the subscription-close day (IST), as in backtest
 
@@ -122,6 +123,42 @@ class VerdictEngine:
     def verdicts(self, *, asof: datetime | None = None) -> list[Verdict]:
         """Compute verdicts for every stored IPO."""
         return [self.verdict_for(record, asof=asof) for record in self._repo.list_all()]
+
+    def history(self) -> list[HistoryRow]:
+        """As-of verdict + actual net-of-cost outcome for every LISTED stored IPO (read-only).
+
+        A row exists only once a record has listed (``listing_open`` populated). The verdict is
+        point-in-time — decision clock = close EOD, scored on as-of features that never read the
+        listing label (Inviolable Rule 2) — while the outcome uses the same net-of-cost label the
+        model was trained on, so predicted and actual are directly comparable (History view +
+        calibration scorecard). No recomputation: the verdict is verbatim ``verdict_for``.
+        """
+        costs = self._config.sell_costs
+        nominal = self._config.calibration.nominal_application_value
+        rows: list[HistoryRow] = []
+        for record in self._repo.list_all():
+            if record.listing_open is None:
+                continue
+            verdict = self.verdict_for(record)
+            net = net_listing_return(
+                record.issue_price,
+                record.listing_open,
+                costs,
+                nominal_application_value=nominal,
+            )
+            rows.append(
+                HistoryRow(
+                    ipo_id=record.ipo_id,
+                    name=record.name,
+                    listing_date=record.listing_date,
+                    verdict=verdict.verdict,
+                    probability=verdict.probability,
+                    net_return=net,
+                    gross_return=(record.listing_open - record.issue_price) / record.issue_price,
+                    listed_positive=bool(is_positive(net)),
+                )
+            )
+        return rows
 
     def get_record(self, ipo_id: str) -> IPORecord | None:
         """Look up a stored IPO record by id (read-through to the repository, for the API)."""

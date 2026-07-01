@@ -118,6 +118,35 @@ def test_ipo_detail_is_enriched_and_consistent() -> None:
     assert body["verdict"] == client.get(f"/verdict/{rec.ipo_id}").json()
 
 
+def test_history_pairs_asof_verdict_with_actual_outcome() -> None:
+    client, _ = _client(load_calibrator(_CAL))
+    records = load_records_from_csv(_CSV)
+    listed = [r for r in records if r.listing_open is not None]
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    rows = resp.json()
+    # One row per LISTED ipo (an outcome exists only after listing).
+    assert isinstance(rows, list) and len(rows) == len(listed)
+
+    r0 = rows[0]
+    assert {
+        "ipo_id",
+        "name",
+        "verdict",
+        "probability",
+        "net_return",
+        "gross_return",
+        "listed_positive",
+    } <= set(r0)
+
+    # The binary label is consistent with the net-of-cost return sign, for every row.
+    assert all(row["listed_positive"] == (row["net_return"] > 0) for row in rows)
+
+    # Point-in-time / no second scoring path: the history verdict equals /verdict for that ipo.
+    assert r0["verdict"] == client.get(f"/verdict/{r0['ipo_id']}").json()["verdict"]
+
+
 def test_gate_survives_serialization() -> None:
     records = load_records_from_csv(_CSV)
     rec = next(r for r in records if r.qib_sub is not None and r.listing_open is not None)
