@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useBoard, useCalibration, useHealth } from './api/hooks'
+import { CommandPalette } from './components/CommandPalette'
 import { IconAlert } from './components/Icons'
 import { Sidebar } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
@@ -10,6 +11,7 @@ import { History } from './screens/History'
 import { Live } from './screens/Live'
 import { Settings } from './screens/Settings'
 import { Upcoming } from './screens/Upcoming'
+import { setThemeMode } from './state/prefs'
 
 const TITLES: Record<View, [string, string]> = {
   live: ['Live signals', 'mainboard · updated live · IST'],
@@ -36,16 +38,27 @@ function EngineDown({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-const Placeholder = ({ label }: { label: string }) => (
-  <div className="state">
-    <h3>{label}</h3>
-    <p>This screen lands in the next build step.</p>
+const HelpOverlay = ({ onClose }: { onClose: () => void }) => (
+  <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="help-card">
+      <div className="hh">Keyboard shortcuts</div>
+      <div className="help-body">
+        <div className="hk"><span>Search / command palette</span><span><kbd>Ctrl K</kbd><kbd>/</kbd></span></div>
+        <div className="hk"><span>Go to Live · Upcoming</span><span><kbd>g l</kbd><kbd>g u</kbd></span></div>
+        <div className="hk"><span>Go to History · Settings</span><span><kbd>g h</kbd><kbd>g s</kbd></span></div>
+        <div className="hk"><span>Toggle light / dark</span><kbd>t</kbd></div>
+        <div className="hk"><span>Close · back</span><kbd>Esc</kbd></div>
+        <div className="hk"><span>This help</span><kbd>?</kbd></div>
+      </div>
+    </div>
   </div>
 )
 
 export function App() {
   const [view, setView] = useState<View>('live')
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const health = useHealth()
   const board = useBoard()
   const calibration = useCalibration()
@@ -56,6 +69,48 @@ export function App() {
     setDetailId(null)
     setView(v)
   }
+
+  // keyboard shortcuts: Ctrl/⌘+K or / (palette), g+l/u/h/s (nav), t (theme), ? (help), Esc (close)
+  useEffect(() => {
+    let gPending = false
+    let gTimer = 0
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+      const isCmdK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'
+      if (isCmdK) {
+        e.preventDefault()
+        setPaletteOpen(true)
+        return
+      }
+      if (tag === 'input' || tag === 'textarea' || e.ctrlKey || e.metaKey || e.altKey) return
+      if (gPending) {
+        gPending = false
+        window.clearTimeout(gTimer)
+        if (e.key === 'l') navigate('live')
+        else if (e.key === 'u') navigate('upcoming')
+        else if (e.key === 'h') navigate('history')
+        else if (e.key === 's') navigate('settings')
+        return
+      }
+      if (e.key === 'g') {
+        gPending = true
+        gTimer = window.setTimeout(() => (gPending = false), 900)
+      } else if (e.key === 't') {
+        setThemeMode(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light')
+      } else if (e.key === '/') {
+        e.preventDefault()
+        setPaletteOpen(true)
+      } else if (e.key === '?') {
+        setHelpOpen(true)
+      } else if (e.key === 'Escape') {
+        setPaletteOpen(false)
+        setHelpOpen(false)
+        setDetailId((d) => (d ? null : d))
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   const [title, sub] = detailId ? ['Verdict detail', 'read-only · engine output verbatim'] : TITLES[view]
 
@@ -70,7 +125,13 @@ export function App() {
         recalibrations={recalibrationCount()}
       />
       <main className="main">
-        <TopBar title={title} sub={sub} />
+        <TopBar
+          title={title}
+          sub={sub}
+          board={board.data ?? []}
+          onOpenIpo={setDetailId}
+          onSearch={() => setPaletteOpen(true)}
+        />
         <div className="content">
           {engineDown ? (
             <EngineDown onRetry={() => void health.refetch()} />
@@ -82,13 +143,20 @@ export function App() {
             <History />
           ) : view === 'upcoming' ? (
             <Upcoming />
-          ) : view === 'settings' ? (
-            <Settings />
           ) : (
-            <Placeholder label={title} />
+            <Settings />
           )}
         </div>
       </main>
+      {paletteOpen && (
+        <CommandPalette
+          board={board.data ?? []}
+          onOpenIpo={setDetailId}
+          onNav={navigate}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
+      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
     </div>
   )
 }

@@ -212,6 +212,40 @@ h3.sec { font-family:'Fira Code'; font-size:10px; letter-spacing:.14em; text-tra
 .actual { font-family:'Fira Code'; font-weight:600; font-size:15px; }
 .actual.pos { color:var(--apply); } .actual.neg { color:var(--skip); }
 
+/* top-bar search + alert center */
+.kbtn { display:flex; align-items:center; gap:9px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; font-size:12px; color:var(--tx3); }
+.kbtn:hover { color:var(--tx2); }
+.kbtn kbd { font-family:'Fira Code'; font-size:10px; background:var(--panel2); border:1px solid var(--line2); border-radius:4px; padding:1px 5px; }
+.alertwrap { position:relative; }
+.alertbtn { position:relative; width:36px; height:36px; border-radius:8px; border:1px solid var(--line); background:var(--panel); display:grid; place-items:center; color:var(--tx2); }
+.alertbtn:hover { color:var(--tx); }
+.alertbtn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; }
+.alertbtn .badge { position:absolute; top:-5px; right:-5px; min-width:16px; height:16px; border-radius:9px; background:var(--skip); color:#fff; font-family:'Fira Code'; font-size:9px; font-weight:600; display:grid; place-items:center; padding:0 4px; }
+.alertpanel { position:absolute; top:48px; right:0; width:330px; background:var(--panel); border:1px solid var(--line2); border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,.5); z-index:40; overflow:hidden; }
+.alertpanel .ah { padding:13px 16px; border-bottom:1px solid var(--line); font-size:12px; font-weight:600; }
+.alertitem { display:flex; gap:11px; padding:12px 16px; border-bottom:1px solid var(--line); cursor:pointer; align-items:flex-start; }
+.alertitem:last-child { border:none; } .alertitem:hover { background:var(--panel2); }
+.alertitem .adot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex:none; }
+.alertitem .an { font-size:12.5px; font-weight:600; } .alertitem .am { font-size:11.5px; color:var(--tx2); margin-top:2px; }
+.alert-empty { padding:20px 16px; text-align:center; color:var(--tx3); font-size:12px; }
+
+/* command palette + help overlay */
+.overlay { position:fixed; inset:0; background:rgba(3,6,10,.6); backdrop-filter:blur(3px); z-index:50; display:flex; align-items:flex-start; justify-content:center; padding-top:12vh; }
+.palette { width:560px; max-width:92vw; background:var(--panel); border:1px solid var(--line2); border-radius:14px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.5); }
+.palette input { width:100%; background:none; border:none; border-bottom:1px solid var(--line); padding:16px 18px; color:var(--tx); font-size:15px; }
+.palette input:focus { outline:none; }
+.pal-list { max-height:340px; overflow:auto; padding:6px; }
+.pal-item { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:8px; cursor:pointer; font-size:13px; }
+.pal-item.sel { background:var(--panel2); }
+.pal-item .pt { font-family:'Fira Code'; font-size:10px; color:var(--tx3); border:1px solid var(--line); border-radius:4px; padding:2px 6px; flex:none; }
+.pal-item .pn { color:var(--tx); } .pal-item .pd { color:var(--tx3); font-size:11px; margin-left:auto; font-family:'Fira Code'; }
+.pal-empty { padding:22px; text-align:center; color:var(--tx3); font-size:12.5px; }
+.help-card { width:430px; background:var(--panel); border:1px solid var(--line2); border-radius:14px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.5); }
+.help-card .hh { padding:16px 18px; border-bottom:1px solid var(--line); font-weight:600; font-size:14px; }
+.help-body { padding:15px 18px; display:flex; flex-direction:column; gap:11px; font-size:13px; }
+.hk { display:flex; justify-content:space-between; align-items:center; color:var(--tx2); }
+.hk kbd { font-family:'Fira Code'; font-size:10.5px; background:var(--panel2); border:1px solid var(--line2); border-radius:5px; padding:2px 7px; color:var(--tx2); margin-left:5px; }
+
 /* pin / star + changed badge + attention strip */
 .star { background:none; border:none; cursor:pointer; color:var(--tx3); opacity:.5; padding:0; flex:none; display:inline-flex; transition:opacity .15s, color .15s; }
 .row:hover .star, .star.on { opacity:1; }
