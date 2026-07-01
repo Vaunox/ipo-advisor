@@ -212,6 +212,19 @@ h3.sec { font-family:'Fira Code'; font-size:10px; letter-spacing:.14em; text-tra
 .actual { font-family:'Fira Code'; font-weight:600; font-size:15px; }
 .actual.pos { color:var(--apply); } .actual.neg { color:var(--skip); }
 
+/* pin / star + changed badge + attention strip */
+.star { background:none; border:none; cursor:pointer; color:var(--tx3); opacity:.5; padding:0; flex:none; display:inline-flex; transition:opacity .15s, color .15s; }
+.row:hover .star, .star.on { opacity:1; }
+.star:hover { color:var(--marginal); }
+.star svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.6; }
+.star.on { color:var(--marginal); } .star.on svg { fill:var(--marginal); }
+.changed { display:inline-block; font-family:'Fira Code'; font-size:8.5px; font-weight:600; letter-spacing:.06em; color:var(--accent); background:color-mix(in srgb, var(--accent) 15%, transparent); border:1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius:4px; padding:1px 5px; margin-left:8px; }
+.attention { display:flex; align-items:center; gap:11px; background:var(--marginal-bg); border:1px solid color-mix(in srgb, var(--marginal) 40%, transparent); border-radius:10px; padding:11px 16px; margin-bottom:16px; font-size:12.5px; color:var(--tx); }
+.attention svg { width:16px; height:16px; flex:none; stroke:var(--marginal); fill:none; stroke-width:1.9; }
+.attention b { color:var(--marginal); } .attention .cd { color:var(--marginal); font-weight:600; font-family:'Fira Code'; }
+.att-x { margin-left:auto; flex:none; width:24px; height:24px; border-radius:6px; display:grid; place-items:center; color:var(--tx3); font-size:13px; }
+.att-x:hover { color:var(--tx); background:color-mix(in srgb, var(--marginal) 18%, transparent); }
+
 /* density */
 body.compact .row { padding-top:9px; padding-bottom:9px; }
 body.compact .co small { margin-top:2px; }
