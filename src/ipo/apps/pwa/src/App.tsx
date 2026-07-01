@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
 import type { View } from './nav'
 import { recalibrationCount } from './recalib'
+import { Detail } from './screens/Detail'
 import { Live } from './screens/Live'
 
 const TITLES: Record<View, [string, string]> = {
@@ -41,19 +42,25 @@ const Placeholder = ({ label }: { label: string }) => (
 
 export function App() {
   const [view, setView] = useState<View>('live')
+  const [detailId, setDetailId] = useState<string | null>(null)
   const health = useHealth()
   const board = useBoard()
   const calibration = useCalibration()
   const engineUp = health.isSuccess && health.data?.status === 'ok'
   const engineDown = health.isError
 
-  const [title, sub] = TITLES[view]
+  const navigate = (v: View) => {
+    setDetailId(null)
+    setView(v)
+  }
+
+  const [title, sub] = detailId ? ['Verdict detail', 'read-only · engine output verbatim'] : TITLES[view]
 
   return (
     <div className="app">
       <Sidebar
         view={view}
-        onNavigate={setView}
+        onNavigate={navigate}
         counts={{ live: board.data?.length }}
         engineUp={engineUp}
         gatePassed={calibration.data?.gate_passed ?? true}
@@ -64,8 +71,10 @@ export function App() {
         <div className="content">
           {engineDown ? (
             <EngineDown onRetry={() => void health.refetch()} />
+          ) : detailId ? (
+            <Detail id={detailId} onBack={() => setDetailId(null)} />
           ) : view === 'live' ? (
-            <Live />
+            <Live onOpen={setDetailId} />
           ) : (
             <Placeholder label={title} />
           )}

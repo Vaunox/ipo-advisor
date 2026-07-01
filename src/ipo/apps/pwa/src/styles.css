@@ -96,7 +96,58 @@ html.theme-anim, html.theme-anim * {
 .btn { background:var(--panel2); border:1px solid var(--line2); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--tx); font-weight:500; }
 .btn:hover { border-color:var(--accent); color:var(--accent); }
 
+/* detail view */
+.back { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--tx2); font-family:'Fira Code'; margin-bottom:18px; }
+.back:hover { color:var(--tx); }
+.back svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2; }
+.det { display:grid; grid-template-columns:1.15fr 1fr; gap:16px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; box-shadow:0 1px 2px rgba(0,0,0,.16), 0 12px 30px -22px rgba(0,0,0,.6); }
+[data-theme="light"] .card { box-shadow:0 1px 2px rgba(16,24,40,.05), 0 14px 30px -22px rgba(16,24,40,.28); }
+.det-hero { grid-column:1/-1; display:flex; align-items:center; gap:26px; padding:24px; }
+.verdict-badge { font-family:'Fira Code'; font-size:26px; font-weight:700; letter-spacing:.04em; padding:14px 22px; border-radius:10px; }
+.hero-meta h2 { font-size:22px; font-weight:600; }
+.hero-meta .m { font-size:12px; color:var(--tx3); margin-top:4px; font-family:'Fira Code'; }
+.hero-prob { margin-left:auto; text-align:right; }
+.hero-prob .big { font-family:'Fira Code'; font-size:42px; font-weight:700; line-height:1; }
+.hero-prob .big.none { color:var(--tx3); }
+.hero-prob .lbl { font-size:11px; color:var(--tx2); margin-top:4px; }
+.gate { display:inline-flex; align-items:center; gap:6px; font-size:10.5px; color:var(--apply); background:var(--apply-bg); padding:4px 9px; border-radius:20px; margin-top:8px; letter-spacing:.04em; font-family:'Fira Code'; }
+.gate.fail { color:var(--marginal); background:var(--marginal-bg); }
+.gate svg { width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2; }
+.meterbar { grid-column:1/-1; display:flex; align-items:center; gap:20px; padding:18px 22px; }
+.bigmeter { height:9px; border-radius:6px; background:var(--panel2); overflow:hidden; flex:1; }
+.bigmeter i { display:block; height:100%; border-radius:6px; background:var(--apply); transform-origin:left; animation:grow 1.1s cubic-bezier(.22,1,.36,1) .15s both; }
+h3.sec { font-family:'Fira Code'; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--tx3); margin-bottom:13px; font-weight:600; }
+.reason-body { font-size:13.5px; line-height:1.6; color:var(--tx); }
+.contrib { display:flex; flex-direction:column; gap:9px; margin-top:4px; }
+.contrib .c { display:grid; grid-template-columns:132px 1fr 48px; align-items:center; gap:10px; font-size:11.5px; }
+.contrib .c .lab { color:var(--tx2); font-family:'Fira Code'; font-size:11px; }
+.contrib .track { height:16px; background:var(--panel2); border-radius:4px; position:relative; overflow:hidden; }
+.contrib .track .mid { position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line2); }
+.contrib .track b { position:absolute; top:2px; bottom:2px; border-radius:3px; }
+.contrib .track b.p { left:50%; background:var(--apply); }
+.contrib .track b.n { right:50%; background:var(--skip); }
+.contrib .val { font-family:'Fira Code'; font-size:11px; text-align:right; }
+.contrib .val.p { color:var(--apply); } .contrib .val.n { color:var(--skip); }
+.watch { list-style:none; display:flex; flex-direction:column; gap:9px; margin-top:4px; }
+.watch li { display:flex; gap:9px; font-size:12.5px; color:var(--tx2); }
+.watch li::before { content:""; flex:none; width:6px; height:6px; border-radius:50%; background:var(--marginal); margin-top:6px; }
+.kf { font-size:12.5px; display:flex; align-items:flex-start; gap:8px; padding:6px 0; }
+.kf.ok { color:var(--apply); } .kf.hit { color:var(--skip); }
+.kf svg { width:15px; height:15px; flex:none; stroke:currentColor; fill:none; stroke-width:2; margin-top:1px; }
+.kv .r { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+.kv .r:last-child { border:none; } .kv .k { color:var(--tx2); }
+.kv .v { font-family:'Fira Code'; font-weight:600; }
+.whatif { grid-column:1/-1; display:flex; gap:11px; align-items:flex-start; font-size:12.5px; color:var(--tx2); background:var(--panel); border:1px dashed var(--line2); border-radius:10px; padding:13px 16px; }
+.whatif svg { width:16px; height:16px; flex:none; stroke:var(--accent); fill:none; stroke-width:1.8; margin-top:1px; }
+.whatif b { color:var(--tx); }
+.caveat { grid-column:1/-1; display:flex; gap:11px; align-items:flex-start; font-size:12.5px; color:var(--tx2); background:var(--marginal-bg); border:1px solid color-mix(in srgb, var(--marginal) 35%, transparent); border-radius:10px; padding:13px 16px; }
+.caveat svg { width:16px; height:16px; flex:none; stroke:var(--marginal); fill:none; stroke-width:1.8; margin-top:1px; }
+.det-actions { grid-column:1/-1; display:flex; gap:10px; align-items:center; }
+.foot-note { grid-column:1/-1; font-family:'Fira Code'; font-size:10.5px; color:var(--tx3); text-align:center; padding:6px 0; line-height:1.7; }
+.pending { color:var(--tx3); font-size:12px; }
+
 @media (prefers-reduced-motion:reduce) {
   * { animation:none !important; transition:none !important; }
-  .rows .row { opacity:1; } .meter i { transform:none; }
+  .rows .row { opacity:1; } .meter i, .bigmeter i { transform:none; }
 }

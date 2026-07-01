@@ -17,7 +17,7 @@ function statusLabel(row: IPOListRow): { text: string; live: boolean } {
 const sizeLabel = (cr: number | null): string =>
   cr != null ? `₹${cr.toLocaleString('en-IN')} cr` : '—'
 
-function Row({ row }: { row: IPOListRow }) {
+function Row({ row, onOpen }: { row: IPOListRow; onOpen: (id: string) => void }) {
   const m = VMETA[row.verdict]
   const isKill = row.kill_flags.length > 0
   // A kill-flag forces SKIP regardless of the score, so lead with the override, not a number
@@ -27,7 +27,19 @@ function Row({ row }: { row: IPOListRow }) {
   const pct = row.probability != null ? Math.round(row.probability * 100) : null
   const st = statusLabel(row)
   return (
-    <div className="row grid-live">
+    <div
+      className="row grid-live"
+      tabIndex={0}
+      role="button"
+      aria-label={`${row.name} — ${row.verdict}, open verdict detail`}
+      onClick={() => onOpen(row.ipo_id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen(row.ipo_id)
+        }
+      }}
+    >
       <div className="spine" style={{ background: `var(--${m.cls})` }} />
       <div className="co">
         <div className="name">{row.name}</div>
@@ -64,7 +76,7 @@ function Row({ row }: { row: IPOListRow }) {
   )
 }
 
-export function Live() {
+export function Live({ onOpen }: { onOpen: (id: string) => void }) {
   const { data, isLoading, isError } = useBoard()
   if (isLoading) return <div className="state">Loading verdicts…</div>
   if (isError || !data)
@@ -84,7 +96,7 @@ export function Live() {
       </div>
       <div className="rows">
         {data.map((row) => (
-          <Row key={row.ipo_id} row={row} />
+          <Row key={row.ipo_id} row={row} onOpen={onOpen} />
         ))}
       </div>
     </>
