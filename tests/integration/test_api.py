@@ -93,6 +93,29 @@ def test_ipos_lists_every_verdict() -> None:
     assert {"ipo_id", "verdict", "probability", "reason"} <= set(body[0])
 
 
+def test_board_carries_display_fields_and_verbatim_verdict() -> None:
+    client, records = _client(load_calibrator(_CAL))
+    resp = client.get("/board")
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert isinstance(rows, list) and len(rows) == len(records)
+
+    r = rows[0]
+    assert {
+        "ipo_id",
+        "name",
+        "segment",
+        "open_date",
+        "close_date",
+        "verdict",
+        "probability",
+        "reason",
+    } <= set(r)
+
+    # The list row's verdict is byte-for-byte /verdict (no second scoring path in the board read).
+    assert r["verdict"] == client.get(f"/verdict/{r['ipo_id']}").json()["verdict"]
+
+
 def test_unknown_ipo_returns_404() -> None:
     client, _ = _client(load_calibrator(_CAL))
     assert client.get("/verdict/NONEXISTENT-9999-99-99").status_code == 404

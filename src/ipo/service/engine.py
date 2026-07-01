@@ -30,7 +30,7 @@ from ipo.core.interfaces import Calibrator, Repository, ScoringModel
 from ipo.core.types import IPOFeatures, IPORecord, Verdict
 from ipo.features.build import build_features
 from ipo.model.verdict import evaluate
-from ipo.service.views import HistoryRow, IPODetail
+from ipo.service.views import HistoryRow, IPODetail, IPOListRow
 
 _CLOSE_EOD_HOUR = 18  # decision clock = end of the subscription-close day (IST), as in backtest
 
@@ -123,6 +123,33 @@ class VerdictEngine:
     def verdicts(self, *, asof: datetime | None = None) -> list[Verdict]:
         """Compute verdicts for every stored IPO."""
         return [self.verdict_for(record, asof=asof) for record in self._repo.list_all()]
+
+    def board(self) -> list[IPOListRow]:
+        """Display rows for the list view: each IPO's metadata + verbatim verdict (read-only).
+
+        One row per stored IPO, so the front end renders the whole board in a single read. The
+        verdict is exactly ``verdict_for`` (no recomputation); the record fields are display-only.
+        """
+        rows: list[IPOListRow] = []
+        for record in self._repo.list_all():
+            v = self.verdict_for(record)
+            rows.append(
+                IPOListRow(
+                    ipo_id=record.ipo_id,
+                    name=record.name,
+                    segment=str(record.segment),
+                    issue_size_cr=record.issue_size_cr,
+                    open_date=record.open_date,
+                    close_date=record.close_date,
+                    listing_date=record.listing_date,
+                    verdict=v.verdict,
+                    probability=v.probability,
+                    reason=v.reason,
+                    watch=v.watch,
+                    kill_flags=v.kill_flags,
+                )
+            )
+        return rows
 
     def history(self) -> list[HistoryRow]:
         """As-of verdict + actual net-of-cost outcome for every LISTED stored IPO (read-only).

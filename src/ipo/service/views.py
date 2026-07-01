@@ -32,6 +32,29 @@ class IPODetail(BaseModel):
     contributions: dict[str, float]
 
 
+class IPOListRow(BaseModel):
+    """One row for the list/board view: display metadata + the verdict, in a single read.
+
+    Combines the record's display fields (name, segment, size, key dates — the front end derives
+    the live status from the dates) with the engine's verdict verbatim, so the list renders without
+    an N-per-IPO fetch. ``verdict``/``probability`` are byte-for-byte ``verdict_for``; the record
+    fields are display-only and never feed a score.
+    """
+
+    ipo_id: str
+    name: str
+    segment: str
+    issue_size_cr: float | None
+    open_date: date
+    close_date: date
+    listing_date: date | None
+    verdict: VerdictType
+    probability: float | None
+    reason: str
+    watch: list[str]
+    kill_flags: list[str]
+
+
 class HistoryRow(BaseModel):
     """One past IPO: its point-in-time verdict paired with the actual net-of-cost outcome.
 

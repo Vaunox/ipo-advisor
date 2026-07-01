@@ -10,7 +10,8 @@ advisory only (Inviolable Rule 6).
 
 Endpoints:
 * ``GET /health``           — liveness.
-* ``GET /ipos``             — verdicts for all stored IPOs.
+* ``GET /ipos``             — verdicts for all stored IPOs (verdicts only).
+* ``GET /board``            — list-view rows: each IPO's display metadata + its verdict, one read.
 * ``GET /ipo/{ipo_id}``     — the record + verdict + point-in-time features + signed
   contributions (read-only enrichment for the detail view; the verdict is verbatim).
 * ``GET /verdict/{ipo_id}`` — the verdict alone.
@@ -29,7 +30,7 @@ from fastapi import FastAPI, HTTPException
 from ipo.core.types import Verdict
 from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
-from ipo.service.views import CalibrationView, HistoryRow, IPODetail
+from ipo.service.views import CalibrationView, HistoryRow, IPODetail, IPOListRow
 
 
 def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = None) -> FastAPI:
@@ -50,6 +51,11 @@ def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = 
     def ipos() -> list[Verdict]:
         """Return the engine's verdict for every stored IPO (verbatim)."""
         return engine.verdicts()
+
+    @app.get("/board", response_model=list[IPOListRow])
+    def board() -> list[IPOListRow]:
+        """The list view's rows: each stored IPO's display metadata + its verdict (read-only)."""
+        return engine.board()
 
     @app.get("/verdict/{ipo_id}", response_model=Verdict)
     def verdict(ipo_id: str) -> Verdict:
