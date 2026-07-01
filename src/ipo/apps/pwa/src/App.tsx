@@ -8,6 +8,8 @@ import { recalibrationCount } from './recalib'
 import { Detail } from './screens/Detail'
 import { History } from './screens/History'
 import { Live } from './screens/Live'
+import { Settings } from './screens/Settings'
+import { Upcoming } from './screens/Upcoming'
 
 const TITLES: Record<View, [string, string]> = {
   live: ['Live signals', 'mainboard · updated live · IST'],
@@ -78,6 +80,10 @@ export function App() {
             <Live onOpen={setDetailId} />
           ) : view === 'history' ? (
             <History />
+          ) : view === 'upcoming' ? (
+            <Upcoming />
+          ) : view === 'settings' ? (
+            <Settings />
           ) : (
             <Placeholder label={title} />
           )}
