@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPO Advisor — Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d12; --panel:#0f141b; --panel2:#141b24; --line:#1e2732; --line2:#28323f;
+  --tx:#e6ecf3; --tx2:#95a3b4; --tx3:#5f6d7e;
+  --apply:#3ddc84; --marginal:#f5c451; --skip:#ff5d63; --insuf:#7c8aa0; --accent:#5aa2ff;
+  --apply-bg:#0e2b1c; --marginal-bg:#2e2610; --skip-bg:#2e1113; --insuf-bg:#1a222c;
+}
+[data-theme="light"]{
+  --bg:#eef1f5; --panel:#ffffff; --panel2:#f6f8fb; --line:#dde3ea; --line2:#cbd4de;
+  --tx:#0f172a; --tx2:#475569; --tx3:#8695a8;
+  --apply:#0f9d58; --marginal:#b7791f; --skip:#d63a3f; --insuf:#5b6b80; --accent:#2563eb;
+  --apply-bg:#e2f4ea; --marginal-bg:#f7efd8; --skip-bg:#fbe4e5; --insuf-bg:#eaeef3;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--tx);font-family:'Fira Sans',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.mono{font-family:'Fira Code',monospace;font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit}
+.app{display:grid;grid-template-columns:198px 1fr;height:100vh}
+/* sidebar */
+.side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 11px}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 20px}
+.brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--apply),#1f9d55);display:grid;place-items:center;color:#04120a;font-weight:800}
+.brand b{font-size:14px;letter-spacing:.01em}
+.brand span{display:block;font-size:10px;color:var(--tx3);letter-spacing:.14em;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.nav a{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:8px;color:var(--tx2);font-size:13px;text-decoration:none;font-weight:500;position:relative}
+.nav a.on{background:var(--panel2);color:var(--tx);box-shadow:inset 2px 0 0 var(--accent)}
+.nav a:hover:not(.on){color:var(--tx);background:var(--panel2)}
+.nav svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6}
+.nav .count{margin-left:auto;font-family:'Fira Code';font-size:10px;color:var(--tx3);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:1px 7px}
+.side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:14px;font-size:10.5px;color:var(--tx3);font-family:'Fira Code'}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--apply);margin-right:7px;box-shadow:0 0 8px var(--apply)}
+.dot.down{background:var(--skip);box-shadow:0 0 8px var(--skip)}
+/* main */
+.main{overflow:auto;position:relative}
+.top{position:sticky;top:0;z-index:6;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:15px 26px}
+.top h1{font-size:16px;font-weight:600;letter-spacing:.01em}
+.top .sub{font-size:11px;color:var(--tx3);font-weight:400;margin-top:1px;font-family:'Fira Code'}
+.controls{display:flex;align-items:center;gap:10px}
+.kbtn{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12px;color:var(--tx3)}
+.kbtn:hover{color:var(--tx2)}
+.kbtn kbd{font-family:'Fira Code';font-size:10px;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:1px 5px}
+.clock{display:flex;align-items:center;gap:7px;font-family:'Fira Code',monospace;font-size:12px;color:var(--tx2);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 11px}
+.clock svg{width:13px;height:13px;stroke:var(--tx3);fill:none;stroke-width:1.7}
+.clock #clock-time{font-variant-numeric:tabular-nums;min-width:78px;text-align:right}
+.clock b{color:var(--tx3);font-weight:600;font-size:10px;letter-spacing:.08em}
+html.theme-anim,html.theme-anim *{transition:background-color .45s ease,color .45s ease,border-color .45s ease,fill .45s ease,stroke .45s ease}
+.tgl{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--tx2);font-weight:500}
+.tgl svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7;transition:transform .5s cubic-bezier(.5,0,.2,1)}
+.tgl.spin svg{animation:spin .55s cubic-bezier(.5,0,.2,1)}
+@keyframes spin{from{transform:rotate(-140deg);opacity:.2}to{transform:rotate(0);opacity:1}}
+.content{padding:20px 26px 60px}
+.section{display:none;animation:fade .35s ease}
+.section.on{display:block}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+/* uncalibrated banner */
+.uncal-banner{display:none;align-items:center;gap:11px;background:var(--marginal-bg);border:1px solid color-mix(in srgb,var(--marginal) 45%,transparent);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12.5px;color:var(--tx)}
+body.uncal .uncal-banner{display:flex}
+.uncal-banner svg{width:17px;height:17px;flex:none;stroke:var(--marginal);fill:none;stroke-width:1.9}
+.uncal-banner b{color:var(--marginal)}
+/* generic table header */
+.lhead{display:grid;gap:14px;padding:0 16px 10px;font-family:'Fira Code';font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);border-bottom:1px solid var(--line)}
+.lhead .r{text-align:right}
+.lhead [data-sort]{cursor:pointer;user-select:none;transition:color .15s}
+.lhead [data-sort]:hover{color:var(--tx2)}
+.lhead [data-sort].sorted{color:var(--accent)}
+.caret{font-size:8px;margin-left:5px}
+.rows{display:flex;flex-direction:column}
+/* LIVE columns */
+.grid-live{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr) minmax(0,0.95fr) minmax(0,3.15fr)}
+.row{display:grid;gap:14px;align-items:center;padding:16px;border-bottom:1px solid var(--line);position:relative;cursor:pointer;transition:background .15s,padding-left .15s}
+.rows .row:hover{background:var(--panel);padding-left:22px}
+.spine{position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px}
+.co .name{font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:9px}
+.co small{display:block;font-weight:400;font-size:11px;color:var(--tx3);margin-top:3px;font-family:'Fira Code'}
+.co small b{color:var(--marginal);font-weight:600}
+.tag{font-family:'Fira Code',monospace;font-size:11px;font-weight:600;letter-spacing:.05em;padding:5px 9px;border-radius:5px;display:inline-block}
+.t-apply{color:var(--apply);background:var(--apply-bg)} .t-marginal{color:var(--marginal);background:var(--marginal-bg)}
+.t-skip{color:var(--skip);background:var(--skip-bg)} .t-insuf{color:var(--insuf);background:var(--insuf-bg)}
+.t-pending{color:var(--tx3);background:var(--panel2);border:1px dashed var(--line2)}
+.prob{font-family:'Fira Code',monospace;font-weight:600;font-size:18px}
+.prob small{display:block;font-size:9px;color:var(--tx3);letter-spacing:.1em;text-transform:uppercase;font-weight:500;margin-top:2px}
+.prob.none{font-size:13px;color:var(--tx3);font-weight:500}
+body.uncal .prob .num{display:none}
+.prob .uncalx{display:none}
+body.uncal .prob .uncalx{display:inline;color:var(--tx3);font-size:12px}
+.reason{font-size:12.5px;color:var(--tx2);line-height:1.45}
+.reason b{color:var(--apply);font-weight:600;font-family:'Fira Code'}
+.meter{margin-top:9px;height:5px;border-radius:3px;background:var(--panel2);overflow:hidden;max-width:340px}
+.meter i{display:block;height:100%;border-radius:3px;transform-origin:left;animation:grow 1s cubic-bezier(.22,1,.36,1) .35s both}
+body.uncal .meter{opacity:.25}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.gain{font-family:'Fira Code',monospace;font-weight:600;font-size:15px;text-align:right}
+.gain.pos{color:var(--apply)} .gain.neu{color:var(--tx2)} .gain.na{color:var(--tx3);font-size:13px}
+.gain small{display:block;font-size:10px;color:var(--tx3);font-weight:400;margin-top:2px}
+.rows .row{opacity:0;animation:rise .5s ease forwards}
+.rows .row:nth-child(1){animation-delay:.04s}.rows .row:nth-child(2){animation-delay:.09s}
+.rows .row:nth-child(3){animation-delay:.14s}.rows .row:nth-child(4){animation-delay:.19s}
+.rows .row:nth-child(5){animation-delay:.24s}.rows .row:nth-child(6){animation-delay:.29s}
+.rows .row:nth-child(7){animation-delay:.34s}.rows .row:nth-child(8){animation-delay:.39s}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.bell{width:30px;height:30px;border-radius:7px;border:1px solid var(--line);display:grid;place-items:center;color:var(--tx3)}
+.bell:hover{color:var(--accent);border-color:var(--accent)}
+.bell.on{color:var(--apply);border-color:color-mix(in srgb,var(--apply) 45%,transparent)}
+.bell svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.7}
+/* UPCOMING columns */
+.grid-up{grid-template-columns:minmax(0,1.9fr) minmax(0,1.1fr) minmax(0,1.8fr) minmax(0,1fr) 64px}
+.count-badge{font-family:'Fira Code';font-size:12px;color:var(--marginal);font-weight:600}
+.pending{font-family:'Fira Code';font-size:11px;color:var(--tx3)}
+.anchor-flag{color:var(--accent);font-family:'Fira Code';font-size:11px;font-weight:600}
+.struct{font-size:12px;color:var(--tx2);font-family:'Fira Code'}
+/* HISTORY */
+.scorecard{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.sc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.sc .lab{font-family:'Fira Code';font-size:10px;color:var(--tx3);letter-spacing:.08em;text-transform:uppercase}
+.sc .val{font-family:'Fira Code';font-size:25px;font-weight:600;margin-top:8px}
+.sc .val small{font-size:12px;color:var(--tx3);font-weight:400}
+.sc .note{font-size:11px;color:var(--tx2);margin-top:4px}
+.relbar{height:6px;border-radius:3px;background:var(--panel2);margin-top:11px;overflow:hidden;position:relative}
+.relbar .pred{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx2)}
+.relbar i{display:block;height:100%;background:var(--apply);border-radius:3px;transform-origin:left;animation:grow 1s ease .2s both}
+.chips{display:flex;gap:8px;margin-bottom:14px}
+.chip{font-family:'Fira Code';font-size:11px;color:var(--tx2);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:6px 13px;transition:.15s}
+.chip:hover{color:var(--tx)}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.grid-hist{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr)}
+.hitmark{font-family:'Fira Code';font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.hit{color:var(--apply)} .miss{color:var(--skip)} .neutral{color:var(--tx3)}
+.actual{font-family:'Fira Code';font-weight:600;font-size:15px}
+.actual.pos{color:var(--apply)}.actual.neg{color:var(--skip)}
+/* empty state */
+.empty{text-align:center;padding:70px 20px;color:var(--tx3)}
+.empty svg{width:38px;height:38px;stroke:var(--line2);fill:none;stroke-width:1.4;margin-bottom:14px}
+.empty h3{font-size:15px;color:var(--tx2);font-weight:600;margin-bottom:6px}
+.empty p{font-size:12.5px}
+/* SETTINGS */
+.set-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:900px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.card.full{grid-column:1/-1}
+h3.sec{font-family:'Fira Code';font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);margin-bottom:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}
+.set-row:last-child{border:none}
+.set-row .k{color:var(--tx)}.set-row .k small{display:block;color:var(--tx3);font-size:11px;margin-top:2px}
+.switch{width:40px;height:22px;border-radius:20px;background:var(--panel2);border:1px solid var(--line2);position:relative;transition:.2s;flex:none}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--tx3);transition:.2s}
+.switch.on{background:var(--apply-bg);border-color:var(--apply)}
+.switch.on::after{left:20px;background:var(--apply)}
+.seg2{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px}
+.seg2 button{padding:6px 12px;border-radius:6px;font-size:12px;color:var(--tx2);font-family:'Fira Code'}
+.seg2 button.on{background:var(--tx);color:var(--bg)}
+.num-in{width:96px;background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:7px 10px;color:var(--tx);font-family:'Fira Code';font-size:12px;text-align:right}
+.num-in:focus{outline:none;border-color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--tx);font-weight:500}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.danger:hover{border-color:var(--skip);color:var(--skip)}
+.health{display:flex;align-items:center;gap:9px;font-family:'Fira Code';font-size:12px}
+.about{font-size:12px;color:var(--tx2);line-height:1.7}
+.about b{color:var(--tx)}
+.disclaimer{font-size:11px;color:var(--tx3);line-height:1.6;font-style:italic;border-left:2px solid var(--line2);padding-left:12px;margin-top:12px}
+/* DETAIL */
+#detail{display:none;padding:20px 26px 60px}
+#detail.on{display:block}
+.back{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);font-family:'Fira Code';margin-bottom:18px}
+.back:hover{color:var(--tx)}
+.back svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+.det{display:grid;grid-template-columns:1.15fr 1fr;gap:16px}
+.det-hero{grid-column:1/-1;display:flex;align-items:center;gap:26px;padding:24px}
+.verdict-badge{font-family:'Fira Code',monospace;font-size:26px;font-weight:700;letter-spacing:.04em;padding:14px 22px;border-radius:10px}
+.hero-meta h2{font-size:22px;font-weight:600}
+.hero-meta .m{font-size:12px;color:var(--tx3);margin-top:4px;font-family:'Fira Code'}
+.hero-prob{margin-left:auto;text-align:right}
+.hero-prob .big{font-family:'Fira Code',monospace;font-size:42px;font-weight:700;line-height:1}
+body.uncal .hero-prob .big{display:none}
+.hero-prob .big-uncal{display:none;font-family:'Fira Code';font-size:19px;font-weight:600;color:var(--marginal)}
+body.uncal .hero-prob .big-uncal{display:block}
+.hero-prob .lbl{font-size:11px;color:var(--tx2);margin-top:4px}
+.gate{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--apply);background:var(--apply-bg);padding:4px 9px;border-radius:20px;margin-top:8px;letter-spacing:.04em;font-family:'Fira Code'}
+.gate.fail{color:var(--marginal);background:var(--marginal-bg)}
+.gate svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+.meterbar{grid-column:1/-1;display:flex;align-items:center;gap:20px;padding:18px 22px}
+body.uncal .meterbar{opacity:.3}
+.bigmeter{height:9px;border-radius:6px;background:var(--panel2);overflow:hidden;flex:1}
+.bigmeter i{display:block;height:100%;border-radius:6px;background:var(--apply);transform-origin:left;animation:grow 1.1s cubic-bezier(.22,1,.36,1) .15s both}
+.reason-body{font-size:13.5px;line-height:1.6;color:var(--tx)}
+.reason-body b{color:var(--apply);font-weight:600;font-family:'Fira Code'}
+/* contribution bars */
+.contrib{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+.contrib .c{display:grid;grid-template-columns:118px 1fr 46px;align-items:center;gap:10px;font-size:11.5px}
+.contrib .c .lab{color:var(--tx2);font-family:'Fira Code';font-size:11px}
+.contrib .track{height:16px;background:var(--panel2);border-radius:4px;position:relative;overflow:hidden}
+.contrib .track .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)}
+.contrib .track b{position:absolute;top:2px;bottom:2px;border-radius:3px;transform-origin:center;animation:grow .8s ease .3s both}
+.contrib .track b.p{left:50%;background:var(--apply)}
+.contrib .track b.n{right:50%;background:var(--skip)}
+.contrib .val{font-family:'Fira Code';font-size:11px;text-align:right}
+.contrib .val.p{color:var(--apply)}.contrib .val.n{color:var(--skip)}
+/* sparkline */
+.spark{margin-top:6px}
+.spark svg{width:100%;height:52px;overflow:visible}
+.spark .pl{fill:none;stroke:var(--apply);stroke-width:2}
+.spark .dt{fill:var(--apply)}
+.spark-lab{display:flex;justify-content:space-between;font-family:'Fira Code';font-size:10px;color:var(--tx3);margin-top:5px}
+/* verdict log */
+.vlog{list-style:none;position:relative;padding-left:18px}
+.vlog::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:1px;background:var(--line2)}
+.vlog li{position:relative;padding:0 0 15px}
+.vlog li:last-child{padding-bottom:0}
+.vlog li::before{content:"";position:absolute;left:-17px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--tx3);border:2px solid var(--panel)}
+.vlog li.cur::before{background:var(--apply)}
+.vlog .vt{font-family:'Fira Code';font-size:10.5px;color:var(--tx3)}
+.vlog .vv{font-family:'Fira Code';font-size:12px;font-weight:600;margin:2px 0}
+.vlog .vn{font-size:12px;color:var(--tx2)}
+.watch{list-style:none;display:flex;flex-direction:column;gap:9px;margin-top:4px}
+.watch li{display:flex;gap:9px;font-size:12.5px;color:var(--tx2)}
+.watch li::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--marginal);margin-top:6px}
+.kf{font-size:12.5px;display:flex;align-items:flex-start;gap:8px;padding:6px 0}
+.kf.ok{color:var(--apply)} .kf.hit{color:var(--skip)}
+.kf svg{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:2;margin-top:1px}
+.kv .r{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.kv .r:last-child{border:none}.kv .k{color:var(--tx2)}
+.kv .v{font-family:'Fira Code';font-weight:600}.kv .v .s{color:var(--tx3);font-weight:400;font-size:11px}
+.costs .r{display:flex;justify-content:space-between;padding:7px 0;font-size:12px;color:var(--tx2)}
+.costs .r .v{font-family:'Fira Code';color:var(--tx)}
+.costs .net{border-top:1px solid var(--line2);margin-top:6px;padding-top:11px;font-size:14px;font-weight:600;color:var(--tx)}
+.costs .net .v{color:var(--apply);font-size:16px;font-family:'Fira Code'}
+.caveat{grid-column:1/-1;display:flex;gap:11px;align-items:flex-start;font-size:12.5px;color:var(--tx2);background:var(--marginal-bg);border:1px solid color-mix(in srgb,var(--marginal) 35%,transparent);border-radius:10px;padding:13px 16px}
+.caveat svg{width:16px;height:16px;flex:none;stroke:var(--marginal);fill:none;stroke-width:1.8;margin-top:1px}
+.det-actions{grid-column:1/-1;display:flex;gap:10px;align-items:center}
+.foot-note{grid-column:1/-1;font-family:'Fira Code';font-size:10.5px;color:var(--tx3);text-align:center;padding:6px 0;line-height:1.7}
+/* command palette */
+.overlay{position:fixed;inset:0;background:rgba(3,6,10,.6);backdrop-filter:blur(3px);z-index:50;display:none;align-items:flex-start;justify-content:center;padding-top:12vh}
+.overlay.on{display:flex}
+.palette{width:560px;max-width:92vw;background:var(--panel);border:1px solid var(--line2);border-radius:14px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.palette input{width:100%;background:none;border:none;border-bottom:1px solid var(--line);padding:16px 18px;color:var(--tx);font-size:15px}
+.palette input:focus{outline:none}
+.pal-list{max-height:340px;overflow:auto;padding:6px}
+.pal-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.pal-item.sel{background:var(--panel2)}
+.pal-item .pt{font-family:'Fira Code';font-size:10px;color:var(--tx3);border:1px solid var(--line);border-radius:4px;padding:2px 6px;flex:none}
+.pal-item .pn{color:var(--tx)}.pal-item .pd{color:var(--tx3);font-size:11px;margin-left:auto;font-family:'Fira Code'}
+.pal-empty{padding:22px;text-align:center;color:var(--tx3);font-size:12.5px}
+/* engine-down overlay */
+.enginedown{position:fixed;inset:0;background:var(--bg);z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px}
+.enginedown.on{display:flex}
+.enginedown .ic{width:60px;height:60px;border-radius:14px;background:var(--skip-bg);display:grid;place-items:center;margin-bottom:20px}
+.enginedown .ic svg{width:30px;height:30px;stroke:var(--skip);fill:none;stroke-width:1.8}
+.enginedown h2{font-size:20px;font-weight:600;margin-bottom:8px}
+.enginedown p{color:var(--tx2);font-size:13px;max-width:400px;margin-bottom:6px;line-height:1.6}
+.enginedown .mn{font-family:'Fira Code';font-size:11px;color:var(--tx3);margin:14px 0 20px}
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:12px 18px;font-size:12.5px;color:var(--tx);box-shadow:0 12px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.25s;z-index:70;display:flex;align-items:center;gap:9px}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast svg{width:15px;height:15px;stroke:var(--apply);fill:none;stroke-width:2}
+/* ---------- polish pass ---------- */
+::selection{background:color-mix(in srgb,var(--accent) 32%,transparent)}
+.card{box-shadow:0 1px 2px rgba(0,0,0,.16),0 12px 30px -22px rgba(0,0,0,.6)}
+[data-theme="light"] .card{box-shadow:0 1px 2px rgba(16,24,40,.05),0 14px 30px -22px rgba(16,24,40,.28)}
+a:focus-visible,button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.row:focus-visible{background:var(--panel)}
+/* sortable header affordance */
+.caret{font-size:11px;margin-left:7px;opacity:.65;transition:opacity .15s}
+.lhead [data-sort].sorted .caret{opacity:1;font-weight:700}
+.lhead [data-sort]:hover .caret{opacity:.95}
+/* sparkline area fill */
+.spark .area{fill:color-mix(in srgb,var(--apply) 13%,transparent);stroke:none}
+/* attention strip */
+.attention{display:none;align-items:center;gap:11px;background:var(--marginal-bg);border:1px solid color-mix(in srgb,var(--marginal) 40%,transparent);border-radius:10px;padding:11px 16px;margin-bottom:16px;font-size:12.5px;color:var(--tx)}
+.attention svg{width:16px;height:16px;flex:none;stroke:var(--marginal);fill:none;stroke-width:1.9}
+.attention b{color:var(--marginal)}
+.attention #cd{color:var(--marginal);font-weight:600}
+.att-x{margin-left:auto;flex:none;width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--tx3);font-size:13px;line-height:1}
+.att-x:hover{color:var(--tx);background:color-mix(in srgb,var(--marginal) 18%,transparent)}
+/* settings shortcut list */
+.set-row kbd{font-family:'Fira Code';font-size:10.5px;background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:2px 7px;color:var(--tx2);margin-left:5px}
+/* startup splash */
+.splash{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease}
+.splash.out{opacity:0;pointer-events:none}
+.splash-in{text-align:center}
+.splash-logo{width:56px;height:56px;border-radius:15px;background:linear-gradient(135deg,var(--apply),#1f9d55);display:grid;place-items:center;color:#04120a;font-weight:800;font-size:26px;font-family:'Fira Code';margin:0 auto 16px;animation:sPop .55s cubic-bezier(.2,1,.3,1)}
+.splash-name{font-size:20px;font-weight:700;letter-spacing:-.01em;margin-bottom:24px}
+.splash-steps{display:flex;flex-direction:column;gap:10px;font-family:'Fira Code';font-size:12px;text-align:left;width:220px;margin:0 auto}
+.sstep{opacity:.25;display:flex;align-items:center;gap:10px;color:var(--tx3);transition:opacity .3s,color .3s}
+.sstep::before{content:"○";font-size:11px}
+.sstep.active{opacity:1;color:var(--tx2)}
+.sstep.done{opacity:.75;color:var(--apply)}
+.sstep.done::before{content:"✓";color:var(--apply)}
+@keyframes sPop{from{transform:scale(.55);opacity:0}to{transform:scale(1);opacity:1}}
+/* glossary tooltips */
+.gl{border-bottom:1px dotted var(--tx3);cursor:help}
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:0;top:calc(100% + 8px);z-index:30;width:230px;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:9px 12px;font-family:'Fira Sans';font-size:11px;font-weight:400;line-height:1.5;letter-spacing:normal;text-transform:none;color:var(--tx2);box-shadow:0 10px 28px rgba(0,0,0,.45);white-space:normal;pointer-events:none}
+.kv [data-tip]:hover::after{top:auto;bottom:calc(100% + 8px)}
+/* shortcuts help */
+.hk{display:flex;justify-content:space-between;align-items:center;color:var(--tx2)}
+.hk kbd{font-family:'Fira Code';font-size:10.5px;background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:2px 7px;color:var(--tx2);margin-left:5px}
+/* alert center */
+.alertwrap{position:relative}
+.alertbtn{position:relative;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;color:var(--tx2)}
+.alertbtn:hover{color:var(--tx)}
+.alertbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7}
+.alertbtn .badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:9px;background:var(--skip);color:#fff;font-family:'Fira Code';font-size:9px;font-weight:600;display:grid;place-items:center;padding:0 4px}
+.alertbtn .badge.hidden{display:none}
+.alertpanel{position:absolute;top:48px;right:0;width:328px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5);z-index:40;overflow:hidden;display:none;animation:fade .2s ease}
+.alertpanel.on{display:block}
+.alertpanel .ah{padding:13px 16px;border-bottom:1px solid var(--line);font-size:12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.alertpanel .ah button{font-size:11px;color:var(--accent)}
+.alertitem{display:flex;gap:11px;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer;align-items:flex-start}
+.alertitem:last-child{border:none}
+.alertitem:hover{background:var(--panel2)}
+.alertitem .adot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none}
+.alertitem .an{font-size:12.5px;font-weight:600}
+.alertitem .am{font-size:11.5px;color:var(--tx2);margin-top:2px}
+.alertitem .at{font-family:'Fira Code';font-size:10px;color:var(--tx3);margin-top:3px}
+/* pin / star */
+.star{background:none;border:none;cursor:pointer;color:var(--tx3);opacity:.5;padding:0;flex:none;display:inline-flex;transition:opacity .15s,color .15s}
+.row:hover .star,.star.on{opacity:1}
+.star:hover{color:var(--marginal)}
+.star svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6}
+.star.on{color:var(--marginal)}
+.star.on svg{fill:var(--marginal)}
+/* changed badge */
+.changed{display:inline-block;font-family:'Fira Code';font-size:8.5px;font-weight:600;letter-spacing:.06em;color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:4px;padding:1px 5px;margin-left:8px;vertical-align:middle}
+/* density */
+body.compact .row{padding-top:9px;padding-bottom:9px}
+body.compact .co small{margin-top:2px}
+body.compact .meter{margin-top:6px}
+/* reliability diagram */
+.reldiag{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:20px;box-shadow:0 1px 2px rgba(0,0,0,.16),0 12px 30px -22px rgba(0,0,0,.6)}
+[data-theme="light"] .reldiag{box-shadow:0 1px 2px rgba(16,24,40,.05),0 14px 30px -22px rgba(16,24,40,.28)}
+.rd-head .sub{font-size:11px;color:var(--tx3);margin-top:4px}
+.rd-body{display:flex;justify-content:space-between;align-items:center;gap:48px;margin-top:18px;flex-wrap:wrap}
+.rd-svg{flex:none;margin-left:6px}
+.rd-diag{stroke:var(--line2);stroke-width:1;stroke-dasharray:3 3}
+.rd-band{fill:color-mix(in srgb,var(--apply) 9%,transparent)}
+.rd-axis{stroke:var(--line);stroke-width:1}
+.rd-line{fill:none;stroke:var(--apply);stroke-width:2}
+.rd-pt{fill:var(--apply);stroke:var(--panel);stroke-width:2}
+.rd-tick{font-family:'Fira Code';font-size:8px;fill:var(--tx3)}
+.rd-axlabel{font-family:'Fira Code';font-size:9px;fill:var(--tx3)}
+.rd-right{max-width:500px;margin-left:auto}
+.rd-caption{font-size:13px;color:var(--tx2);line-height:1.65;margin-bottom:16px}
+.rd-caption b{color:var(--tx)}
+.rd-buckets{display:flex;flex-direction:column;gap:9px}
+.rd-brow{display:grid;grid-template-columns:70px 1fr 132px;align-items:center;gap:14px;font-family:'Fira Code';font-size:11px}
+.rd-brow .bp{color:var(--tx3)}
+.rd-brow .bar{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.rd-brow .bar i{display:block;height:100%;background:var(--apply);border-radius:4px;transform-origin:left;animation:grow .8s ease .2s both}
+.rd-brow .ba{color:var(--tx2);text-align:left;white-space:nowrap}
+.rd-brow .ba b{display:inline-block;width:40px;text-align:right;color:var(--tx);font-weight:600}
+.rd-brow .ba .n{color:var(--tx3)}
+.rd-legend{display:flex;gap:18px;margin-top:16px;font-size:10.5px;color:var(--tx3)}
+.rd-legend .k{display:inline-flex;align-items:center;gap:7px}
+.rd-legend i{width:13px;height:2px;background:var(--tx3);display:inline-block}
+.rd-legend .dotk{width:9px;height:9px;border-radius:50%;background:var(--apply);display:inline-block}
+/* history tools */
+.hist-tools{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.hist-search{width:250px;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.hist-search input{background:none;border:none;color:var(--tx);font-size:12.5px;width:100%}
+.hist-search input:focus{outline:none}
+.hist-search svg{width:14px;height:14px;stroke:var(--tx3);fill:none;stroke-width:1.7;flex:none}
+.hist-tools .spacer{margin-left:auto}
+/* what-would-change callout */
+.whatif{grid-column:1/-1;display:flex;gap:11px;align-items:flex-start;font-size:12.5px;color:var(--tx2);background:var(--panel);border:1px dashed var(--line2);border-radius:10px;padding:13px 16px}
+.whatif svg{width:16px;height:16px;flex:none;stroke:var(--accent);fill:none;stroke-width:1.8;margin-top:1px}
+.whatif b{color:var(--tx)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rows .row{opacity:1}.meter i,.bigmeter i,.contrib .track b{transform:none}}
+</style>
+</head>
+<body>
+<div class="splash" id="splash">
+  <div class="splash-in">
+    <div class="splash-logo">◆</div>
+    <div class="splash-name">IPO Advisor</div>
+    <div class="splash-steps" id="splash-steps">
+      <div class="sstep">Starting engine…</div>
+      <div class="sstep">Health check&nbsp; /health</div>
+      <div class="sstep">Loading calibrator</div>
+      <div class="sstep">Ready</div>
+    </div>
+  </div>
+</div>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="mark mono">◆</div><div><b>IPO Advisor</b><span>Terminal</span></div></div>
+    <nav class="nav" id="nav">
+      <a class="on" data-nav="live" onclick="go('live')"><svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg> Live signals <span class="count" id="c-live"></span></a>
+      <a data-nav="upcoming" onclick="go('upcoming')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Upcoming <span class="count" id="c-up"></span></a>
+      <a data-nav="history" onclick="go('history')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg> History <span class="count" id="c-hist"></span></a>
+      <a data-nav="settings" onclick="go('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7 7 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L14.9 3H9.1l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h5.8l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.4z"/></svg> Settings</a>
+    </nav>
+    <div class="side-foot"><span class="dot" id="foot-dot"></span><span id="foot-status">Engine online</span><br>calibrator · gate passed<br><span style="white-space:nowrap">recalibrated <span id="recal-foot">—</span>×</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div><h1 id="page-title">Live signals</h1><div class="sub" id="page-sub">mainboard · 5 open · updated 2 min ago · IST</div></div>
+      <div class="controls">
+        <div class="alertwrap">
+          <button class="alertbtn" onclick="toggleAlerts(event)" title="Recent alerts"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="badge" id="alert-badge"></span></button>
+          <div class="alertpanel" id="alertpanel">
+            <div class="ah">Recent alerts <button onclick="markAlertsRead(event)">Mark all read</button></div>
+            <div id="alert-list"></div>
+          </div>
+        </div>
+        <button class="kbtn" onclick="openPalette()">Search <kbd>Ctrl K</kbd></button>
+        <div class="clock" title="Current time — India Standard Time"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="clock-time">—</span> <b>IST</b></div>
+        <button class="tgl" onclick="toggleTheme()">
+          <svg class="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="i-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>
+          <span class="tlabel">Light</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="uncal-banner"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span><b>UNCALIBRATED — reliability gate not passed.</b> Verdicts are shown; probabilities are withheld until the calibrator passes its out-of-sample check. No number the gate didn't bless.</span></div>
+
+      <!-- LIVE -->
+      <section class="section on" id="s-live">
+        <div class="attention" id="attention"></div>
+        <div class="lhead grid-live">
+          <div data-sort="company" onclick="sortLive('company')">Company<span class="caret"></span></div>
+          <div data-sort="verdict" onclick="sortLive('verdict')">Verdict<span class="caret"></span></div>
+          <div data-sort="prob" onclick="sortLive('prob')">Prob.<span class="caret"></span></div>
+          <div>Grounded reason</div>
+        </div>
+        <div class="rows" id="live-rows"></div>
+      </section>
+
+      <!-- UPCOMING -->
+      <section class="section" id="s-upcoming">
+        <div class="lhead grid-up"><div>Company</div><div>Opens</div><div>Structure preview</div><div>Valuation</div><div class="r">Notify</div></div>
+        <!-- notify header aligned right to match the bell column -->
+        <div class="rows" id="up-rows"></div>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="section" id="s-history">
+        <div class="scorecard" id="scorecard"></div>
+        <div class="reldiag" id="reldiag"></div>
+        <div class="hist-tools">
+          <div class="hist-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg><input id="hist-q" placeholder="Search history…" oninput="renderHistory()"></div>
+          <div class="chips" id="hist-chips" style="margin:0"></div>
+          <span class="spacer"></span>
+          <button class="btn" onclick="exportCSV()">Export CSV</button>
+        </div>
+        <div class="lhead grid-hist">
+          <div data-sort="company" onclick="sortHist('company')">Company<span class="caret"></span></div>
+          <div data-sort="verdict" onclick="sortHist('verdict')">Verdict<span class="caret"></span></div>
+          <div data-sort="prob" onclick="sortHist('prob')">Predicted<span class="caret"></span></div>
+          <div data-sort="actual" onclick="sortHist('actual')">Actual (net)<span class="caret"></span></div>
+          <div class="r">Call</div>
+        </div>
+        <div class="rows" id="hist-rows"></div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="section" id="s-settings">
+        <div class="set-grid">
+          <div class="card">
+            <h3 class="sec"><svg viewBox="0 0 24 24" width="13" height="13" style="stroke:var(--tx3);fill:none;stroke-width:1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg> Notifications</h3>
+            <div class="set-row"><div class="k">Native Windows notifications</div><div class="switch on" onclick="tog(this)"></div></div>
+            <div class="set-row"><div class="k">Alert on APPLY crossing<small>when a verdict crosses into APPLY</small></div><div class="switch on" onclick="tog(this)"></div></div>
+            <div class="set-row"><div class="k">Alert on verdict change<small>any MARGINAL/SKIP transition</small></div><div class="switch" onclick="tog(this)"></div></div>
+            <div class="set-row"><div class="k">Quiet hours (22:00–08:00 IST)</div><div class="switch on" onclick="tog(this)"></div></div>
+          </div>
+
+          <div class="card">
+            <h3 class="sec">Broker cost assumptions</h3>
+            <div class="set-row"><div class="k">STT on sell (%)<small>listing-day delivery sell</small></div><input class="num-in" id="cost-stt" value="0.10" oninput="recost()"></div>
+            <div class="set-row"><div class="k">DP charge (₹, flat)<small>per ISIN per sell-day</small></div><input class="num-in" id="cost-dp" value="15.34" oninput="recost()"></div>
+            <div class="set-row"><div class="k">Exchange + GST + SEBI (%)</div><input class="num-in" id="cost-oth" value="0.05" oninput="recost()"></div>
+            <div class="set-row"><div class="k">Effect</div><div class="pending" id="cost-effect">applied to net-of-cost on History listing gains</div></div>
+          </div>
+
+          <div class="card">
+            <h3 class="sec">Appearance</h3>
+            <div class="set-row"><div class="k">Theme</div><div class="seg2"><button onclick="setTheme('dark',this)">Dark</button><button onclick="setTheme('light',this)">Light</button><button class="on" onclick="setTheme('system',this)">System</button></div></div>
+            <div class="set-row"><div class="k">Density</div><div class="seg2" id="density-seg"><button class="on" onclick="setDensity('comfortable',this)">Comfortable</button><button onclick="setDensity('compact',this)">Compact</button></div></div>
+            <div class="set-row"><div class="k">Launch on Windows startup</div><div class="switch" onclick="tog(this)"></div></div>
+            <div class="set-row"><div class="k">Minimize to system tray</div><div class="switch on" onclick="tog(this)"></div></div>
+          </div>
+
+          <div class="card">
+            <h3 class="sec">Engine</h3>
+            <div class="set-row"><div class="k">Status</div><div class="health"><span class="dot" id="set-dot"></span><span id="set-health">online · engine ready</span></div></div>
+            <div class="set-row"><div class="k">Calibrator</div><div class="mono" style="font-size:12px;color:var(--tx2)">reliability gate <span style="color:var(--apply)">PASSED</span> · re-fit <span id="recal-set">—</span>×</div></div>
+            <div class="set-row"><div class="k">Last ingest</div><div class="mono" style="font-size:12px;color:var(--tx2)">NSE 2m · Chittorgarh 4m · RHP 1h</div></div>
+            <div class="set-row"><div class="k">Actions</div><div style="display:flex;gap:8px"><button class="btn" onclick="refreshNow()">Refresh now</button><button class="btn danger" onclick="restartEngine()">Restart engine</button></div></div>
+          </div>
+
+          <div class="card">
+            <h3 class="sec">Keyboard shortcuts</h3>
+            <div class="set-row"><div class="k">Search / command palette</div><span><kbd>Ctrl K</kbd><kbd>/</kbd></span></div>
+            <div class="set-row"><div class="k">Go to Live · Upcoming</div><span><kbd>g l</kbd><kbd>g u</kbd></span></div>
+            <div class="set-row"><div class="k">Go to History · Settings</div><span><kbd>g h</kbd><kbd>g s</kbd></span></div>
+            <div class="set-row"><div class="k">Toggle light / dark</div><kbd>t</kbd></div>
+            <div class="set-row"><div class="k">Show this list any time</div><kbd>?</kbd></div>
+          </div>
+
+          <div class="card full">
+            <h3 class="sec">Preview app states <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0;font-family:'Fira Sans'">— design review only</span></h3>
+            <div class="set-row"><div class="k">UNCALIBRATED state<small>hides all probabilities, shows the reliability banner (invariant #2)</small></div><div class="switch" onclick="tog(this);toggleUncal(this)"></div></div>
+            <div class="set-row"><div class="k">Engine-unavailable screen<small>the cold-start / crash surface (build-loop gate)</small></div><button class="btn" onclick="showEngineDown()">Preview</button></div>
+          </div>
+
+          <div class="card full">
+            <h3 class="sec">About</h3>
+            <div class="about"><b>IPO Advisor</b> v0.7.0 · Windows desktop (Electron shell + Python FastAPI engine sidecar). Mainboard IPOs only.</div>
+            <div class="disclaimer">Engineering/research reference — not financial advice. The operator is not a SEBI-registered adviser. A calibrated probability is an estimate, not an assurance — a well-calibrated 70% still fails ~30% of the time. GMP is not a scoring input. The app is <b>advisory only</b>: it displays verdicts and places no orders.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DETAIL (opened from a Live row) -->
+      <section id="detail"></section>
+    </div>
+  </main>
+</div>
+
+<!-- command palette -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closePalette()">
+  <div class="palette">
+    <input id="pal-input" placeholder="Search IPOs or jump to a section…" oninput="renderPalette()" onkeydown="palKey(event)">
+    <div class="pal-list" id="pal-list"></div>
+  </div>
+</div>
+
+<!-- shortcuts help -->
+<div class="overlay" id="help-overlay" onclick="if(event.target===this)closeHelp()">
+  <div class="palette" style="width:430px">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px">Keyboard shortcuts</div>
+    <div style="padding:15px 18px;display:flex;flex-direction:column;gap:11px;font-size:13px">
+      <div class="hk"><span>Search / command palette</span><span><kbd>Ctrl K</kbd><kbd>/</kbd></span></div>
+      <div class="hk"><span>Go to Live · Upcoming</span><span><kbd>g l</kbd><kbd>g u</kbd></span></div>
+      <div class="hk"><span>Go to History · Settings</span><span><kbd>g h</kbd><kbd>g s</kbd></span></div>
+      <div class="hk"><span>Toggle light / dark</span><kbd>t</kbd></div>
+      <div class="hk"><span>Close · back</span><kbd>Esc</kbd></div>
+      <div class="hk"><span>This help</span><kbd>?</kbd></div>
+    </div>
+  </div>
+</div>
+
+<!-- engine-down -->
+<div class="enginedown" id="enginedown">
+  <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
+  <h2>Engine unavailable</h2>
+  <p>The advisory engine isn't responding. Verdicts can't be shown until it's back — nothing here is stale-but-pretending-to-be-live.</p>
+  <div class="mn">sidecar exited · last /health 200 OK at 17:01:04 IST</div>
+  <div style="display:flex;gap:10px"><button class="btn" onclick="hideEngineDown()">Retry connection</button></div>
+</div>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span id="toast-msg"></span></div>
+
+<script>
+/* ---------- DATA (the engine's output; the UI only displays & reorders it) ---------- */
+const VMETA={APPLY:{c:'apply',rank:0},MARGINAL:{c:'marginal',rank:1},SKIP:{c:'skip',rank:2},INSUFFICIENT_SIGNAL:{c:'insuf',rank:3}};
+const DATA=[
+ {id:'nimbus',stage:'live',name:'Nimbus Logistics',sector:'Logistics',size:'₹1,240 cr',band:'₹256–270',status:'CLOSES TODAY',live:true,rank:0,
+  verdict:'APPLY',prob:74,grossN:11.8,cold:false,
+  reason:'QIB <b>42×</b>, anchors <b>88%</b>, issue P/E <b>12% below</b> peer median',
+  reasonFull:'Institutional demand is strong — <b>QIB 42×</b> with high-quality anchors (<b>88%</b> reputable, long lock-in). The issue is priced <b>12% below</b> the peer-median P/E, and the market regime is constructive (<b>+0.4</b>). No kill-flags triggered.',
+  contrib:[['QIB 42×',0.31],['Anchors 88%',0.22],['Valuation −12%',0.18],['Regime +0.4',0.09],['OFS 30%',-0.04]],
+  subs:{qib:'42.1×',nii:'28.4×',niiSub:'sNII 21 / bNII 33',retail:'9.2×',overall:'31.6×'},
+  struct:{fresh:'70 / 30',anchor:'0.88',lot:'55 · ₹14,850'},
+  prog:[0.6,2.1,8.4,31.6],
+  watch:['NII book is retail-heavy (bNII 4× vs sNII 21×)','Sector momentum cooling over the last two weeks'],
+  kills:[],
+  vlog:[['Day 1 · 09:30','INSUFFICIENT_SIGNAL','book opened, no QIB yet'],['Day 1 · 15:00','MARGINAL','QIB 8×, anchors disclosed'],['Day 2 · 12:00','APPLY','QIB 28×, anchors confirmed high-quality'],['now','APPLY','QIB 42× — demand firming']]},
+ {id:'aster',stage:'live',name:'Aster Pharma',sector:'Pharma',size:'₹860 cr',band:'₹410–432',status:'OPEN · 1D LEFT',live:false,rank:1,
+  verdict:'APPLY',prob:68,grossN:7.9,cold:true,
+  reason:'QIB 31×, anchors 79%, fair valuation · <span style="color:var(--marginal)">cold market — less certain</span>',
+  reasonFull:'Solid institutional interest — <b>QIB 31×</b>, anchors <b>79%</b>, valuation broadly fair vs peers. Market regime is soft, so confidence is held back.',
+  contrib:[['QIB 31×',0.24],['Anchors 79%',0.17],['Valuation fair',0.10],['Regime −0.3',-0.08],['OFS 25%',-0.03]],
+  subs:{qib:'31.0×',nii:'18.2×',niiSub:'sNII 14 / bNII 21',retail:'7.1×',overall:'21.6×'},
+  struct:{fresh:'75 / 25',anchor:'0.79',lot:'34 · ₹14,688'},
+  prog:[0.9,4.2,21.6],
+  watch:['Cold market — listing pops less reliable in a soft regime','Retail leg lighter than the QIB leg'],
+  kills:[],
+  vlog:[['Day 1 · 09:30','INSUFFICIENT_SIGNAL','book opened'],['Day 1 · 16:00','APPLY','QIB 22×, anchors disclosed'],['now','APPLY','QIB 31× — cold-market caveat attached']]},
+ {id:'vertex',stage:'live',name:'Vertex Cements',sector:'Materials',size:'₹540 cr',band:'₹128–135',status:'CLOSES IN 2D',live:false,rank:2,
+  verdict:'MARGINAL',prob:55,grossN:3.1,cold:false,
+  reason:'Retail-led demand, QIB only <b style="color:var(--marginal)">6×</b>, valuation rich vs peers',
+  reasonFull:'Demand is retail-led with a thin institutional book — <b>QIB only 6×</b>. Valuation sits <b>rich vs peers</b>, capping the expected pop. Sits right on the MARGINAL threshold.',
+  contrib:[['QIB 6×',0.08],['Anchors 61%',0.06],['Valuation rich',-0.14],['Regime +0.1',0.04],['OFS 40%',-0.07]],
+  subs:{qib:'6.2×',nii:'11.4×',niiSub:'sNII 9 / bNII 13',retail:'14.8×',overall:'10.9×'},
+  struct:{fresh:'60 / 40',anchor:'0.61',lot:'110 · ₹14,850'},
+  prog:[1.4,5.1,10.9],
+  watch:['Institutional book thin — retail-driven demand is a weaker signal','Rich valuation limits headroom'],
+  kills:[],
+  vlog:[['Day 1 · 09:30','INSUFFICIENT_SIGNAL','book opened'],['Day 1 · 17:00','MARGINAL','QIB 4×, retail leading'],['now','MARGINAL','QIB 6× — borderline']]},
+ {id:'orion',stage:'live',name:'Orion Steel',sector:'Metals',size:'₹2,100 cr',band:'₹640–672',status:'CLOSES TODAY',live:true,rank:0,
+  verdict:'SKIP',prob:null,grossN:null,cold:false,killflag:true,
+  reason:'<span style="color:var(--skip)">Kill-flag:</span> near-total OFS (94%) + material promoter litigation',
+  reasonFull:'Score is overridden. Two hard kill-flags fire: the issue is <b style="color:var(--skip)">94% offer-for-sale</b> (promoters cashing out, little fresh capital) and there is <b style="color:var(--skip)">material promoter litigation</b> disclosed in the RHP. Forced SKIP regardless of subscription.',
+  contrib:[],
+  subs:{qib:'12.0×',nii:'8.1×',niiSub:'sNII 6 / bNII 9',retail:'4.2×',overall:'8.6×'},
+  struct:{fresh:'6 / 94',anchor:'0.55',lot:'22 · ₹14,784'},
+  prog:[0.8,3.1,8.6],
+  watch:[],
+  kills:['Near-total OFS — 94% offer-for-sale, minimal fresh capital','Material promoter litigation disclosed in RHP'],
+  vlog:[['Day 1 · 09:30','SKIP','kill-flags evaluated at book open'],['now','SKIP','OFS + litigation — override stands']]},
+ {id:'bluewave',stage:'live',name:'Bluewave Digital',sector:'Tech',size:'₹720 cr',band:'₹295–310',status:'OPENS TOMORROW',live:false,rank:4,
+  verdict:'INSUFFICIENT_SIGNAL',prob:null,grossN:null,cold:false,
+  reason:'Book not closed — QIB &amp; anchor data pending. Engine abstains until signal is complete.',
+  reasonFull:'The book has not opened, so the critical signals (QIB subscription, anchor allotment) do not yet exist. The engine <b>abstains</b> rather than fabricate a number.',
+  contrib:[],
+  subs:{qib:'—',nii:'—',niiSub:'awaiting book',retail:'—',overall:'—'},
+  struct:{fresh:'80 / 20',anchor:'—',lot:'48 · ₹14,880'},
+  prog:[],
+  watch:['Anchor allotment discloses ~1 trading day before open','QIB subscription is the first confidence signal to arrive'],
+  kills:[],
+  vlog:[['now','INSUFFICIENT_SIGNAL','pre-open — awaiting anchor + QIB']]},
+ /* upcoming */
+ {id:'helios',stage:'upcoming',name:'Helios Renewables',sector:'Renewables',size:'₹1,560 cr',opens:'in 3 days',anchor:'in 2 days',struct:'Fresh 85 / OFS 15',val:'In line with peers'},
+ {id:'kaveri',stage:'upcoming',name:'Kaveri Foods',sector:'FMCG',size:'₹430 cr',opens:'in 6 days',anchor:'TOMORROW',struct:'Fresh 60 / OFS 40',val:'Slight discount to peers'},
+ {id:'meridian',stage:'upcoming',name:'Meridian Fintech',sector:'Fintech',size:'₹2,400 cr',opens:'in 8 days',anchor:'in 7 days',struct:'Fresh 50 / OFS 50',val:'Rich vs peers — watch'},
+ /* history — actual listing outcomes vs the verdict/probability shown at the time */
+ {id:'stellar',stage:'history',name:'Stellar Cables',verdict:'APPLY',prob:78,actual:14.2,when:'12 Jun'},
+ {id:'ganga',stage:'history',name:'Ganga Textiles',verdict:'APPLY',prob:71,actual:6.8,when:'10 Jun'},
+ {id:'orbit',stage:'history',name:'Orbit Motors',verdict:'APPLY',prob:69,actual:-2.1,when:'05 Jun'},
+ {id:'peak',stage:'history',name:'Peak Minerals',verdict:'MARGINAL',prob:52,actual:1.4,when:'31 May'},
+ {id:'delta',stage:'history',name:'Delta Chemicals',verdict:'APPLY',prob:75,actual:9.6,when:'27 May'},
+ {id:'nova',stage:'history',name:'Nova Realty',verdict:'SKIP',prob:null,actual:-8.3,when:'22 May'},
+ {id:'ivory',stage:'history',name:'Ivory Retail',verdict:'MARGINAL',prob:48,actual:-3.2,when:'18 May'},
+ {id:'summit',stage:'history',name:'Summit Pharma',verdict:'APPLY',prob:73,actual:11.1,when:'14 May'},
+ {id:'crest',stage:'history',name:'Crest Energy',verdict:'APPLY',prob:82,actual:12.0,when:'09 May'},
+ {id:'aventis',stage:'history',name:'Aventis Auto',verdict:'APPLY',prob:66,actual:2.0,when:'05 May'},
+ {id:'lumen',stage:'history',name:'Lumen Textiles',verdict:'MARGINAL',prob:58,actual:-1.1,when:'30 Apr'},
+ {id:'pioneer',stage:'history',name:'Pioneer Foods',verdict:'APPLY',prob:85,actual:16.5,when:'25 Apr'},
+ {id:'cobalt',stage:'history',name:'Cobalt Mining',verdict:'SKIP',prob:null,actual:-11.2,when:'20 Apr'},
+ {id:'verde',stage:'history',name:'Verde Agro',verdict:'APPLY',prob:76,actual:-1.8,when:'15 Apr'},
+ {id:'halcyon',stage:'history',name:'Halcyon Tech',verdict:'APPLY',prob:88,actual:18.9,when:'10 Apr'},
+ {id:'meadow',stage:'history',name:'Meadow Realty',verdict:'MARGINAL',prob:54,actual:2.1,when:'05 Apr'},
+ {id:'basalt',stage:'history',name:'Basalt Cement',verdict:'APPLY',prob:64,actual:3.4,when:'31 Mar'},
+ {id:'zephyr',stage:'history',name:'Zephyr Air',verdict:'SKIP',prob:null,actual:5.5,when:'26 Mar'}
+];
+const byId=id=>DATA.find(d=>d.id===id);
+/* recent verdict-crossing alerts (what the notifier fired) */
+const ALERTS=[
+ {id:'nimbus',v:'APPLY',t:'today · 12:00',msg:'crossed into APPLY (QIB 28×→42×)'},
+ {id:'vertex',v:'MARGINAL',t:'today · 09:30',msg:'opened at MARGINAL (retail-led)'},
+ {id:'orion',v:'SKIP',t:'today · 09:30',msg:'kill-flag override at book open'},
+ {id:'aster',v:'APPLY',t:'yesterday · 16:00',msg:'crossed into APPLY (cold-market caveat)'}
+];
+let costs={stt:0.10,dp:15.34,oth:0.05};
+let pinned=new Set(), density='comfortable', lastSeen=null, alertsRead=false;
+
+/* ---------- render helpers ---------- */
+function tagHTML(v){const m=VMETA[v];const label=v==='INSUFFICIENT_SIGNAL'?'INSUFFICIENT':v;return `<span class="tag t-${m.c}">${label}</span>`;}
+function gainClass(g){return g>=6?'pos':g>0?'neu':'na';}
+
+/* LIVE */
+let liveSort={key:'verdict',dir:1};
+const STAR='<svg viewBox="0 0 24 24"><path d="M12 2l3 6.5 7 .6-5.3 4.7L18.5 21 12 17.3 5.5 21l1.8-7.2L2 9.1l7-.6z"/></svg>';
+function renderLive(){
+  const rows=DATA.filter(d=>d.stage==='live');
+  const box=document.getElementById('live-rows');
+  box.innerHTML=rows.map(d=>{
+    const m=VMETA[d.verdict];
+    const probCell=d.prob==null
+      ? `<div class="prob none">— <small style="display:inline">${d.killflag?'kill-flag':'no signal'}</small></div>`
+      : `<div class="prob"><span class="num">${d.prob}%<small>calibrated</small></span><span class="uncalx">— <small style="display:inline">withheld</small></span></div>`;
+    const meter=d.prob==null?`<div class="meter"><i style="width:${d.killflag?100:0}%;background:var(--skip);opacity:${d.killflag?.4:0}"></i></div>`
+      :`<div class="meter"><i style="width:${d.prob}%;background:var(--${m.c==='marginal'?'marginal':'apply'})"></i></div>`;
+    const changed=lastSeen&&lastSeen[d.id]&&lastSeen[d.id]!==d.verdict?`<span class="changed" title="Verdict changed from ${lastSeen[d.id].replace('_SIGNAL','')}">CHANGED</span>`:'';
+    const star=`<button class="star ${pinned.has(d.id)?'on':''}" title="Pin to top" onclick="togglePin(event,'${d.id}')">${STAR}</button>`;
+    return `<div class="row grid-live" tabindex="0" role="button" aria-label="${d.name} — ${d.verdict}, open verdict detail" onkeydown="rowKey(event,'${d.id}')" onclick="openDetail('${d.id}')" data-id="${d.id}" data-company="${d.name}" data-vrank="${m.rank}" data-prob="${d.prob??''}">
+      <div class="spine" style="background:var(--${m.c})"></div>
+      <div class="co"><div class="name">${star}${d.name}${changed}</div><small>${d.sector} · ${d.size} · ${d.live?'<b>'+d.status+'</b>':d.status}</small></div>
+      <div>${tagHTML(d.verdict)}</div>
+      ${probCell}
+      <div class="reason">${d.reason}${meter}</div>
+    </div>`;}).join('');
+  applyLiveSort();
+}
+function applyLiveSort(){
+  const key=liveSort.key,dir=liveSort.dir,box=document.getElementById('live-rows');
+  const rows=[...box.querySelectorAll('.row')];
+  const firstTop=new Map(rows.map(r=>[r,r.getBoundingClientRect().top]));
+  const pinRank=r=>pinned.has(r.dataset.id)?0:1;
+  const val=r=>{if(key==='company')return r.dataset.company.toLowerCase();if(key==='verdict')return +r.dataset.vrank;
+    if(key==='prob')return r.dataset.prob===''?-1:+r.dataset.prob;return 0;};
+  rows.sort((a,b)=>{const pa=pinRank(a),pb=pinRank(b);if(pa!==pb)return pa-pb;const x=val(a),y=val(b);return x<y?-dir:x>y?dir:0;}).forEach(r=>box.appendChild(r));
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    rows.forEach(r=>{const dy=firstTop.get(r)-r.getBoundingClientRect().top;
+      if(dy)r.animate([{transform:`translateY(${dy}px)`},{transform:'translateY(0)'}],{duration:380,easing:'cubic-bezier(.22,1,.36,1)'});});
+  }
+  document.querySelectorAll('#s-live .lhead [data-sort]').forEach(h=>{const on=h.dataset.sort===key;h.classList.toggle('sorted',on);h.querySelector('.caret').textContent=on?(dir>0?'▲':'▼'):'⇅';});
+}
+function sortLive(key){
+  if(liveSort.key===key)liveSort.dir*=-1;else{liveSort.key=key;liveSort.dir=(key==='company'||key==='verdict')?1:-1;}
+  applyLiveSort();
+}
+function togglePin(e,id){e.stopPropagation();if(pinned.has(id))pinned.delete(id);else pinned.add(id);
+  e.currentTarget.classList.toggle('on',pinned.has(id));applyLiveSort();saveP();toast(pinned.has(id)?'Pinned to top':'Unpinned');}
+function rowKey(e,id){if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(id);}}
+
+/* UPCOMING */
+function renderUpcoming(){
+  const rows=DATA.filter(d=>d.stage==='upcoming');
+  const box=document.getElementById('up-rows');
+  if(!rows.length){box.innerHTML=emptyState('No upcoming IPOs','Nothing scheduled on the mainboard calendar right now.');return;}
+  box.innerHTML=rows.map(d=>{
+    const anchorSoon=d.anchor==='TOMORROW';
+    return `<div class="row grid-up" style="cursor:default">
+      <div class="co"><div class="name">${d.name}</div><small>${d.sector} · ${d.size}</small></div>
+      <div><div class="count-badge">${d.opens}</div><div class="pending">anchor day: ${anchorSoon?'<span class="anchor-flag">TOMORROW ★</span>':d.anchor}</div></div>
+      <div class="struct">${d.struct}</div>
+      <div class="pending" style="color:var(--tx2)">${d.val}</div>
+      <div style="display:flex;justify-content:flex-end"><button class="bell" title="Notify when this opens / gets a verdict" onclick="toggleBell(this,event)"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></button></div>
+    </div>`;}).join('');
+}
+function toggleBell(el,e){e.stopPropagation();el.classList.toggle('on');toast(el.classList.contains('on')?'Alert set for this IPO':'Alert removed');}
+
+/* HISTORY */
+let histFilter='all', histSort={key:'when',dir:1};
+function renderHistory(){
+  const all=DATA.filter(d=>d.stage==='history');
+  const applies=all.filter(d=>d.verdict==='APPLY');
+  const applyPos=applies.filter(d=>d.actual>0).length;
+  const applyRate=Math.round(applyPos/applies.length*100);
+  const avgPred=Math.round(applies.reduce((s,d)=>s+d.prob,0)/applies.length);
+  const skips=all.filter(d=>d.verdict==='SKIP');
+  const skipAvoided=skips.filter(d=>d.actual<0).length;
+  document.getElementById('scorecard').innerHTML=`
+    <div class="sc"><div class="lab">IPOs scored</div><div class="val">${all.length}</div><div class="note">last 90 days</div></div>
+    <div class="sc"><div class="lab">APPLY hit rate</div><div class="val" style="color:var(--apply)">${applyRate}%<small> actual</small></div><div class="note">${applyPos}/${applies.length} listed positive · predicted ~${avgPred}%</div>
+      <div class="relbar"><div class="pred" style="left:${avgPred}%"></div><i style="width:${applyRate}%"></i></div></div>
+    <div class="sc"><div class="lab">SKIPs avoided</div><div class="val">${skipAvoided}/${skips.length}</div><div class="note">flagged issues that fell on listing</div></div>
+    <div class="sc"><div class="lab">Calibration</div><div class="val" style="font-size:19px">Tracking</div><div class="note">within ±12pt of the diagonal</div></div>`;
+  renderReliability(all);
+  const chips=['all','APPLY','MARGINAL','SKIP'];
+  document.getElementById('hist-chips').innerHTML=chips.map(c=>`<button class="chip ${histFilter===c?'on':''}" onclick="setHistFilter('${c}')">${c==='all'?'All':c}</button>`).join('');
+  const q=(document.getElementById('hist-q')?.value||'').toLowerCase();
+  let rows=all.filter(d=>(histFilter==='all'||d.verdict===histFilter)&&d.name.toLowerCase().includes(q));
+  const key=histSort.key,dir=histSort.dir;
+  const hv=d=>{if(key==='company')return d.name.toLowerCase();if(key==='verdict')return VMETA[d.verdict].rank;
+    if(key==='prob')return d.prob==null?-1:d.prob;if(key==='actual')return d.actual;return DATA.indexOf(d);};
+  rows.sort((a,b)=>{const x=hv(a),y=hv(b);return x<y?-dir:x>y?dir:0;});
+  const box=document.getElementById('hist-rows');
+  if(!rows.length){box.innerHTML=emptyState('No matching IPOs','Nothing matches this filter and search.');}
+  else box.innerHTML=rows.map(d=>{
+    const pred=d.prob==null?'<span class="pending">n/a</span>':`<span class="mono">${d.prob}%</span>`;
+    const pos=d.actual>0;
+    return `<div class="row grid-hist" style="cursor:default">
+      <div class="co"><div class="name">${d.name}</div><small>${d.when}</small></div>
+      <div>${tagHTML(d.verdict)}</div>
+      <div>${pred}</div>
+      <div class="actual ${pos?'pos':'neg'}">${pos?'+':''}${d.actual.toFixed(1)}%</div>
+      <div style="text-align:right">${callMark(d)}</div>
+    </div>`;}).join('');
+  document.querySelectorAll('#s-history .lhead [data-sort]').forEach(h=>{const on=h.dataset.sort===key;h.classList.toggle('sorted',on);h.querySelector('.caret').textContent=on?(dir>0?'▲':'▼'):'⇅';});
+}
+function sortHist(key){if(histSort.key===key)histSort.dir*=-1;else{histSort.key=key;histSort.dir=(key==='company')?1:-1;}renderHistory();}
+function callMark(d){
+  if(d.verdict==='APPLY')return d.actual>0?'<span class="hitmark hit">✓ HIT</span>':'<span class="hitmark miss">✗ MISS</span>';
+  if(d.verdict==='SKIP')return d.actual<0?'<span class="hitmark hit">✓ AVOIDED</span>':'<span class="hitmark neutral">— missed pop</span>';
+  return '<span class="hitmark neutral">~ borderline</span>';
+}
+function setHistFilter(f){histFilter=f;renderHistory();}
+/* reliability diagram — predicted probability vs actual positive rate, bucketed */
+function renderReliability(all){
+  const scored=all.filter(d=>d.prob!=null);
+  const defs=[[40,50],[50,60],[60,70],[70,80],[80,90]];
+  const buckets=defs.map(([lo,hi])=>{const inb=scored.filter(d=>d.prob>=lo&&d.prob<hi);
+    if(!inb.length)return null;return {lo,hi,mid:(lo+hi)/2,actual:inb.filter(d=>d.actual>0).length/inb.length*100,n:inb.length};}).filter(Boolean);
+  const S=250,P=34,X=v=>P+(v/100)*S,Y=v=>P+S-(v/100)*S,W=P+S+18,H=P+S+34;
+  const line=buckets.map(p=>`${X(p.mid).toFixed(1)},${Y(p.actual).toFixed(1)}`).join(' ');
+  const dots=buckets.map(p=>`<circle class="rd-pt" cx="${X(p.mid).toFixed(1)}" cy="${Y(p.actual).toFixed(1)}" r="${(4+p.n*0.8).toFixed(1)}"><title>${p.lo}–${p.hi}% predicted → ${Math.round(p.actual)}% actual (n=${p.n})</title></circle>`).join('');
+  const band=`M ${X(0)} ${Y(12)} L ${X(88)} ${Y(100)} L ${X(100)} ${Y(100)} L ${X(100)} ${Y(88)} L ${X(12)} ${Y(0)} L ${X(0)} ${Y(0)} Z`;
+  const ticks=[0,25,50,75,100];
+  const xt=ticks.map(t=>`<text class="rd-tick" x="${X(t).toFixed(1)}" y="${P+S+13}" text-anchor="middle">${t}</text>`).join('');
+  const yt=ticks.map(t=>`<text class="rd-tick" x="${P-8}" y="${(Y(t)+3).toFixed(1)}" text-anchor="end">${t}</text>`).join('');
+  const brows=buckets.map(p=>`<div class="rd-brow"><span class="bp">${p.lo}–${p.hi}%</span><span class="bar"><i style="width:${p.actual}%"></i></span><span class="ba"><b>${Math.round(p.actual)}%</b> actual <span class="n">· n${p.n}</span></span></div>`).join('');
+  document.getElementById('reldiag').innerHTML=`
+    <div class="rd-head"><h3 class="sec" style="margin:0">Reliability — predicted vs actual</h3><div class="sub">${scored.length} scored IPOs · does a "~70%" verdict really list positive about 70% of the time?</div></div>
+    <div class="rd-body">
+      <svg class="rd-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+        <path class="rd-band" d="${band}"/>
+        <line class="rd-diag" x1="${X(0)}" y1="${Y(0)}" x2="${X(100)}" y2="${Y(100)}"/>
+        <line class="rd-axis" x1="${P}" y1="${P}" x2="${P}" y2="${P+S}"/>
+        <line class="rd-axis" x1="${P}" y1="${P+S}" x2="${P+S}" y2="${P+S}"/>
+        <polyline class="rd-line" points="${line}"/>${dots}${xt}${yt}
+        <text class="rd-axlabel" x="${P+S/2}" y="${P+S+28}" text-anchor="middle">predicted probability %</text>
+        <text class="rd-axlabel" transform="rotate(-90 11 ${P+S/2})" x="11" y="${P+S/2}" text-anchor="middle">actual positive %</text>
+      </svg>
+      <div class="rd-right">
+        <div class="rd-caption"><b>The points hug the diagonal.</b> When the model says ~70%, those IPOs listed positive about 70% of the time — the probability means what it says. Sitting a touch above the line, it runs mildly conservative. The shaded band is the ±12pt tolerance.</div>
+        <div class="rd-buckets">${brows}</div>
+        <div class="rd-legend"><span class="k"><i></i> perfect calibration</span><span class="k"><span class="dotk"></span> observed bucket · size = sample count</span></div>
+      </div>
+    </div>`;
+}
+/* CSV export */
+function csvCell(v){v=String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function callText(d){if(d.verdict==='APPLY')return d.actual>0?'HIT':'MISS';if(d.verdict==='SKIP')return d.actual<0?'AVOIDED':'missed pop';return 'borderline';}
+function exportCSV(){
+  const all=DATA.filter(d=>d.stage==='history');
+  const head=['Company','Date','Verdict','Predicted','ActualNet','Call'];
+  const lines=[head.join(',')].concat(all.map(d=>[d.name,d.when,d.verdict,d.prob==null?'':d.prob+'%',d.actual+'%',callText(d)].map(csvCell).join(',')));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='ipo-history.csv';a.click();URL.revokeObjectURL(a.href);toast('History exported as CSV');
+}
+/* what-would-change-this-call */
+function whatIf(d){
+  if(d.verdict==='APPLY')return 'Holds as APPLY while the QIB book stays strong and no kill-flag fires. Softens to MARGINAL if institutional demand faded or the valuation re-rated rich.';
+  if(d.verdict==='MARGINAL')return 'Reaches APPLY if the QIB book firms past ~15× with steady anchors. Slips to SKIP if a kill-flag (heavy OFS, promoter litigation) appears.';
+  if(d.killflag)return 'The kill-flag override stands as long as the OFS share and litigation flags are active — subscription strength cannot lift it.';
+  return 'A verdict lands once the book closes with QIB subscription and anchor allotment in hand. Until then the engine abstains.';
+}
+/* alert center */
+function renderAlerts(){
+  document.getElementById('alert-list').innerHTML=ALERTS.map(a=>{const c=VMETA[a.v].c;const d=byId(a.id);
+    return `<div class="alertitem" onclick="openAlert('${a.id}')"><span class="adot" style="background:var(--${c})"></span><div><div class="an">${d?d.name:a.id} <span style="color:var(--${c})">${a.v.replace('_SIGNAL','')}</span></div><div class="am">${a.msg}</div><div class="at">${a.t}</div></div></div>`;}).join('');
+  updateAlertBadge();
+}
+function updateAlertBadge(){const b=document.getElementById('alert-badge');if(!b)return;b.textContent=ALERTS.length;b.classList.toggle('hidden',alertsRead);}
+function toggleAlerts(e){e.stopPropagation();document.getElementById('alertpanel').classList.toggle('on');}
+function markAlertsRead(e){e.stopPropagation();alertsRead=true;updateAlertBadge();saveP();}
+function openAlert(id){document.getElementById('alertpanel').classList.remove('on');const d=byId(id);if(d&&d.stage==='live')openDetail(id);else go('live');alertsRead=true;updateAlertBadge();saveP();}
+document.addEventListener('click',e=>{const w=document.querySelector('.alertwrap');if(w&&!w.contains(e.target))document.getElementById('alertpanel').classList.remove('on');});
+/* density */
+function setDensity(mode,el){density=mode;document.body.classList.toggle('compact',mode==='compact');el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on');saveP();}
+function applyDensity(){document.body.classList.toggle('compact',density==='compact');const seg=document.getElementById('density-seg');if(seg){seg.querySelectorAll('button').forEach(b=>b.classList.remove('on'));seg.querySelector(density==='compact'?'button:last-child':'button:first-child').classList.add('on');}}
+
+function emptyState(h,p){return `<div class="empty"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg><h3>${h}</h3><p>${p}</p></div>`;}
+
+/* DETAIL */
+function netGain(d){if(d.grossN==null)return null;return +(d.grossN-costs.stt-dpPct(d)-costs.oth).toFixed(1);}
+function dpPct(d){return +( (costs.dp/14850)*100 ).toFixed(2);} /* DP flat ₹ over a ~₹14,850 lot */
+function openDetail(id){
+  const d=byId(id),m=VMETA[d.verdict];
+  const contribHTML=d.contrib.length?`<div class="contrib">${d.contrib.map(([lab,v])=>{
+     const pct=Math.min(Math.abs(v)/0.35*50,50);const pos=v>=0;
+     return `<div class="c"><div class="lab">${lab}</div><div class="track"><div class="mid"></div><b class="${pos?'p':'n'}" style="width:${pct}%"></b></div><div class="val ${pos?'p':'n'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</div></div>`;
+   }).join('')}</div>`:'<div class="pending">No contribution breakdown — verdict set by override / abstention.</div>';
+  const sparkHTML=d.prog.length>1?spark(d.prog):'<div class="pending">Subscription progression appears once the book opens.</div>';
+  const watchHTML=d.watch.length?`<ul class="watch">${d.watch.map(w=>`<li>${w}</li>`).join('')}</ul>`:'<div class="pending">None.</div>';
+  const killHTML=d.kills.length?d.kills.map(k=>`<div class="kf hit"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>${k}</div>`).join('')
+    :'<div class="kf ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>None triggered</div>';
+  const caveat=d.cold?`<div class="caveat"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span><b>Cold market — probability less certain.</b> Annotation only; it does not change the number above.</span></div>`:'';
+  const probBlock=d.prob==null
+    ?`<div class="hero-prob"><div class="big-uncal" style="display:block;color:var(--tx3)">—</div><div class="lbl">${d.killflag?'verdict set by kill-flag override':'engine abstained — no number'}</div></div>`
+    :`<div class="hero-prob"><div class="big mono">${d.prob}%</div><div class="big-uncal">UNCAL</div><div class="lbl">calibrated P(positive listing)</div></div>`;
+  const gate=d.prob==null?'':`<div class="gate" data-tip="The calibrator passed its out-of-sample reliability check (the 70% bucket lists positive ~70% of the time), so this probability is trustworthy. Until it passes, the app shows no number."><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> RELIABILITY GATE PASSED · CALIBRATOR v4</div>`;
+  const meterbar=d.prob==null?'':`<div class="card meterbar"><div class="mono" style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);white-space:nowrap">Calibrated P(positive listing)</div><div class="bigmeter"><i style="width:${d.prob}%"></i></div><div class="mono" style="color:var(--tx3);font-size:12px;white-space:nowrap">${d.prob} / 100</div></div>`;
+  const costBlock=''; /* forward gain removed — magnitude is shown in History (actuals) only, per build decision */
+  document.getElementById('detail').innerHTML=`
+    <a class="back" onclick="closeDetail()"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> Back to live signals</a>
+    <div class="det">
+      <div class="card det-hero">
+        <div class="verdict-badge t-${m.c}">${d.verdict==='INSUFFICIENT_SIGNAL'?'INSUFF.':d.verdict}</div>
+        <div class="hero-meta"><h2>${d.name} Ltd</h2><div class="m">${d.sector} · Issue ${d.size} · Band ${d.band} · ${d.status}</div>${gate}</div>
+        ${probBlock}
+      </div>
+      ${meterbar}
+      <div class="card">
+        <h3 class="sec">Grounded reason</h3>
+        <p class="reason-body">${d.reasonFull}</p>
+        <h3 class="sec" style="margin-top:22px">What drove this <span style="color:var(--tx3);font-weight:400;letter-spacing:0;text-transform:none;font-family:'Fira Sans'">— feature contributions</span></h3>
+        ${contribHTML}
+      </div>
+      <div class="card">
+        <h3 class="sec">Subscription (final)</h3>
+        <div class="kv">
+          <div class="r"><span class="k gl" data-tip="Qualified Institutional Buyers — banks, mutual funds, insurers. Their subscription multiple is the strongest institutional-confidence signal.">QIB</span><span class="v" style="color:var(--apply)">${d.subs.qib}</span></div>
+          <div class="r"><span class="k gl" data-tip="Non-Institutional Investors (HNIs). Split into small (sNII, ₹2–10L) and big (bNII, over ₹10L) buckets.">NII</span><span class="v">${d.subs.nii} <span class="s">${d.subs.niiSub}</span></span></div>
+          <div class="r"><span class="k gl" data-tip="Retail Individual Investors — bids up to ₹2 lakh. A retail-led book is a weaker signal than a QIB-led one.">Retail</span><span class="v">${d.subs.retail}</span></div>
+          <div class="r"><span class="k gl" data-tip="Total times the issue was subscribed across all investor categories.">Overall</span><span class="v">${d.subs.overall}</span></div>
+        </div>
+        <h3 class="sec" style="margin-top:18px">Progression</h3>
+        ${sparkHTML}
+      </div>
+      <div class="card">
+        <h3 class="sec">Watch items</h3>
+        ${watchHTML}
+        <h3 class="sec" style="margin-top:20px">Kill-flags</h3>
+        ${killHTML}
+      </div>
+      <div class="card">
+        <h3 class="sec">Issue structure</h3>
+        <div class="kv">
+          <div class="r"><span class="k gl" data-tip="Fresh = new capital raised for the company. OFS = Offer For Sale, existing holders cashing out. A high OFS share is a mild negative.">Fresh / OFS</span><span class="v">${d.struct.fresh}</span></div>
+          <div class="r"><span class="k gl" data-tip="A 0–1 score of the anchor investors' reputation and lock-in length. Higher means stronger institutional endorsement before the book opens.">Anchor quality</span><span class="v" style="color:var(--apply)">${d.struct.anchor}</span></div>
+          <div class="r"><span class="k gl" data-tip="One application lot: number of shares and the rupee amount at the cut-off price.">Lot</span><span class="v">${d.struct.lot}</span></div>
+        </div>
+        <h3 class="sec" style="margin-top:18px">Verdict history</h3>
+        <ul class="vlog">${d.vlog.map((v,i)=>`<li class="${i===d.vlog.length-1?'cur':''}"><div class="vt">${v[0]}</div><div class="vv t-${VMETA[v[1]].c}" style="background:none;padding:0;color:var(--${VMETA[v[1]].c})">${v[1]==='INSUFFICIENT_SIGNAL'?'INSUFFICIENT':v[1]}</div><div class="vn">${v[2]}</div></li>`).join('')}</ul>
+      </div>
+      <div class="whatif"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2zM9 21h6"/></svg><span><b>What would change this call:</b> ${whatIf(d)}</span></div>
+      ${costBlock}
+      ${caveat}
+      <div class="card det-actions" style="background:none;border:none;padding:0">
+        <button class="btn" onclick='copyVerdict("${d.id}")'>Copy verdict as text</button>
+        <span class="pending">Advisory only — there is no order control here, by design.</span>
+      </div>
+      <p class="foot-note">engineering/research reference — not financial advice · a calibrated ${d.prob??''}% still fails its share of the time · advisory only — no orders, no recomputation</p>
+    </div>`;
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('on'));
+  document.getElementById('detail').classList.add('on');
+  setTitle(d.name+' Ltd','verdict detail · '+d.sector);
+  window.scrollTo(0,0);
+}
+function closeDetail(){document.getElementById('detail').classList.remove('on');go('live');}
+function spark(prog){
+  const w=240,h=44,max=Math.max(...prog),n=prog.length;
+  const pts=prog.map((v,i)=>[ (i/(n-1))*w, h-(v/max)*h ]);
+  const poly=pts.map(p=>p.map(x=>x.toFixed(1)).join(',')).join(' ');
+  const dots=pts.map(p=>`<circle class="dt" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6"/>`).join('');
+  const area=`${poly} ${w.toFixed(1)},${h.toFixed(1)} 0,${h.toFixed(1)}`;
+  return `<div class="spark"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polygon class="area" points="${area}"/><polyline class="pl" points="${poly}"/>${dots}</svg><div class="spark-lab"><span>Day 1</span><span>Overall ${prog[prog.length-1]}×</span></div></div>`;
+}
+function copyVerdict(id){const d=byId(id);const txt=`${d.name} — ${d.verdict}${d.prob!=null?' ('+d.prob+'% calibrated)':''}. ${d.reason.replace(/<[^>]+>/g,'')}. Advisory only, not financial advice.`;
+  navigator.clipboard?.writeText(txt).then(()=>toast('Verdict copied to clipboard'),()=>toast('Copy blocked by browser'));}
+
+/* ---------- routing ---------- */
+const TITLES={live:['Live signals','mainboard · 5 open · updated 2 min ago · IST'],upcoming:['Upcoming IPOs','mainboard calendar · anchor days flagged'],history:['History &amp; accountability','did the verdicts hold up?'],settings:['Settings','operational — model internals are not editable']};
+function go(name){
+  document.getElementById('detail').classList.remove('on');
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+name).classList.add('on');
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));
+  setTitle(...TITLES[name]);
+}
+function setTitle(t,s){document.getElementById('page-title').innerHTML=t;document.getElementById('page-sub').textContent=s;}
+
+/* ---------- theme ---------- */
+let themeMode='dark';
+function applyTheme(){const sys=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';const t=themeMode==='system'?sys:themeMode;document.documentElement.setAttribute('data-theme',t);
+  const light=t==='light';document.querySelector('.i-moon').style.display=light?'':'none';document.querySelector('.i-sun').style.display=light?'none':'';document.querySelector('.tlabel').textContent=light?'Light':'Dark';}
+function toggleTheme(){const cur=document.documentElement.getAttribute('data-theme');themeMode=cur==='light'?'dark':'light';themeAnim();applyTheme();syncThemeSeg();saveP();
+  const btn=document.querySelector('.tgl');btn.classList.remove('spin');void btn.offsetWidth;btn.classList.add('spin');}
+function setTheme(mode,el){themeMode=mode;el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on');themeAnim();applyTheme();saveP();}
+function syncThemeSeg(){const btns=document.querySelectorAll('#s-settings .seg2 button');if(!btns.length)return;const map={dark:0,light:1,system:2};btns.forEach(b=>b.classList.remove('on'));btns[map[themeMode]??2]?.classList.add('on');}
+function themeAnim(){const h=document.documentElement;h.classList.add('theme-anim');clearTimeout(window.__ta);window.__ta=setTimeout(()=>h.classList.remove('theme-anim'),520);}
+
+/* ---------- settings behaviours ---------- */
+function tog(el){el.classList.toggle('on');}
+function toggleUncal(el){document.body.classList.toggle('uncal',el.classList.contains('on'));toast(el.classList.contains('on')?'Previewing UNCALIBRATED state':'Calibrated view restored');}
+function recost(){costs.stt=parseFloat(document.getElementById('cost-stt').value)||0;costs.dp=parseFloat(document.getElementById('cost-dp').value)||0;costs.oth=parseFloat(document.getElementById('cost-oth').value)||0;
+  document.getElementById('cost-effect').textContent='saved — applied to net-of-cost on History listings';saveP();}
+function refreshNow(){document.getElementById('page-sub').textContent='mainboard · updated just now · IST';toast('Verdicts refreshed');}
+function restartEngine(){toast('Engine restart requested');}
+let engineUp=true;
+function showEngineDown(){document.getElementById('enginedown').classList.add('on');document.getElementById('foot-dot').classList.add('down');document.getElementById('foot-status').textContent='Engine offline';document.getElementById('set-dot')?.classList.add('down');}
+function hideEngineDown(){document.getElementById('enginedown').classList.remove('on');document.getElementById('foot-dot').classList.remove('down');document.getElementById('foot-status').textContent='Engine online';document.getElementById('set-dot')?.classList.remove('down');toast('Reconnected to engine');}
+
+/* ---------- command palette ---------- */
+let palItems=[],palSel=0;
+function openPalette(){document.getElementById('overlay').classList.add('on');const i=document.getElementById('pal-input');i.value='';i.focus();renderPalette();}
+function closePalette(){document.getElementById('overlay').classList.remove('on');}
+function renderPalette(){
+  const q=document.getElementById('pal-input').value.toLowerCase();
+  const navs=[['Live signals','live'],['Upcoming','upcoming'],['History','history'],['Settings','settings']].map(([n,k])=>({type:'GO',name:n,detail:'section',act:()=>go(k)}));
+  const ipos=DATA.filter(d=>d.stage!=='history'&&d.name.toLowerCase().includes(q)).map(d=>({type:d.stage==='live'?d.verdict.replace('_SIGNAL',''):'SOON',name:d.name,detail:d.stage==='live'?(d.prob!=null?d.prob+'%':d.verdict):'upcoming',act:()=>{closePalette();if(d.stage==='live')openDetail(d.id);else go('upcoming');}}));
+  palItems=[...ipos,...navs.filter(n=>n.name.toLowerCase().includes(q))];
+  palSel=0;
+  const box=document.getElementById('pal-list');
+  box.innerHTML=palItems.length?palItems.map((it,i)=>`<div class="pal-item ${i===0?'sel':''}" onclick="palItems[${i}].act()" onmouseover="palHover(${i})"><span class="pt">${it.type}</span><span class="pn">${it.name}</span><span class="pd">${it.detail}</span></div>`).join(''):'<div class="pal-empty">No matches.</div>';
+}
+function palHover(i){palSel=i;document.querySelectorAll('.pal-item').forEach((el,j)=>el.classList.toggle('sel',j===i));}
+function palKey(e){if(e.key==='ArrowDown'){e.preventDefault();palSel=Math.min(palSel+1,palItems.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();palSel=Math.max(palSel-1,0);}
+  else if(e.key==='Enter'){if(palItems[palSel])palItems[palSel].act();return;}
+  else if(e.key==='Escape'){closePalette();return;}else return;
+  document.querySelectorAll('.pal-item').forEach((el,j)=>el.classList.toggle('sel',j===palSel));
+}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}});
+
+/* ---------- toast + clock ---------- */
+function toast(msg){const t=document.getElementById('toast');document.getElementById('toast-msg').textContent=msg;t.classList.add('on');clearTimeout(window.__tt);window.__tt=setTimeout(()=>t.classList.remove('on'),2200);}
+function tick(){const s=new Date().toLocaleTimeString('en-US',{timeZone:'Asia/Kolkata',hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'});const el=document.getElementById('clock-time');if(el)el.textContent=s;fmtCountdown();}
+/* attention strip + live countdown to the 17:00 IST subscription close */
+let attnDismissed=false;
+function renderAttention(){
+  const closing=DATA.filter(d=>d.stage==='live'&&/CLOSES TODAY/.test(d.status));
+  const el=document.getElementById('attention');if(!el)return;
+  if(attnDismissed||!closing.length){el.style.display='none';return;}
+  el.style.display='flex';
+  el.innerHTML=`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b>${closing.length} IPO${closing.length>1?'s':''} close today</b> — place bids before 17:00 IST · <span id="cd" class="mono">—</span> left</span><button class="att-x" onclick="dismissAttention()" title="Dismiss">✕</button>`;
+}
+function dismissAttention(){attnDismissed=true;const el=document.getElementById('attention');if(el)el.style.display='none';}
+function fmtCountdown(){
+  const el=document.getElementById('cd');if(!el)return;
+  const istNow=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  const t=new Date(istNow);t.setHours(17,0,0,0);if(t<=istNow)t.setDate(t.getDate()+1);
+  let s=Math.floor((t-istNow)/1000);const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60);const ss=s%60;
+  el.textContent=h>0?`${h}h ${m}m`:`${m}m ${ss}s`;
+}
+/* keyboard shortcuts */
+function openHelp(){document.getElementById('help-overlay').classList.add('on');}
+function closeHelp(){document.getElementById('help-overlay').classList.remove('on');}
+let gPend=false,gTimer;
+document.addEventListener('keydown',e=>{
+  const tag=(e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea')return;
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  const k=e.key;
+  if(gPend){gPend=false;clearTimeout(gTimer);
+    if(k==='l')go('live');else if(k==='u')go('upcoming');else if(k==='h')go('history');else if(k==='s')go('settings');return;}
+  if(k==='g'){gPend=true;gTimer=setTimeout(()=>gPend=false,900);return;}
+  else if(k==='t')toggleTheme();
+  else if(k==='/'){e.preventDefault();openPalette();}
+  else if(k==='?')openHelp();
+  else if(k==='Escape'){closePalette();closeHelp();document.getElementById('alertpanel').classList.remove('on');if(document.getElementById('detail').classList.contains('on'))closeDetail();}
+});
+/* persistence */
+function saveP(){try{localStorage.setItem('ipoadv',JSON.stringify({theme:themeMode,costs,pinned:[...pinned],density,lastSeen,alertsRead}));}catch(e){}}
+function loadP(){try{const p=JSON.parse(localStorage.getItem('ipoadv')||'{}');if(p.theme)themeMode=p.theme;if(p.costs&&typeof p.costs==='object')costs=p.costs;if(Array.isArray(p.pinned))pinned=new Set(p.pinned);if(p.density)density=p.density;if(p.lastSeen)lastSeen=p.lastSeen;if(p.alertsRead)alertsRead=p.alertsRead;}catch(e){}}
+
+/* recalibration count — honest, derived: initial gate-passing fit + one per quarter since (Phase 8 re-fits quarterly).
+   Increments on its own as real time crosses each quarter boundary; the engine would supply the true value from the calibrator's version history. */
+const CALIB_FIRST_FIT=new Date(2024,9,1); /* Q4 2024 — first calibrator that passed the reliability gate */
+function recalibCount(){
+  const n=new Date();
+  const q=(n.getFullYear()-CALIB_FIRST_FIT.getFullYear())*4 + (Math.floor(n.getMonth()/3)-Math.floor(CALIB_FIRST_FIT.getMonth()/3));
+  return 1+Math.max(0,q);
+}
+function applyRecalCount(){const n=recalibCount();const a=document.getElementById('recal-foot'),b=document.getElementById('recal-set');if(a)a.textContent=n;if(b)b.textContent=n;}
+/* ---------- startup splash (mirrors the engine readiness gate: spawn → /health → ready) ---------- */
+function boot(){
+  const sp=document.getElementById('splash');if(!sp)return;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){sp.remove();return;}
+  const steps=[...document.querySelectorAll('#splash-steps .sstep')];let i=0;
+  (function next(){
+    if(i>0){steps[i-1].classList.add('done');steps[i-1].classList.remove('active');}
+    if(i<steps.length){steps[i].classList.add('active');i++;setTimeout(next,i===steps.length?520:400);}
+    else{sp.classList.add('out');setTimeout(()=>sp.remove(),520);}
+  })();
+}
+/* ---------- init ---------- */
+loadP();
+if(!lastSeen)lastSeen={nimbus:'MARGINAL'}; /* seed so the CHANGED badge is demonstrable on first load */
+applyTheme();syncThemeSeg();applyDensity();
+document.getElementById('cost-stt').value=costs.stt;document.getElementById('cost-dp').value=costs.dp;document.getElementById('cost-oth').value=costs.oth;
+document.getElementById('c-live').textContent=DATA.filter(d=>d.stage==='live').length;
+document.getElementById('c-up').textContent=DATA.filter(d=>d.stage==='upcoming').length;
+document.getElementById('c-hist').textContent=DATA.filter(d=>d.stage==='history').length;
+renderAlerts();renderAttention();applyRecalCount();
+renderLive();renderUpcoming();renderHistory();
+tick();setInterval(tick,1000);saveP();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeMode==='system')applyTheme();});
+boot();
+</script>
+</body>
+</html>

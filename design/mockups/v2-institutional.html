@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPO Advisor — V2 Institutional</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b1020; --panel:#121a2e; --panel2:#16203a; --line:#22304e; --line2:#2c3d61;
+  --tx:#eef2fb; --tx2:#9fb0cf; --tx3:#67789a;
+  --apply:#34d399; --marginal:#fbbf24; --skip:#fb7185; --insuf:#8ea3c7;
+  --apply-bg:#0f2e26; --marginal-bg:#33290d; --skip-bg:#331620; --insuf-bg:#1a2440;
+  --accent:#6366f1; --ring-track:#22304e;
+}
+[data-theme="light"]{
+  --bg:#f4f6fb; --panel:#ffffff; --panel2:#f7f9fd; --line:#e4e9f2; --line2:#d3dbe8;
+  --tx:#0f1b34; --tx2:#4a5a76; --tx3:#8494b0;
+  --apply:#059669; --marginal:#b45309; --skip:#e11d48; --insuf:#546484;
+  --apply-bg:#d9f5ea; --marginal-bg:#fbeed6; --skip-bg:#fde2e8; --insuf-bg:#e9eef7;
+  --accent:#4f46e5; --ring-track:#e4e9f2;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'IBM Plex Sans',sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+/* top nav */
+.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;gap:24px;height:64px;max-width:1080px;margin:0 auto;padding:0 28px}
+.logo{display:flex;align-items:center;gap:11px;font-weight:600;font-size:16px}
+.logo .m{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:grid;place-items:center;color:#fff;font-weight:700}
+.links{display:flex;gap:4px}
+.links a{padding:8px 14px;border-radius:8px;color:var(--tx2);text-decoration:none;font-size:13.5px;font-weight:500}
+.links a.on{color:var(--tx);background:var(--panel)}
+.links a:hover:not(.on){color:var(--tx)}
+.nav-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+.chip{font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);padding:7px 12px;border-radius:20px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--apply);box-shadow:0 0 8px var(--apply)}
+.tgl{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:8px 13px;font-size:12.5px;color:var(--tx2);font-weight:500}
+.tgl svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7}
+/* header */
+.head{padding:34px 0 8px;display:flex;align-items:flex-end;justify-content:space-between}
+.head h1{font-size:26px;font-weight:600;letter-spacing:-.01em}
+.head p{color:var(--tx3);font-size:13px;margin-top:6px}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px}
+.seg button{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:500;color:var(--tx2)}
+.seg button.on{background:var(--panel2);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.advisory-bar{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--tx2);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 16px;margin:18px 0 26px}
+.advisory-bar svg{width:15px;height:15px;stroke:var(--accent);fill:none;stroke-width:1.7;flex:none}
+.view{display:none;padding-bottom:50px}.view.on{display:block}
+/* list cards */
+.list{display:flex;flex-direction:column;gap:14px}
+.ipo{display:grid;grid-template-columns:auto 1fr auto auto;gap:22px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 22px;cursor:pointer;transition:border-color .15s,transform .15s}
+.ipo:hover{border-color:var(--line2);transform:translateY(-1px)}
+.ring{--v:74;--c:var(--apply);position:relative;width:66px;height:66px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--c) calc(var(--v)*1%),var(--ring-track) 0)}
+.ring::before{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--panel)}
+.ring b{position:relative;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:16px}
+.ring small{position:relative;display:block;font-size:8px;color:var(--tx3);text-align:center;letter-spacing:.08em;margin-top:-2px}
+.ring.na{background:var(--ring-track)}.ring.na b{font-size:20px;color:var(--tx3)}
+.co h3{font-size:17px;font-weight:600}
+.co .meta{font-size:12px;color:var(--tx3);margin-top:3px}
+.co .reason{font-size:13px;color:var(--tx2);margin-top:9px;max-width:440px;line-height:1.5}
+.co .reason b{color:var(--apply);font-weight:600}
+.badge{font-size:12px;font-weight:600;letter-spacing:.05em;padding:8px 15px;border-radius:9px;text-align:center;white-space:nowrap}
+.b-apply{color:var(--apply);background:var(--apply-bg)}.b-marginal{color:var(--marginal);background:var(--marginal-bg)}
+.b-skip{color:var(--skip);background:var(--skip-bg)}.b-insuf{color:var(--insuf);background:var(--insuf-bg);font-size:11px}
+.gaincol{text-align:right;min-width:96px}
+.gaincol .g{font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:600}
+.gaincol .g.pos{color:var(--apply)}.gaincol .g.neu{color:var(--tx)}.gaincol .g.na{color:var(--tx3);font-size:16px}
+.gaincol small{display:block;font-size:10.5px;color:var(--tx3);margin-top:2px}
+.status{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.05em;padding:3px 8px;border-radius:5px;background:var(--panel2);color:var(--tx2);margin-left:8px}
+.status.live{color:var(--marginal)}
+/* detail */
+.det{display:grid;grid-template-columns:1fr 340px;gap:20px}
+.hero{grid-column:1/-1;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px 30px;display:flex;align-items:center;gap:30px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--apply) 22%,transparent),transparent 70%)}
+.hero .badge{font-size:16px;padding:12px 22px;border-radius:12px}
+.hero .co h2{font-size:24px;font-weight:600}
+.hero .co .m{font-size:12.5px;color:var(--tx3);margin-top:5px}
+.gate{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--apply);background:var(--apply-bg);padding:5px 11px;border-radius:20px;margin-top:11px;font-weight:500}
+.gate svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.2}
+.bigring{margin-left:auto;position:relative;z-index:1;--v:74;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--apply) calc(var(--v)*1%),var(--ring-track) 0)}
+.bigring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--panel)}
+.bigring .n{position:relative;font-family:'IBM Plex Mono',monospace;font-size:32px;font-weight:600}
+.bigring .l{position:relative;font-size:10px;color:var(--tx2);letter-spacing:.05em}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+h4.sec{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);font-weight:600;margin-bottom:14px}
+.reason-body{font-size:14px;line-height:1.65;color:var(--tx)}
+.reason-body b{color:var(--apply);font-weight:600;font-family:'IBM Plex Mono',monospace}
+.watch{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.watch li{display:flex;gap:10px;font-size:13px;color:var(--tx2)}
+.watch li::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--marginal);margin-top:6px}
+.kf{font-size:13px;color:var(--apply);display:flex;align-items:center;gap:8px;margin-top:4px}
+.kf svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2}
+.kv .r{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}
+.kv .r:last-child{border:none}.kv .k{color:var(--tx2)}
+.kv .v{font-family:'IBM Plex Mono',monospace;font-weight:600}.kv .v .sub{color:var(--tx3);font-weight:400;font-size:11px}
+.costs .r{display:flex;justify-content:space-between;padding:8px 0;font-size:12.5px;color:var(--tx2)}
+.costs .r .v{font-family:'IBM Plex Mono',monospace;color:var(--tx)}
+.costs .net{border-top:1px solid var(--line2);margin-top:6px;padding-top:12px;font-weight:600;font-size:14.5px;color:var(--tx)}
+.costs .net .v{color:var(--apply);font-size:17px}
+.caveat{grid-column:1/-1;display:flex;gap:12px;align-items:flex-start;font-size:13px;color:var(--tx2);background:var(--marginal-bg);border:1px solid color-mix(in srgb,var(--marginal) 35%,transparent);border-radius:14px;padding:15px 18px}
+.caveat.off{display:none}.caveat svg{width:17px;height:17px;flex:none;stroke:var(--marginal);fill:none;stroke-width:1.8;margin-top:1px}
+.foot{grid-column:1/-1;text-align:center;font-size:11.5px;color:var(--tx3);line-height:1.6;padding:8px 20px}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-in">
+  <div class="logo"><div class="m mono">i</div> IPO Advisor</div>
+  <div class="links"><a class="on" href="#">Live</a><a href="#">Upcoming</a><a href="#">History</a><a href="#">Settings</a></div>
+  <div class="nav-r">
+    <span class="chip"><span class="dot"></span> Engine online</span>
+    <button class="tgl" onclick="toggleTheme()">
+      <svg class="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>
+      <span class="tlabel">Light</span>
+    </button>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <div class="head">
+    <div><h1>Live &amp; Upcoming IPOs</h1><p>Mainboard only · 5 tracked · updated 2 min ago</p></div>
+    <div class="seg"><button class="on" data-view="list" onclick="setView('list')">List</button><button data-view="detail" onclick="setView('detail')">Verdict detail</button></div>
+  </div>
+  <div class="advisory-bar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 12h1v4h1"/></svg> Advisory only. The app displays verdicts from the calibrated engine — it never places an order.</div>
+
+  <!-- LIST -->
+  <section class="view on" id="v-list">
+    <div class="list">
+      <div class="ipo" onclick="setView('detail')">
+        <div class="ring" style="--v:74;--c:var(--apply)"><b class="mono">74%</b><small>CAL</small></div>
+        <div class="co"><h3>Nimbus Logistics <span class="status live">CLOSES TODAY</span></h3><div class="meta">Logistics · Issue ₹1,240 cr · Band ₹256–270</div><div class="reason">QIB <b>42×</b>, anchors <b>88%</b>, issue P/E <b>12% below</b> peer median. Regime constructive.</div></div>
+        <div class="badge b-apply">APPLY</div>
+        <div class="gaincol"><div class="g pos">+9.4%</div><small>net · +11.8% gross</small></div>
+      </div>
+      <div class="ipo">
+        <div class="ring" style="--v:68;--c:var(--apply)"><b class="mono">68%</b><small>CAL</small></div>
+        <div class="co"><h3>Aster Pharma <span class="status">OPEN · 1D LEFT</span></h3><div class="meta">Pharma · Issue ₹860 cr · Band ₹410–432</div><div class="reason">QIB 31×, anchors 79%, fair valuation. <span style="color:var(--marginal)">Cold market — less certain.</span></div></div>
+        <div class="badge b-apply">APPLY</div>
+        <div class="gaincol"><div class="g pos">+6.1%</div><small>net · +7.9% gross</small></div>
+      </div>
+      <div class="ipo">
+        <div class="ring" style="--v:55;--c:var(--marginal)"><b class="mono">55%</b><small>CAL</small></div>
+        <div class="co"><h3>Vertex Cements <span class="status">CLOSES IN 2D</span></h3><div class="meta">Materials · Issue ₹540 cr · Band ₹128–135</div><div class="reason">Retail-led demand, QIB only <b style="color:var(--marginal)">6×</b>, valuation rich vs peers.</div></div>
+        <div class="badge b-marginal">MARGINAL</div>
+        <div class="gaincol"><div class="g neu">+2.3%</div><small>net · +3.1% gross</small></div>
+      </div>
+      <div class="ipo">
+        <div class="ring na"><b>—</b></div>
+        <div class="co"><h3>Orion Steel <span class="status live">CLOSES TODAY</span></h3><div class="meta">Metals · Issue ₹2,100 cr · Band ₹640–672</div><div class="reason"><span style="color:var(--skip)">Kill-flag:</span> near-total OFS (94%) + material promoter litigation. Forced SKIP regardless of score.</div></div>
+        <div class="badge b-skip">SKIP</div>
+        <div class="gaincol"><div class="g na">—</div><small>kill-flag</small></div>
+      </div>
+      <div class="ipo">
+        <div class="ring na"><b>?</b></div>
+        <div class="co"><h3>Bluewave Digital <span class="status">OPENS TOMORROW</span></h3><div class="meta">Tech · Issue ₹720 cr · Band ₹295–310</div><div class="reason">Book not closed — QIB &amp; anchor data pending. Engine abstains until the signal is complete.</div></div>
+        <div class="badge b-insuf">INSUFFICIENT&nbsp;SIGNAL</div>
+        <div class="gaincol"><div class="g na">—</div><small>no estimate</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DETAIL -->
+  <section class="view" id="v-detail">
+    <div class="det">
+      <div class="hero">
+        <div class="badge b-apply">APPLY</div>
+        <div class="co"><h2>Nimbus Logistics Ltd</h2><div class="m">Logistics · Issue ₹1,240 cr · Band ₹256–270 · Closes today 17:00 IST</div>
+          <div class="gate"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Reliability gate PASSED · calibrator v4</div></div>
+        <div class="bigring" style="--v:74"><div style="text-align:center"><div class="n">74%</div><div class="l">calibrated</div></div></div>
+      </div>
+
+      <div class="card">
+        <h4 class="sec">Grounded reason</h4>
+        <p class="reason-body">Institutional demand is strong — <b>QIB 42×</b> with high-quality anchors (<b>88%</b> reputable, long lock-in). The issue is priced <b>12% below</b> the peer-median P/E, and the market regime is constructive (<b>+0.4</b>). No kill-flags triggered.</p>
+        <h4 class="sec" style="margin-top:24px">Watch items</h4>
+        <ul class="watch"><li>NII book is retail-heavy (bNII 4× vs sNII 21×)</li><li>Sector momentum cooling over the last two weeks</li></ul>
+        <h4 class="sec" style="margin-top:24px">Kill-flags</h4>
+        <div class="kf"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> None triggered</div>
+      </div>
+
+      <div class="card">
+        <h4 class="sec">Subscription (final)</h4>
+        <div class="kv">
+          <div class="r"><span class="k">QIB</span><span class="v" style="color:var(--apply)">42.1×</span></div>
+          <div class="r"><span class="k">NII</span><span class="v">28.4×<span class="sub"> sNII 21/bNII 33</span></span></div>
+          <div class="r"><span class="k">Retail</span><span class="v">9.2×</span></div>
+          <div class="r"><span class="k">Overall</span><span class="v">31.6×</span></div>
+        </div>
+        <h4 class="sec" style="margin-top:22px">Issue structure</h4>
+        <div class="kv">
+          <div class="r"><span class="k">Fresh / OFS</span><span class="v">70 / 30</span></div>
+          <div class="r"><span class="k">Anchor quality</span><span class="v" style="color:var(--apply)">0.88</span></div>
+          <div class="r"><span class="k">Lot</span><span class="v">55 · ₹14,850</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <h4 class="sec">Listing-gain estimate — gross &amp; net of cost</h4>
+        <div class="costs" style="max-width:520px">
+          <div class="r"><span>Gross listing gain (est.)</span><span class="v">+11.8%</span></div>
+          <div class="r"><span>− STT on sell (0.10%)</span><span class="v">−0.10%</span></div>
+          <div class="r"><span>− DP charge (₹15.34 flat)</span><span class="v">−0.11%</span></div>
+          <div class="r"><span>− Exchange + GST + SEBI</span><span class="v">−0.05%</span></div>
+          <div class="r net"><span>Net listing gain (what you keep)</span><span class="v">+9.4%</span></div>
+        </div>
+      </div>
+
+      <div class="caveat off" id="caveat"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span><b>Cold market — probability less certain.</b> Annotation only; it does not change the displayed number.</span></div>
+      <p class="foot">Engineering/research reference — not financial advice. A calibrated 74% still fails ~26% of the time. Advisory only — the app places no orders.</p>
+    </div>
+  </section>
+</div>
+<script>
+function toggleTheme(){const h=document.documentElement,light=h.getAttribute('data-theme')==='light';h.setAttribute('data-theme',light?'dark':'light');document.querySelector('.i-moon').style.display=light?'':'none';document.querySelector('.i-sun').style.display=light?'none':'';document.querySelector('.tlabel').textContent=light?'Light':'Dark';}
+function setView(v){document.querySelectorAll('.view').forEach(s=>s.classList.remove('on'));document.getElementById('v-'+v).classList.add('on');document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));}
+</script>
+</body>
+</html>
