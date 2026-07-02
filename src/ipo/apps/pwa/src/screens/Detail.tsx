@@ -53,7 +53,10 @@ const Check = () => (
   </svg>
 )
 
-const x = (v: number | null): string => (v != null ? `${v}×` : '—')
+// Subscription multiples arrive as raw floats (e.g. 3.477239327931627 = bid ÷ offered). Show them
+// the way the exchanges do: 2 decimals, trailing zeros trimmed — 3.48×, 19.22×, 242×.
+const fmtMult = (v: number): string => v.toFixed(2).replace(/\.?0+$/, '')
+const x = (v: number | null): string => (v != null ? `${fmtMult(v)}×` : '—')
 
 const fmtDay = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
@@ -78,7 +81,7 @@ function DemandSpark({ points }: { points: SubscriptionPoint[] }) {
     <div className="sub-spark">
       <div className="ss-head">
         <span>Demand progression · overall</span>
-        <span className="ss-final mono">{last}× final</span>
+        <span className="ss-final mono">{fmtMult(last)}× final</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="ss-svg">
         <path d={area} className="ss-area" />
@@ -105,11 +108,11 @@ function DemandSpark({ points }: { points: SubscriptionPoint[] }) {
 function contribLabel(key: string, f: IPOFeatures): string {
   switch (key) {
     case 'qib_sub':
-      return f.qib_sub != null ? `QIB ${f.qib_sub}×` : 'QIB'
+      return f.qib_sub != null ? `QIB ${fmtMult(f.qib_sub)}×` : 'QIB'
     case 'nii_sub':
-      return f.nii_sub != null ? `NII ${f.nii_sub}×` : 'NII'
+      return f.nii_sub != null ? `NII ${fmtMult(f.nii_sub)}×` : 'NII'
     case 'retail_sub':
-      return f.retail_sub != null ? `Retail ${f.retail_sub}×` : 'Retail'
+      return f.retail_sub != null ? `Retail ${fmtMult(f.retail_sub)}×` : 'Retail'
     case 'anchor_quality':
       return f.anchor_quality != null ? `Anchors ${Math.round(f.anchor_quality * 100)}%` : 'Anchors'
     case 'relative_valuation':
