@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useBoard, useCalibration, useHealth } from './api/hooks'
 import { CommandPalette } from './components/CommandPalette'
 import { IconAlert } from './components/Icons'
@@ -76,6 +76,23 @@ export function App() {
   const engineUp = health.isSuccess && health.data?.status === 'ok'
   const engineDown = health.isError
 
+  // Nav count chips: the size of each section, derived from the board (the same partitions the
+  // Upcoming / History screens render) — no extra fetch, no fabricated numbers.
+  const counts = useMemo(() => {
+    const rows = board.data ?? []
+    const t = new Date()
+    t.setHours(0, 0, 0, 0)
+    const midnight = (d: string) => +new Date(`${d}T00:00:00`)
+    let upcoming = 0
+    let history = 0
+    for (const r of rows) {
+      const listed = r.listing_date != null && midnight(r.listing_date) <= +t
+      if (listed) history += 1
+      else if (midnight(r.close_date) >= +t) upcoming += 1
+    }
+    return { live: rows.length, upcoming, history }
+  }, [board.data])
+
   const navigate = (v: View) => {
     setDetailId(null)
     setView(v)
@@ -130,7 +147,7 @@ export function App() {
       <Sidebar
         view={view}
         onNavigate={navigate}
-        counts={{ live: board.data?.length }}
+        counts={counts}
         engineUp={engineUp}
         gatePassed={calibration.data?.gate_passed ?? true}
         recalibrations={recalibrationCount()}

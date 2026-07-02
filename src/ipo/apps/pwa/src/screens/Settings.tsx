@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useCalibration, useHealth } from '../api/hooks'
+import { useBoard, useCalibration, useHealth } from '../api/hooks'
 import { recalibrationCount } from '../recalib'
 import { toast } from '../toast'
 import {
@@ -25,7 +25,18 @@ function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 export function Settings() {
   const qc = useQueryClient()
   const health = useHealth()
+  const board = useBoard()
   const cal = useCalibration()
+  const lastRefresh =
+    board.dataUpdatedAt > 0
+      ? new Date(board.dataUpdatedAt).toLocaleTimeString('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour12: true,
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      : null
   const [theme, setTheme] = useState<ThemeMode>(getThemeMode())
   const [density, setDens] = useState<Density>(getDensity())
   const [notif, setNotif] = useState({ native: true, applyCrossing: true, anyChange: false, quiet: true })
@@ -176,6 +187,14 @@ export function Settings() {
           <div className="health">
             <span className={engineUp ? 'dot' : 'dot down'} />
             {engineUp ? 'online' : health.isError ? 'offline' : 'connecting…'}
+          </div>
+        </div>
+        <div className="set-row">
+          <div className="k">
+            Last refresh<small>verdicts last pulled from the engine</small>
+          </div>
+          <div className="mono" style={{ fontSize: 12, color: 'var(--tx2)' }}>
+            {lastRefresh ? `${lastRefresh} IST` : '—'}
           </div>
         </div>
         <div className="set-row">

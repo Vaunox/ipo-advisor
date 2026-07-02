@@ -1,6 +1,7 @@
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { useTransitions } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
+import { getAlertsSeen, setAlertsSeen } from '../state/prefs'
 import { VMETA } from '../verdict'
 
 const fmtDate = (iso: string): string =>
@@ -17,11 +18,14 @@ export function AlertCenter({
   onOpenIpo: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [read, setRead] = useState(false)
+  // Which APPLY signals have already been seen — persisted, so the unread badge survives a reload
+  // and only re-lights when a genuinely new IPO crosses into APPLY.
+  const [seen, setSeen] = useState<Set<string>>(() => new Set(getAlertsSeen()))
   const wrap = useRef<HTMLDivElement>(null)
   const alerts = (board ?? []).filter((r) => r.verdict === 'APPLY')
   const { data: transitions } = useTransitions()
   const crossings = (transitions ?? []).filter((t) => t.crossed_into_apply)
+  const unread = alerts.filter((a) => !seen.has(a.ipo_id)).length
 
   useEffect(() => {
     const onDoc = (e: globalThis.MouseEvent) => {
@@ -34,7 +38,10 @@ export function AlertCenter({
   const toggle = (e: MouseEvent) => {
     e.stopPropagation()
     setOpen((o) => !o)
-    setRead(true)
+    // Mark the current APPLY signals as seen (persisted) when the panel is opened.
+    const next = new Set([...seen, ...alerts.map((a) => a.ipo_id)])
+    setSeen(next)
+    setAlertsSeen([...next])
   }
 
   return (
@@ -43,7 +50,7 @@ export function AlertCenter({
         <svg viewBox="0 0 24 24">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
         </svg>
-        {alerts.length > 0 && !read && <span className="badge">{alerts.length}</span>}
+        {unread > 0 && <span className="badge">{unread}</span>}
       </button>
       {open && (
         <div className="alertpanel">

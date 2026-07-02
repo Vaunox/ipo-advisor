@@ -8,6 +8,15 @@ let child: ChildProcess | null = null
 let win: BrowserWindow | null = null
 let engineReady = false
 
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+// Drive the splash's step list from the real boot stages (best-effort: ignore if the splash page
+// has already been replaced by the dashboard). Steps: 0 spawn · 1 health · 2 calibrator · 3 ready.
+function splashStep(n: number, failed = false): void {
+  const fn = failed ? '__setFail' : '__setStep'
+  void win?.webContents.executeJavaScript(`window.${fn}&&window.${fn}(${n})`).catch(() => {})
+}
+
 async function boot(): Promise<void> {
   const repoRoot = findRepoRoot(__dirname)
   const port = await freePort()
@@ -51,8 +60,21 @@ async function boot(): Promise<void> {
   await win.loadFile(path.join(__dirname, '..', 'splash.html'))
 
   const t0 = Date.now()
+  splashStep(1) // engine spawned; now polling /health
   engineReady = await waitForHealth(base, 30_000)
   console.log(`[boot] /health ${engineReady ? 'green' : 'TIMEOUT'} after ${Date.now() - t0}ms`)
+
+  if (engineReady) {
+    // Health green means the engine came up with its calibrator loaded; show the last stages
+    // briefly so the readiness sequence is legible before the dashboard replaces the splash.
+    splashStep(2)
+    await sleep(320)
+    splashStep(3)
+    await sleep(200)
+  } else {
+    splashStep(1, true) // health timed out — mark the check failed; the app shows engine-down
+    await sleep(400)
+  }
 
   // Only now load the dashboard — a cold start never shows the UI before /health resolves. If it
   // timed out, the app still loads and its /health poll renders the engine-down state.

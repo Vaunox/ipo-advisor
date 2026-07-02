@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>IPO Advisor — starting</title>
     <style>
-      :root { --bg:#0a0d12; --tx:#e6ecf3; --tx2:#95a3b4; --tx3:#5f6d7e; --apply:#3ddc84; --line2:#28323f; }
+      :root { --bg:#0a0d12; --tx:#e6ecf3; --tx2:#95a3b4; --tx3:#5f6d7e; --apply:#3ddc84; --skip:#ff5d63; --line2:#28323f; }
       * { box-sizing:border-box; margin:0; padding:0; }
       html, body { height:100%; }
       body {
@@ -21,26 +21,57 @@
         font-family:'Fira Code', monospace; animation:pop .55s cubic-bezier(.2,1,.3,1);
       }
       .name { font-size:20px; font-weight:700; letter-spacing:-.01em; margin-bottom:22px; }
-      .steps { display:flex; flex-direction:column; gap:10px; width:230px; margin:0 auto;
+      .steps { display:flex; flex-direction:column; gap:10px; width:240px; margin:0 auto;
         font-family:'Fira Code', monospace; font-size:12px; text-align:left; }
-      .s { color:var(--tx3); display:flex; align-items:center; gap:10px; }
-      .s::before { content:"○"; font-size:11px; }
-      .s.on { color:var(--tx2); }
-      .spin { display:inline-block; width:11px; height:11px; border:2px solid var(--line2);
+      .s { color:var(--tx3); display:flex; align-items:center; gap:10px; transition:color .25s ease; }
+      .s .ic { width:12px; height:12px; flex:none; display:inline-grid; place-items:center; }
+      /* pending: hollow ring */
+      .s .ic::before { content:""; width:9px; height:9px; border:1.5px solid var(--tx3); border-radius:50%; }
+      /* active: spinner */
+      .s.on { color:var(--tx); }
+      .s.on .ic::before { content:""; width:11px; height:11px; border:2px solid var(--line2);
         border-top-color:var(--apply); border-radius:50%; animation:rot .8s linear infinite; }
+      /* done: green check */
+      .s.done { color:var(--tx2); }
+      .s.done .ic::before { content:"✓"; border:none; width:auto; height:auto; color:var(--apply); font-weight:700; font-size:12px; }
+      /* failed: red cross */
+      .s.fail { color:var(--skip); }
+      .s.fail .ic::before { content:"✕"; border:none; width:auto; height:auto; color:var(--skip); font-weight:700; font-size:12px; }
       @keyframes pop { from { transform:scale(.55); opacity:0; } to { transform:scale(1); opacity:1; } }
       @keyframes rot { to { transform:rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        .logo { animation:none; }
+        .s.on .ic::before { animation:none; }
+      }
     </style>
   </head>
   <body>
     <div class="in">
       <div class="logo">◆</div>
       <div class="name">IPO Advisor</div>
-      <div class="steps">
-        <div class="s on"><span class="spin"></span> Starting engine…</div>
-        <div class="s">○&nbsp; Health check&nbsp; /health</div>
-        <div class="s">○&nbsp; Loading verdicts</div>
+      <div class="steps" id="steps">
+        <div class="s on" data-step="0"><span class="ic"></span> Starting engine…</div>
+        <div class="s" data-step="1"><span class="ic"></span> Health check&nbsp; /health</div>
+        <div class="s" data-step="2"><span class="ic"></span> Loading calibrator</div>
+        <div class="s" data-step="3"><span class="ic"></span> Ready</div>
       </div>
     </div>
+    <script>
+      // The main process drives these as each real boot stage completes: __setStep(n) marks
+      // 0..n-1 done and n active; __setFail(n) marks step n as failed (health timeout).
+      const rows = () => Array.from(document.querySelectorAll('.s'))
+      window.__setStep = (n) => {
+        rows().forEach((el) => {
+          const i = Number(el.dataset.step)
+          el.className = 's' + (i < n ? ' done' : i === n ? ' on' : '')
+        })
+      }
+      window.__setFail = (n) => {
+        rows().forEach((el) => {
+          const i = Number(el.dataset.step)
+          el.className = 's' + (i < n ? ' done' : i === n ? ' fail' : '')
+        })
+      }
+    </script>
   </body>
 </html>

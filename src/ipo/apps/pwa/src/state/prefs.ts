@@ -26,6 +26,7 @@ interface Prefs {
   lastSeen: Record<string, VerdictType>
   costs: Costs
   startup: Startup
+  alertsSeen: string[]
 }
 
 const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
@@ -48,6 +49,7 @@ function load(): Prefs {
         p.startup && typeof p.startup === 'object'
           ? { ...DEFAULT_STARTUP, ...p.startup }
           : { ...DEFAULT_STARTUP },
+      alertsSeen: Array.isArray(p.alertsSeen) ? p.alertsSeen : [],
     }
   } catch {
     return {
@@ -57,6 +59,7 @@ function load(): Prefs {
       lastSeen: {},
       costs: { ...DEFAULT_COSTS },
       startup: { ...DEFAULT_STARTUP },
+      alertsSeen: [],
     }
   }
 }
@@ -133,5 +136,12 @@ export function setCosts(costs: Costs): void {
 export const getStartup = (): Startup => prefs.startup
 export function setStartup(startup: Startup): void {
   prefs = { ...prefs, startup }
+  save()
+}
+
+/* ---- alerts-read (which APPLY signals have been seen; drives the unread badge) ---- */
+export const getAlertsSeen = (): string[] => prefs.alertsSeen
+export function setAlertsSeen(ids: string[]): void {
+  prefs = { ...prefs, alertsSeen: ids }
   save()
 }
