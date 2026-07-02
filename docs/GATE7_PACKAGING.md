@@ -69,9 +69,12 @@ Needs a manual GUI run (not automatable in this environment):
 
 ## Notes for the operator
 
-- **Signing.** The app ships **unsigned** (`win.signAndEditExecutable=false`); the operator signs
-  the installer + binaries with their own certificate. Claude never holds signing keys.
-- **Clean-machine build.** electron-builder extracts a `winCodeSign` cache that contains macOS
-  symlinks; on a machine without **Windows Developer Mode** (or an elevated shell) that extraction
-  needs the symlink privilege. Enable Developer Mode once, or run the build from an Administrator
-  terminal. (This build machine's cache is already warm.)
+- **Signing.** The app ships **unsigned** via a no-op `win.sign` hook (`sign-noop.cjs`) — the
+  branded icon is still embedded (rcedit runs), but no certificate is used. The operator signs the
+  installer + binaries with their own certificate: remove the hook in `package.json` and configure
+  real signing. Claude never holds signing keys.
+- **Developer Mode required to build.** electron-builder extracts a `winCodeSign` cache that
+  contains macOS symlinks; creating them needs the symlink privilege, which **Windows Developer
+  Mode** grants (Settings → System → For developers → Developer Mode → On). Enable it once (or build
+  from an Administrator terminal). With it off, the installer build fails at
+  "Cannot create symbolic link". This is an OS setting, unrelated to our build config.
