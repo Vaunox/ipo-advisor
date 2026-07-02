@@ -32,7 +32,19 @@ binaries: list = []
 # submodules must be collected explicitly or the frozen server fails to start.
 hiddenimports = collect_submodules("ipo") + collect_submodules("uvicorn")
 
-for pkg in ("pyarrow", "pydantic", "pydantic_core", "fastapi", "starlette"):
+for pkg in (
+    "pyarrow",
+    "pydantic",
+    "pydantic_core",
+    "fastapi",
+    "starlette",
+    "requests",  # live NSE ingestion (HTTP)
+    "certifi",  # CA bundle requests needs for TLS to nseindia.com
+    "urllib3",
+    "charset_normalizer",
+    "idna",
+    "bs4",  # pulled in via ipo.data.sources.chittorgarh (collected with the ipo package)
+):
     pkg_datas, pkg_binaries, pkg_hidden = collect_all(pkg)
     datas += pkg_datas
     binaries += pkg_binaries

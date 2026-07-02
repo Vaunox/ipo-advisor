@@ -64,6 +64,10 @@ class ScrapeConfig(_Section):
     user_agent: str = "ipo-advisor/0.1"
     cadence_minutes_default: int = 360
     cadence_minutes_subscription_window: int = 30
+    # When true, the running service pulls live current mainboard IPOs from NSE each cycle
+    # (the scheduler's refresh). Off → serve the seeded store only. See docs/SHIPPED_APP_GAPS.md
+    # for the public-distribution caveat (per-user scraping of NSE's robots-disallowed /api).
+    live_ingest: bool = True
 
 
 class VerdictThresholds(_Section):

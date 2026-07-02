@@ -4,18 +4,36 @@ Audit date: 2026-07-03. Scope: the packaged Windows app (NSIS `.exe` and the MSI
 i.e. the Electron shell + the PyInstaller'd Python engine sidecar as they actually run on an
 end user's machine, versus what exists in the repo but is not connected to that running app.
 
-## Bottom line
+## UPDATE 2026-07-03 — live ingestion wired (the core gap is closed)
 
-The shipped app is a **complete, correct advisory *engine* + UI + packaging that runs on frozen
-sample data.** The scoring engine is real and gated (Platt calibrator, GATE 4, AUC 0.812 / ECE
-0.073 on 311 official NSE IPOs). But the **entire live-data half is designed and never wired in**:
-the running app never ingests, so it shows the same static demo verdicts forever. It therefore does
-**not** meet the Phase-7 gate line "shows **live** verdicts, fires native notifications on **APPLY
-crossings**" ([07_Phase7_App.md](deep_dives/07_Phase7_App.md), §"BUILD loop" / "Sequence summary").
+The main gap below (no live data) is **fixed**. The running app now pulls **live current mainboard
+IPOs from NSE** each scheduler cycle and scores them:
 
-This was the phased plan, not an accident — Phases 1–6 built and gated the engine on real official
-data; Phase 7 put a UI + genuine-software packaging on it; the *live feed into the running app* was
-the seam left for "operate & maintain." The demo store was the stand-in.
+- [`data/ingest/live.py`](../src/ipo/data/ingest/live.py) — `refresh_from_nse`: NSE `ipo-current-issue`
+  → per-category subscription (`ipo-active-category`) → `IPORecord`s → store. Never raises (a data
+  hiccup degrades to the last store).
+- [`data/sources/nse.py`](../src/ipo/data/sources/nse.py) gained `current_issues()` + sNII/bNII parsing.
+- [`service/runner.py`](../src/ipo/service/runner.py) `main()` now passes `refresh=_live_refresh(...)`
+  and a logging `push_transport` (fixes the notify landmine). Config flag `scrape.live_ingest`
+  (default on).
+- **Verified in the frozen binary:** a fresh install pulled the real live IPO *KNACK* (Knack
+  Packaging) from NSE and scored it MARGINAL. `requests`/`certifi` are bundled in the PyInstaller
+  spec.
+- **Fabricated companies removed** (Greenspark/NovaCore/Helios/Deferred-Demo). The seed now keeps
+  only real-company historical examples for the History tab; live data supplies current IPOs.
+
+Items 1–3, 5, 6 below are therefore **RESOLVED**. What still stands: the enhancement features (item 4
+— anchor/valuation/OFS have no official live feed), the **public-distribution caveat** (per-user
+scraping of NSE's robots-disallowed `/api` — for a public Store release, prefer a hosted API the
+operator runs and the app polls), auto-update (item 9, deferred), and GMP-out-by-design (item 10).
+
+## Bottom line (original audit)
+
+The shipped app *was* a complete, correct advisory *engine* + UI + packaging that ran on frozen
+sample data. The scoring engine is real and gated (Platt calibrator, GATE 4, AUC 0.812 / ECE
+0.073 on 311 official NSE IPOs). The **live-data half was designed but not wired** — now it is (see
+the update above). Phases 1–6 built and gated the engine on real official data; Phase 7 put a UI +
+packaging on it; the live feed was the seam left for "operate & maintain," now closed.
 
 ---
 

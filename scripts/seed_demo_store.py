@@ -24,10 +24,9 @@ from pathlib import Path
 
 from ipo.calibration.calibrate import load_calibrator
 from ipo.calibration.regime import NiftyRegime
-from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, load_config
 from ipo.core.constants import IST
-from ipo.core.types import IPORecord, Segment, SubscriptionPoint, VerdictType
+from ipo.core.types import IPORecord, SubscriptionPoint, VerdictType
 from ipo.data.store.repository import ParquetRepository
 from ipo.model.scorer import WeightedScorer
 from ipo.service.engine import VerdictEngine
@@ -98,69 +97,12 @@ def _enrich(record: IPORecord) -> IPORecord:
     )
 
 
-def _upcoming_records(captured: datetime) -> list[IPORecord]:
-    """Open / upcoming issues (book not yet closed) so the calendar is non-empty.
-
-    Dated relative to 2026-07-02 (the demo 'today'): one live, one whose anchor lands
-    tomorrow, one further out — spanning below-peer, in-line, and rich valuations.
-    """
-    green_prog = (
-        SubscriptionPoint(
-            asof=datetime(2026, 7, 1, 17, 0, tzinfo=IST),
-            qib=0.38,
-            nii=1.15,
-            retail=2.05,
-            overall=1.05,
-        ),
-    )
-    return [
-        IPORecord(
-            ipo_id="greenspark-2026",
-            name="Greenspark Energy Ltd",
-            segment=Segment.MAINBOARD,
-            price_band_low=480,
-            price_band_high=505,
-            lot_size=29,
-            issue_size_cr=1850,
-            ofs_fraction=0.35,
-            open_date=date(2026, 7, 1),
-            close_date=date(2026, 7, 3),
-            issue_pe=32.0,
-            peer_median_pe=38.0,
-            subscription_progression=green_prog,
-            captured_at=captured,
-        ),
-        IPORecord(
-            ipo_id="novacore-2026",
-            name="NovaCore Semiconductors Ltd",
-            segment=Segment.MAINBOARD,
-            price_band_low=720,
-            price_band_high=760,
-            lot_size=19,
-            issue_size_cr=3200,
-            ofs_fraction=0.10,
-            open_date=date(2026, 7, 4),
-            close_date=date(2026, 7, 8),
-            issue_pe=44.0,
-            peer_median_pe=41.0,
-            captured_at=captured,
-        ),
-        IPORecord(
-            ipo_id="helioswind-2026",
-            name="Helios Wind Infra Ltd",
-            segment=Segment.MAINBOARD,
-            price_band_low=210,
-            price_band_high=222,
-            lot_size=67,
-            issue_size_cr=640,
-            ofs_fraction=0.80,
-            open_date=date(2026, 7, 9),
-            close_date=date(2026, 7, 11),
-            issue_pe=55.0,
-            peer_median_pe=30.0,
-            captured_at=captured,
-        ),
-    ]
+# Real-company historical examples kept for the History/accountability tab (illustrative sample
+# figures). Everything else in the old demo blob — the fabricated upcoming companies and the
+# deferred-demo placeholder — is dropped; live NSE ingestion supplies real current IPOs.
+_REAL_HISTORICAL = frozenset(
+    {"zomato-2021", "nykaa-2021", "paytm-2021", "lic-2022", "tatatech-2023", "spectrum-sme-2023"}
+)
 
 
 def _seed_transitions(repo: ParquetRepository, config: AppConfig, data_dir: Path) -> int:
@@ -208,15 +150,21 @@ def main() -> None:
     data_dir = _REPO_ROOT / config.storage.data_dir
     repo = ParquetRepository(data_dir)
 
-    existing = repo.list_all()
-    enriched = [_enrich(r) for r in existing]
-    upcoming = _upcoming_records(now_ist())
-    repo.upsert_many(enriched + upcoming)
+    # Keep only the real-company historical examples (for the History/accountability tab); drop the
+    # fabricated "upcoming" demos and the deferred-demo placeholder. The running app ingests real
+    # current IPOs live (ipo.data.ingest.live), so NO fabricated companies ship.
+    kept = [_enrich(r) for r in repo.list_all() if r.ipo_id in _REAL_HISTORICAL]
+
+    # Rewrite the store from scratch so dropped records are actually removed (upsert never deletes).
+    parquet = data_dir / "ipo_records.parquet"
+    parquet.unlink(missing_ok=True)
+    repo = ParquetRepository(data_dir)
+    repo.upsert_many(kept)
     n_transitions = _seed_transitions(repo, config, data_dir)
 
     total = repo.list_all()
-    print(f"demo store at {data_dir / 'ipo_records.parquet'}")
-    print(f"  enriched {len(enriched)} existing record(s); {len(upcoming)} open/upcoming added")
+    print(f"demo store at {parquet}")
+    print(f"  kept {len(kept)} real historical example(s); fabricated/upcoming dropped")
     print(f"  total records: {len(total)}; seeded {n_transitions} verdict transition(s)")
     for r in sorted(total, key=lambda x: x.close_date):
         prog = len(r.subscription_progression) if r.subscription_progression else 0

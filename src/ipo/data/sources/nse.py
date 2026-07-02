@@ -35,6 +35,7 @@ from ipo.data.sources.base import PoliteClient, RawCache, SourceError, compute_h
 NSE_BASE = "https://www.nseindia.com"
 NSE_HOMEPAGE = f"{NSE_BASE}/market-data/all-upcoming-issues-ipo"
 PAST_ISSUES_URL = f"{NSE_BASE}/api/public-past-issues?index=equities"
+CURRENT_ISSUES_URL = f"{NSE_BASE}/api/ipo-current-issue"
 SUBSCRIPTION_URL = f"{NSE_BASE}/api/ipo-active-category"
 BHAVCOPY_OLD = "https://archives.nseindia.com/content/historical/EQUITIES/{y}/{mon}/cm{d:02d}{mon}{y}bhav.csv.zip"
 BHAVCOPY_UDIFF = (
@@ -62,13 +63,28 @@ class NsePastIssue:
 
 
 @dataclass(frozen=True)
+class NseCurrentIssue:
+    """One live/active issue from ``ipo-current-issue`` (open or just-closed, pre-listing)."""
+
+    symbol: str
+    company: str
+    segment: str  # "mainboard" | "sme"
+    price_band_low: float | None
+    price_band_high: float | None
+    open_date: date | None
+    close_date: date | None
+
+
+@dataclass(frozen=True)
 class NseSubscription:
-    """Final oversubscription multiples (closing figures) from NSE bid-details."""
+    """Final/live oversubscription multiples (closing or in-progress) from NSE bid-details."""
 
     qib: float | None
     nii: float | None
     retail: float | None
     total: float | None
+    nii_small: float | None = None  # sNII: bid > ₹2L up to ₹10L
+    nii_big: float | None = None  # bNII: bid > ₹10L
 
 
 # --- pure parsing helpers ---------------------------------------------------
@@ -168,7 +184,38 @@ def parse_subscription(raw: RawResponse) -> NseSubscription:
         nii=value_for(lambda c: c == "Non Institutional Investors"),
         retail=value_for(lambda c: "Retail Individual Investors" in c),
         total=value_for(lambda c: c == "Total"),
+        nii_small=value_for(lambda c: "Two Lakh Rupees upto Ten Lakh" in c),
+        nii_big=value_for(lambda c: "more than Ten Lakh Rupees" in c),
     )
+
+
+def parse_current_issues(raw: RawResponse) -> list[NseCurrentIssue]:
+    """Parse the ``ipo-current-issue`` JSON (live/active issues) into typed rows (fail loud)."""
+    try:
+        data = json.loads(raw.content)
+    except json.JSONDecodeError as exc:
+        raise SourceError("nse: current-issue is not valid JSON") from exc
+    if not isinstance(data, list):
+        raise SourceError("nse: current-issue JSON is not a list (source drift?)")
+
+    issues: list[NseCurrentIssue] = []
+    for row in data:
+        symbol = str(row.get("symbol", "")).strip()
+        if not symbol:
+            raise SourceError("nse: current-issue row missing symbol (drift?)")
+        low, high = _parse_band(row.get("issuePrice", ""), row.get("issuePrice", ""))
+        issues.append(
+            NseCurrentIssue(
+                symbol=symbol,
+                company=str(row.get("companyName", "")).strip(),
+                segment=_segment_of_series(str(row.get("series", ""))),
+                price_band_low=low,
+                price_band_high=high,
+                open_date=_parse_nse_date(row.get("issueStartDate", "")),
+                close_date=_parse_nse_date(row.get("issueEndDate", "")),
+            )
+        )
+    return issues
 
 
 def parse_listing_prices(raw_csv: str, symbol: str) -> tuple[float, float] | None:
@@ -237,9 +284,33 @@ class NseClient:
         """Fetch (cached) and parse the past-issues master list."""
         return parse_past_issues(self._get_json("nse_past", PAST_ISSUES_URL, referer=NSE_HOMEPAGE))
 
-    def subscription(self, symbol: str) -> NseSubscription:
-        """Fetch (cached) and parse final subscription for one symbol."""
+    def current_issues(self, *, force: bool = True) -> list[NseCurrentIssue]:
+        """Fetch and parse the live/active issues (open or just-closed, pre-listing).
+
+        ``force`` bypasses the immutable raw cache — current issues change intraday, so a live
+        refresh must re-fetch rather than serve a stale snapshot (unlike the immutable past data).
+        """
+        if force:
+            self._ensure_cookies()
+            resp = self._client.fetch(
+                "nse_current",
+                CURRENT_ISSUES_URL,
+                headers={"Accept": "application/json", "Referer": NSE_HOMEPAGE},
+            )
+            return parse_current_issues(resp)
+        return parse_current_issues(
+            self._get_json("nse_current", CURRENT_ISSUES_URL, referer=NSE_HOMEPAGE)
+        )
+
+    def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
+        """Fetch + parse subscription for one symbol (``force`` re-fetches live, skipping cache)."""
         url = f"{SUBSCRIPTION_URL}?symbol={symbol}"
+        if force:
+            self._ensure_cookies()
+            resp = self._client.fetch(
+                "nse_sub", url, headers={"Accept": "application/json", "Referer": NSE_HOMEPAGE}
+            )
+            return parse_subscription(resp)
         return parse_subscription(self._get_json("nse_sub", url, referer=NSE_HOMEPAGE))
 
     def listing_prices(self, symbol: str, listing_day: date) -> tuple[float, float] | None:

@@ -15,6 +15,7 @@ from ipo.data.sources.nse import (
     _parse_money,
     _parse_nse_date,
     mainboard_since,
+    parse_current_issues,
     parse_listing_prices,
     parse_past_issues,
     parse_subscription,
@@ -90,3 +91,33 @@ def test_mainboard_since_filters_segment_and_date() -> None:
     filtered = mainboard_since(issues, date(2012, 1, 1))
     assert all(i.segment == "mainboard" for i in filtered)
     assert all(i.listing_date is not None for i in filtered)
+
+
+def test_parse_current_issues_fixture() -> None:
+    raw = _raw((_FIX / "nse_current_issue_sample.json").read_text(encoding="utf-8"))
+    issues = parse_current_issues(raw)
+    by_symbol = {i.symbol: i for i in issues}
+    assert set(by_symbol) == {"KNACK", "ICELCO"}
+    knack = by_symbol["KNACK"]
+    assert knack.company == "Knack Packaging Limited"
+    assert knack.segment == "mainboard"  # series EQ
+    assert (knack.price_band_low, knack.price_band_high) == (161.0, 170.0)
+    assert knack.open_date == date(2026, 7, 1)
+    assert knack.close_date == date(2026, 7, 3)
+    assert by_symbol["ICELCO"].segment == "sme"  # series SME
+
+
+def test_parse_current_issues_bad_shape_raises() -> None:
+    with pytest.raises(SourceError):
+        parse_current_issues(_raw('{"not": "a list"}'))
+
+
+def test_parse_subscription_captures_snii_bnii() -> None:
+    raw = _raw((_FIX / "nse_active_category_sample.json").read_text(encoding="utf-8"))
+    sub = parse_subscription(raw)
+    assert sub.qib == pytest.approx(3.4772, abs=1e-3)
+    assert sub.nii == pytest.approx(19.2186, abs=1e-3)
+    assert sub.retail == pytest.approx(4.2335, abs=1e-3)
+    assert sub.total == pytest.approx(7.2149, abs=1e-3)
+    assert sub.nii_small == pytest.approx(17.1256, abs=1e-3)  # sNII (₹2–10L)
+    assert sub.nii_big == pytest.approx(20.2651, abs=1e-3)  # bNII (>₹10L)

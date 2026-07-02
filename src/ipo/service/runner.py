@@ -27,6 +27,7 @@ from ipo.calibration.regime import NiftyRegime
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, load_config
 from ipo.core.interfaces import Calibrator, Notifier, Repository
+from ipo.core.logging import get_logger
 from ipo.data.store.repository import ParquetRepository
 from ipo.model.scorer import WeightedScorer
 from ipo.service.api import create_app
@@ -138,6 +139,37 @@ def build_service(
     )
 
 
+def _live_refresh(
+    config: AppConfig, repository: Repository, data_dir: Path
+) -> Callable[[], None] | None:
+    """Build the scheduler's live-ingest refresh (NSE current issues → store), or None if disabled.
+
+    Constructs the polite NSE client (cookie-handshake, rate-limited; robots off — NSE disallows
+    ``/api``, operator-authorized public data) and returns a callback the scheduler runs each cycle.
+    ``refresh_from_nse`` never raises, so a live-data hiccup degrades to the last store.
+    """
+    if not config.scrape.live_ingest:
+        return None
+
+    from ipo.data.ingest.live import refresh_from_nse
+    from ipo.data.sources.base import PoliteClient, RawCache
+    from ipo.data.sources.nse import NseClient
+
+    client = PoliteClient(
+        user_agent=config.scrape.user_agent,
+        rate_limit_per_sec=config.scrape.rate_limit_per_sec,
+        backoff_factor=config.scrape.backoff_factor,
+        max_retries=config.scrape.max_retries,
+        respect_robots=False,
+    )
+    nse = NseClient(client, RawCache(root=data_dir / "raw_cache"))
+
+    def refresh() -> None:
+        refresh_from_nse(repository, nse)
+
+    return refresh
+
+
 def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server)
     """Build the service from config + artifacts and run it (scheduler loop + API server).
 
@@ -168,13 +200,20 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     config = load_config(config_dir=res / "config")
     data_dir = Path(args.data_dir) if args.data_dir else Path(config.storage.data_dir)
     _provision_data_dir(data_dir, res)
+    repository = ParquetRepository(data_dir)
     service = build_service(
         config,
-        repository=ParquetRepository(data_dir),
+        repository=repository,
         calibrator=load_calibrator(res / "models" / "calibrator.json"),
         nifty_path=res / "data" / "backfill" / "nifty.csv",
         calibration_report_path=res / "models" / "reliability.json",
         transition_store=TransitionStore(data_dir / "verdict_transitions.json"),
+        refresh=_live_refresh(config, repository, data_dir),
+        # A logging transport so a 'push' notify channel never crashes for lack of one (the
+        # user-facing alerts are the renderer's native toasts; this just journals crossings).
+        push_transport=lambda message: get_logger("ipo.service.runner").info(
+            "notify_crossing", extra={"message": message}
+        ),
     )
 
     def loop() -> None:
