@@ -67,6 +67,32 @@ Needs a manual GUI run (not automatable in this environment):
 - ⬜ Launch → splash → dashboard with live verdicts; tray minimize/restore/restart/quit; window
   state remembered across launches; a native toast on a live APPLY crossing; launch-on-startup.
 
+## Microsoft Store (MSIX)
+
+The Store takes an **MSIX/AppX**, not the NSIS `.exe`. Build it with electron-builder's `appx`
+target (config in `package.json` → `build.appx`); Microsoft signs it on submission (free — no
+certificate needed), so the `.appx` is uploaded unsigned.
+
+The built package is a **full-trust desktop app** (`AppxManifest.xml`:
+`EntryPoint=Windows.FullTrustApplication` + `runFullTrust`), so the Electron↔localhost engine and
+the sidecar spawn work exactly as in the Win32 build — verified by inspecting the manifest.
+
+**Windows 11 tooling gotcha (important):** electron-builder ships an old `makeappx.exe`
+(winCodeSign-2.6.0) whose side-by-side assembly is broken on Windows 11 → `spawn UNKNOWN` /
+"side-by-side configuration is incorrect". Fix without installing the full SDK:
+
+1. Download the `Microsoft.Windows.SDK.BuildTools` NuGet package (a zip) — it has a modern
+   `makeappx.exe` / `makepri.exe` / `signtool.exe` under `bin/<ver>/x64/`.
+2. Point electron-builder at a relocated cache via `ELECTRON_BUILDER_CACHE=<dir>`, copy the
+   `winCodeSign-2.6.0` tree there, and mirror the BuildTools `x64` tools over
+   `winCodeSign/winCodeSign-2.6.0/windows-10/x64` (a *clean* replace — leftover 2.6.0 files break
+   SxS resolution), keeping `rcedit-x64.exe` and `appxAssets/` from the original.
+3. Build: `ELECTRON_BUILDER_CACHE=<dir> electron-builder --win appx`.
+
+Store submission still needs: the real **MSIX product identity** from Partner Center (Package
+Identity Name + Publisher `CN=…` + publisher display name — an *MSIX* product, not the EXE/MSI
+"win32apps" type), and **branded tile assets** replacing electron-builder's SampleAppx defaults.
+
 ## Notes for the operator
 
 - **Signing.** The app ships **unsigned** via a no-op `win.sign` hook (`sign-noop.cjs`) — the

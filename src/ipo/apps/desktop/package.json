@@ -49,6 +49,17 @@
       "createStartMenuShortcut": true,
       "shortcutName": "IPO Advisor",
       "uninstallDisplayName": "IPO Advisor"
+    },
+    "appx": {
+      "identityName": "IPOAdvisorTest.Sideload",
+      "publisher": "CN=IPOAdvisorTest",
+      "publisherDisplayName": "IPO Advisor",
+      "applicationId": "IPOAdvisor",
+      "displayName": "IPO Advisor",
+      "backgroundColor": "#0a0d12",
+      "languages": [
+        "en-US"
+      ]
     }
   }
 }
