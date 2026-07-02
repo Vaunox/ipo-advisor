@@ -5,6 +5,7 @@ import { IconAlert } from './components/Icons'
 import { Sidebar } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
 import type { View } from './nav'
+import { useCrossingNotifications } from './notifications'
 import { recalibrationCount } from './recalib'
 import { Detail } from './screens/Detail'
 import { History } from './screens/History'
@@ -75,6 +76,7 @@ export function App() {
   const calibration = useCalibration()
   const engineUp = health.isSuccess && health.data?.status === 'ok'
   const engineDown = health.isError
+  useCrossingNotifications() // native OS toast on a new APPLY crossing (desktop shell only)
 
   // Nav count chips: the size of each section, derived from the board (the same partitions the
   // Upcoming / History screens render) — no extra fetch, no fabricated numbers.

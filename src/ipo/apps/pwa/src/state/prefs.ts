@@ -27,6 +27,8 @@ interface Prefs {
   costs: Costs
   startup: Startup
   alertsSeen: string[]
+  notifiedCrossings: string[]
+  notifSeeded: boolean
 }
 
 const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
@@ -50,6 +52,8 @@ function load(): Prefs {
           ? { ...DEFAULT_STARTUP, ...p.startup }
           : { ...DEFAULT_STARTUP },
       alertsSeen: Array.isArray(p.alertsSeen) ? p.alertsSeen : [],
+      notifiedCrossings: Array.isArray(p.notifiedCrossings) ? p.notifiedCrossings : [],
+      notifSeeded: p.notifSeeded === true,
     }
   } catch {
     return {
@@ -60,6 +64,8 @@ function load(): Prefs {
       costs: { ...DEFAULT_COSTS },
       startup: { ...DEFAULT_STARTUP },
       alertsSeen: [],
+      notifiedCrossings: [],
+      notifSeeded: false,
     }
   }
 }
@@ -143,5 +149,17 @@ export function setStartup(startup: Startup): void {
 export const getAlertsSeen = (): string[] => prefs.alertsSeen
 export function setAlertsSeen(ids: string[]): void {
   prefs = { ...prefs, alertsSeen: ids }
+  save()
+}
+
+/* ---- native notifications (which APPLY crossings have already fired an OS toast) ---- */
+export const getNotifiedCrossings = (): string[] => prefs.notifiedCrossings
+export function setNotifiedCrossings(keys: string[]): void {
+  prefs = { ...prefs, notifiedCrossings: keys }
+  save()
+}
+export const isNotifSeeded = (): boolean => prefs.notifSeeded
+export function markNotifSeeded(): void {
+  prefs = { ...prefs, notifSeeded: true }
   save()
 }
