@@ -17,6 +17,8 @@ Endpoints:
 * ``GET /verdict/{ipo_id}`` — the verdict alone.
 * ``GET /history``          — every listed IPO's point-in-time verdict + actual net-of-cost
   outcome (read-only accountability for the History view / calibration scorecard).
+* ``GET /transitions``      — the durable verdict-change log (most-recent-first) for the alert
+  center history; ``/transitions/{ipo_id}`` filters to one IPO's detail log.
 * ``GET /calibration``      — the held-out (walk-forward OOS) reliability report + live gate/
   version, for the History reliability diagram. Held-out, never an in-sample recompute.
 """
@@ -31,7 +33,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from ipo.core.types import Verdict
 from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
-from ipo.service.views import CalibrationView, HistoryRow, IPODetail, IPOListRow
+from ipo.service.views import (
+    CalibrationView,
+    HistoryRow,
+    IPODetail,
+    IPOListRow,
+    VerdictTransitionView,
+)
 
 
 def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = None) -> FastAPI:
@@ -101,6 +109,22 @@ def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = 
         net-of-cost display only — never a verdict or a probability.
         """
         return engine.history(stt=stt, dp=dp, oth=oth)
+
+    @app.get("/transitions", response_model=list[VerdictTransitionView])
+    def transitions() -> list[VerdictTransitionView]:
+        """Every recorded verdict change (most-recent-first), for the alert center history.
+
+        Verbatim from the durable transition log — each row is what the engine emitted at that
+        clock, name-joined for display. ``crossed_into_apply`` marks the APPLY crossings alerted.
+        """
+        return engine.transitions()
+
+    @app.get("/transitions/{ipo_id}", response_model=list[VerdictTransitionView])
+    def transitions_for(ipo_id: str) -> list[VerdictTransitionView]:
+        """One IPO's verdict-change history, most-recent-first; 404 if the IPO is unknown."""
+        if engine.get_record(ipo_id) is None:
+            raise HTTPException(status_code=404, detail=f"unknown ipo_id: {ipo_id}")
+        return engine.transitions(ipo_id)
 
     @app.get("/calibration", response_model=CalibrationView)
     def calibration() -> CalibrationView:

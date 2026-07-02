@@ -149,6 +149,20 @@ h3.sec { font-family:'Fira Code'; font-size:10px; letter-spacing:.14em; text-tra
 .sub-spark .ss-line { fill:none; stroke:var(--apply); stroke-width:1.6; vector-effect:non-scaling-stroke; }
 .sub-spark .ss-dot { fill:var(--apply); }
 .sub-spark .ss-axis { display:flex; justify-content:space-between; font-size:10.5px; color:var(--tx3); margin-top:3px; }
+.vhist { list-style:none; margin:0; padding:0; }
+.vhist li { display:flex; align-items:center; gap:9px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12px; flex-wrap:wrap; }
+.vhist li:last-child { border:none; }
+.vh-date { color:var(--tx3); font-size:11px; min-width:88px; }
+.vh-badge { font-family:'Fira Code'; font-size:10px; font-weight:700; letter-spacing:.04em; padding:2px 7px; border-radius:5px; border:1px solid var(--line2); }
+.vh-badge.t-apply { color:var(--apply); border-color:color-mix(in srgb, var(--apply) 45%, transparent); }
+.vh-badge.t-marginal { color:var(--marginal); border-color:color-mix(in srgb, var(--marginal) 45%, transparent); }
+.vh-badge.t-skip { color:var(--skip); border-color:color-mix(in srgb, var(--skip) 45%, transparent); }
+.vh-badge.t-insuf { color:var(--tx3); }
+.vh-arrow { color:var(--tx3); }
+.vh-cross { color:var(--apply); font-size:11px; font-weight:600; }
+.vh-p { margin-left:auto; color:var(--tx2); font-weight:600; }
+.alertpanel .ah-sub { margin-top:4px; border-top:1px solid var(--line); }
+.alertitem.cross { opacity:.92; }
 .whatif { grid-column:1/-1; display:flex; gap:11px; align-items:flex-start; font-size:12.5px; color:var(--tx2); background:var(--panel); border:1px dashed var(--line2); border-radius:10px; padding:13px 16px; }
 .whatif svg { width:16px; height:16px; flex:none; stroke:var(--accent); fill:none; stroke-width:1.8; margin-top:1px; }
 .whatif b { color:var(--tx); }

@@ -103,6 +103,16 @@ export interface ReliabilityBin {
   count: number
 }
 
+export interface VerdictTransition {
+  ipo_id: string
+  name: string
+  asof: string
+  from_verdict: VerdictType | null
+  to_verdict: VerdictType
+  probability: number | null
+  crossed_into_apply: boolean
+}
+
 export interface CalibrationView {
   version: string
   gate_passed: boolean

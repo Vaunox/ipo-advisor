@@ -32,6 +32,7 @@ from ipo.service.api import create_app
 from ipo.service.engine import VerdictEngine
 from ipo.service.notify import build_notifier, notify_crossings
 from ipo.service.scheduler import CycleResult, ScoringScheduler
+from ipo.service.transitions import TransitionStore
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -64,23 +65,39 @@ def build_service(
     calibrator: Calibrator,
     nifty_path: Path,
     calibration_report_path: Path | None = None,
+    transition_store: TransitionStore | None = None,
     push_transport: Callable[[str], None] | None = None,
     refresh: Callable[[], None] | None = None,
     clock: Callable[[], datetime] = now_ist,
 ) -> Service:
-    """Wire the layers into a running service (composition only — no new logic)."""
+    """Wire the layers into a running service (composition only — no new logic).
+
+    ``transition_store`` is the durable verdict-change log (injected so tests can isolate it); it
+    defaults to ``verdict_transitions.json`` under the configured data dir.
+    """
     scorer = WeightedScorer(config.feature_weights, config.features)
     regime = NiftyRegime(nifty_path)
+    transitions = transition_store or TransitionStore(
+        Path(config.storage.data_dir) / "verdict_transitions.json"
+    )
     engine = VerdictEngine(
         repository=repository,
         calibrator=calibrator,
         scorer=scorer,
         config=config,
         regime=regime,
+        transitions=transitions,
         clock=clock,
     )
     notifier = build_notifier(config, push_transport=push_transport)
-    scheduler = ScoringScheduler(source=engine, config=config, refresh=refresh, clock=clock)
+    scheduler = ScoringScheduler(
+        source=engine,
+        config=config,
+        refresh=refresh,
+        on_transition=transitions.record,
+        initial_last=transitions.latest_by_ipo(),
+        clock=clock,
+    )
     return Service(
         config=config,
         engine=engine,

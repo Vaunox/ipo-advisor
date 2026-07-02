@@ -9,7 +9,7 @@ path. Every field is verbatim engine output — the ``verdict`` here is byte-for
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -77,6 +77,23 @@ class HistoryRow(BaseModel):
     net_return: float
     gross_return: float
     listed_positive: bool
+
+
+class VerdictTransitionView(BaseModel):
+    """One verdict change for the alert center + detail history: the persisted transition + name.
+
+    Verbatim from the transition log (recorded as the engine emitted it) with the IPO's display
+    name joined for rendering — no re-score. ``from_verdict`` is ``None`` for a first observation;
+    ``crossed_into_apply`` is the APPLY crossing the alert center highlights.
+    """
+
+    ipo_id: str
+    name: str
+    asof: datetime
+    from_verdict: VerdictType | None
+    to_verdict: VerdictType
+    probability: float | None
+    crossed_into_apply: bool
 
 
 class ReliabilityBinView(BaseModel):

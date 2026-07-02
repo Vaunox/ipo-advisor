@@ -30,7 +30,8 @@ from ipo.core.interfaces import Calibrator, Repository, ScoringModel
 from ipo.core.types import IPOFeatures, IPORecord, Verdict
 from ipo.features.build import build_features
 from ipo.model.verdict import evaluate
-from ipo.service.views import HistoryRow, IPODetail, IPOListRow
+from ipo.service.transitions import TransitionStore
+from ipo.service.views import HistoryRow, IPODetail, IPOListRow, VerdictTransitionView
 
 _CLOSE_EOD_HOUR = 18  # decision clock = end of the subscription-close day (IST), as in backtest
 
@@ -46,6 +47,7 @@ class VerdictEngine:
         scorer: ScoringModel,
         config: AppConfig,
         regime: NiftyRegime | None = None,
+        transitions: TransitionStore | None = None,
         clock: Callable[[], datetime] = now_ist,
     ) -> None:
         """Bind the composed dependencies; ``regime=None`` disables the cold-market flag."""
@@ -54,6 +56,7 @@ class VerdictEngine:
         self._scorer = scorer
         self._config = config
         self._regime = regime
+        self._transitions = transitions
         self._clock = clock
 
     def decision_asof(self, record: IPORecord) -> datetime:
@@ -217,6 +220,32 @@ class VerdictEngine:
     def records(self) -> list[IPORecord]:
         """All stored IPO records (read-through, for the scheduler's cadence/iteration)."""
         return self._repo.list_all()
+
+    def transitions(self, ipo_id: str | None = None) -> list[VerdictTransitionView]:
+        """Recorded verdict changes (most-recent-first), name-joined for display (read-only).
+
+        Verbatim from the persisted transition log — each ``to_verdict``/``probability`` is what the
+        engine emitted at that clock, never a re-score. ``ipo_id`` filters to one IPO's history.
+        Empty when no transition store is wired or nothing has been recorded.
+        """
+        if self._transitions is None:
+            return []
+        rows = self._transitions.for_ipo(ipo_id) if ipo_id is not None else self._transitions.all()
+        views: list[VerdictTransitionView] = []
+        for t in rows:
+            record = self._repo.get(t.ipo_id)
+            views.append(
+                VerdictTransitionView(
+                    ipo_id=t.ipo_id,
+                    name=record.name if record is not None else t.ipo_id,
+                    asof=t.asof,
+                    from_verdict=t.from_verdict,
+                    to_verdict=t.to_verdict,
+                    probability=t.probability,
+                    crossed_into_apply=t.crossed_into_apply,
+                )
+            )
+        return views
 
     @property
     def calibrator_version(self) -> str:

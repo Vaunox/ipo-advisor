@@ -3,7 +3,14 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from './client'
-import type { CalibrationView, HistoryRow, IPODetail, IPOListRow, Verdict } from './types'
+import type {
+  CalibrationView,
+  HistoryRow,
+  IPODetail,
+  IPOListRow,
+  Verdict,
+  VerdictTransition,
+} from './types'
 
 export const useHealth = () =>
   useQuery({
@@ -37,3 +44,16 @@ export const useHistory = (costs?: { stt: number; dp: number; oth: number }) =>
 
 export const useCalibration = () =>
   useQuery({ queryKey: ['calibration'], queryFn: () => apiGet<CalibrationView>('/calibration') })
+
+export const useTransitions = () =>
+  useQuery({
+    queryKey: ['transitions'],
+    queryFn: () => apiGet<VerdictTransition[]>('/transitions'),
+  })
+
+export const useTransitionsFor = (id: string | null) =>
+  useQuery({
+    queryKey: ['transitions', id],
+    queryFn: () => apiGet<VerdictTransition[]>(`/transitions/${id}`),
+    enabled: !!id,
+  })

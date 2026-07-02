@@ -26,6 +26,7 @@ from typing import Protocol, runtime_checkable
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig
 from ipo.core.types import IPORecord, Verdict, VerdictType
+from ipo.service.transitions import VerdictTransition
 
 
 @runtime_checkable
@@ -59,20 +60,29 @@ class ScoringScheduler:
         source: VerdictSource,
         config: AppConfig,
         refresh: Callable[[], None] | None = None,
+        on_transition: Callable[[VerdictTransition], None] | None = None,
+        initial_last: dict[str, VerdictType] | None = None,
         clock: Callable[[], datetime] = now_ist,
     ) -> None:
-        """Bind the verdict source, cadence config, optional refresh hook, and clock."""
+        """Bind the verdict source, cadence config, optional refresh + transition hooks, and clock.
+
+        ``initial_last`` primes the prior-verdict map (from the persisted transition log), so a
+        restart does not re-record verdicts already known — only genuine future changes are logged.
+        """
         self._source = source
         self._config = config
         self._refresh = refresh
+        self._on_transition = on_transition
         self._clock = clock
-        self._last_verdict: dict[str, VerdictType] = {}
+        self._last_verdict: dict[str, VerdictType] = dict(initial_last or {})
 
     def run_cycle(self) -> CycleResult:
         """Refresh (if wired), score, and emit the APPLY crossings since the last cycle.
 
         Idempotent: a second cycle over unchanged state returns the same verdicts and an empty
-        ``became_apply`` (the prior-state map already reflects them), so no duplicate alerts.
+        ``became_apply`` (the prior-state map already reflects them), so no duplicate alerts. A
+        genuine verdict change (differing prior) is recorded to the transition hook once — never
+        the steady state, so the durable log inherits the same no-duplicate guarantee.
         """
         when = self._clock()
         if self._refresh is not None:
@@ -81,8 +91,24 @@ class ScoringScheduler:
         became_apply: list[str] = []
         for verdict in verdicts:
             prior = self._last_verdict.get(verdict.ipo_id)
-            if verdict.verdict is VerdictType.APPLY and prior is not VerdictType.APPLY:
+            crossed = verdict.verdict is VerdictType.APPLY and prior is not VerdictType.APPLY
+            if crossed:
                 became_apply.append(verdict.ipo_id)
+            # A first observation that is merely abstaining (None -> INSUFFICIENT_SIGNAL) is not a
+            # meaningful change — starting to watch an open book is not an event to log.
+            first_abstention = prior is None and verdict.verdict is VerdictType.INSUFFICIENT_SIGNAL
+            changed = prior != verdict.verdict and not first_abstention
+            if changed and self._on_transition is not None:
+                self._on_transition(
+                    VerdictTransition(
+                        ipo_id=verdict.ipo_id,
+                        asof=when,
+                        from_verdict=prior,
+                        to_verdict=verdict.verdict,
+                        probability=verdict.probability,
+                        crossed_into_apply=crossed,
+                    )
+                )
             self._last_verdict[verdict.ipo_id] = verdict.verdict
         return CycleResult(asof=when, verdicts=verdicts, became_apply=became_apply)
 

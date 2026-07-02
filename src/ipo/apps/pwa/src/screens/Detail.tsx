@@ -1,9 +1,51 @@
 import { useState } from 'react'
-import { useIpo } from '../api/hooks'
+import { useIpo, useTransitionsFor } from '../api/hooks'
 import type { IPODetail, IPOFeatures, SubscriptionPoint, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
+
+const shortVerdict = (v: VerdictType): string =>
+  v === 'INSUFFICIENT_SIGNAL' ? 'INSUFF.' : VMETA[v].label
+
+const fmtFullDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+// The persisted verdict-change log for one IPO (engine transition endpoint) — recorded as the
+// verdict moved, most-recent-first. Never a re-score: each row is a real emission.
+function VerdictHistory({ id }: { id: string }) {
+  const { data } = useTransitionsFor(id)
+  const rows = data ?? []
+  return (
+    <div className="card">
+      <h3 className="sec">Verdict history</h3>
+      {rows.length ? (
+        <ul className="vhist">
+          {rows.map((t, i) => (
+            <li key={i}>
+              <span className="vh-date mono">{fmtFullDate(t.asof)}</span>
+              <span className={`vh-badge t-${VMETA[t.from_verdict ?? 'INSUFFICIENT_SIGNAL'].cls}`}>
+                {shortVerdict(t.from_verdict ?? 'INSUFFICIENT_SIGNAL')}
+              </span>
+              <span className="vh-arrow">→</span>
+              <span className={`vh-badge t-${VMETA[t.to_verdict].cls}`}>
+                {shortVerdict(t.to_verdict)}
+              </span>
+              {t.crossed_into_apply && <span className="vh-cross">crossed into APPLY</span>}
+              {t.probability != null && (
+                <span className="vh-p mono">{Math.round(t.probability * 100)}%</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="pending">
+          No verdict changes recorded — the engine has not moved this call.
+        </div>
+      )}
+    </div>
+  )
+}
 
 const Check = () => (
   <svg viewBox="0 0 24 24">
@@ -219,6 +261,8 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
           </h3>
           <Contributions d={d} />
         </div>
+
+        <VerdictHistory id={id} />
 
         <div className="card">
           <h3 className="sec">{f.book_closed ? 'Subscription (final)' : 'Subscription (live)'}</h3>

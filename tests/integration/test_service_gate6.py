@@ -14,6 +14,7 @@ composed ``Service`` (engine + scheduler + notifier + API):
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
@@ -30,6 +31,7 @@ from ipo.features.build import build_features
 from ipo.model.scorer import WeightedScorer
 from ipo.model.verdict import evaluate
 from ipo.service.runner import Service, build_service
+from ipo.service.transitions import TransitionStore
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CSV = _REPO_ROOT / "data" / "backfill" / "mainboard_ipos.csv"
@@ -94,11 +96,15 @@ def _service(
     )
     records = load_records_from_csv(_CSV)
     pushed: list[str] = []
+    # Isolated, empty transition log per service so this is a genuine cold start (first-cycle
+    # crossings fire) — not primed by any persisted log under the real data dir.
+    store = TransitionStore(Path(tempfile.mkdtemp()) / "verdict_transitions.json")
     service = build_service(
         config,
         repository=_ListRepo(records),
         calibrator=calibrator,
         nifty_path=_NIFTY,
+        transition_store=store,
         push_transport=pushed.append,
         refresh=refresh,
     )
