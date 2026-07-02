@@ -14,6 +14,7 @@ inherited and re-proven end-to-end at GATE 6:
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -35,6 +36,36 @@ from ipo.service.scheduler import CycleResult, ScoringScheduler
 from ipo.service.transitions import TransitionStore
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _resource_root() -> Path:
+    """Where the read-only artifacts (models, nifty, seed store) live.
+
+    In a PyInstaller build the bundled data is unpacked under ``sys._MEIPASS``; from source it sits
+    at the repo root. Resolving it here lets the same ``main()`` serve both dev and the packaged
+    sidecar without branching on "am I frozen" at every call site.
+    """
+    bundle = getattr(sys, "_MEIPASS", None)
+    return Path(bundle) if bundle else _REPO_ROOT
+
+
+def _provision_data_dir(data_dir: Path, resource_root: Path) -> None:
+    """First-run seed: copy the bundled demo store into the writable data dir if it is empty.
+
+    The packaged app ships a curated sample store as a read-only resource (``_seed/``); on first
+    launch we copy it into the user-writable data dir so the app opens with content. Existing data
+    is never overwritten, so this is a no-op on every subsequent launch and in dev.
+    """
+    import shutil
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    seed = resource_root / "_seed"
+    if not seed.is_dir():
+        return
+    for name in ("ipo_records.parquet", "verdict_transitions.json"):
+        src, dst = seed / name, data_dir / name
+        if src.is_file() and not dst.exists():
+            shutil.copyfile(src, dst)
 
 
 @dataclass
@@ -122,15 +153,28 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     parser = argparse.ArgumentParser(description="Run the IPO Advisor engine (API + scheduler).")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--data-dir",
+        default=None,
+        help="writable directory for the record store + verdict-transition log "
+        "(the desktop shell passes its per-user data dir; defaults to the configured data_dir)",
+    )
     args = parser.parse_args()
 
-    config = load_config()
+    # Resolve read-only artifacts (config, models, nifty, seed) from the bundle when frozen, the
+    # repo root otherwise — so feature weights/thresholds come from the SAME config the seed used,
+    # not the empty defaults (a missing config silently changes verdicts).
+    res = _resource_root()
+    config = load_config(config_dir=res / "config")
+    data_dir = Path(args.data_dir) if args.data_dir else Path(config.storage.data_dir)
+    _provision_data_dir(data_dir, res)
     service = build_service(
         config,
-        repository=ParquetRepository(Path(config.storage.data_dir)),
-        calibrator=load_calibrator(_REPO_ROOT / "models" / "calibrator.json"),
-        nifty_path=_REPO_ROOT / "data" / "backfill" / "nifty.csv",
-        calibration_report_path=_REPO_ROOT / "models" / "reliability.json",
+        repository=ParquetRepository(data_dir),
+        calibrator=load_calibrator(res / "models" / "calibrator.json"),
+        nifty_path=res / "data" / "backfill" / "nifty.csv",
+        calibration_report_path=res / "models" / "reliability.json",
+        transition_store=TransitionStore(data_dir / "verdict_transitions.json"),
     )
 
     def loop() -> None:
