@@ -280,8 +280,16 @@ class NseClient:
         self._cache.store(resp, request_id=url)
         return resp
 
-    def past_issues(self) -> list[NsePastIssue]:
-        """Fetch (cached) and parse the past-issues master list."""
+    def past_issues(self, *, force: bool = False) -> list[NsePastIssue]:
+        """Fetch + parse the past-issues master list (``force`` re-fetches for new listings)."""
+        if force:
+            self._ensure_cookies()
+            resp = self._client.fetch(
+                "nse_past",
+                PAST_ISSUES_URL,
+                headers={"Accept": "application/json", "Referer": NSE_HOMEPAGE},
+            )
+            return parse_past_issues(resp)
         return parse_past_issues(self._get_json("nse_past", PAST_ISSUES_URL, referer=NSE_HOMEPAGE))
 
     def current_issues(self, *, force: bool = True) -> list[NseCurrentIssue]:

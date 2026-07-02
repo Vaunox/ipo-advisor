@@ -7,24 +7,30 @@ failure degrades to zero records rather than raising (the sidecar must never cra
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import cast
 
 from ipo.core.interfaces import Repository
-from ipo.core.types import IPORecord, ListingLabel
-from ipo.data.ingest.live import build_live_records, refresh_from_nse
+from ipo.core.types import IPORecord, ListingLabel, Segment
+from ipo.data.ingest.live import build_live_records, refresh_from_nse, resolve_listings
 from ipo.data.sources.base import SourceError
-from ipo.data.sources.nse import NseClient, NseCurrentIssue, NseSubscription
+from ipo.data.sources.nse import NseClient, NseCurrentIssue, NsePastIssue, NseSubscription
 
 
 class _StubClient:
-    """Duck-typed NseClient: returns canned current issues + subscription (or raises)."""
+    """Duck-typed NseClient: canned current issues + subscription + past issues / listing prices."""
 
     def __init__(
-        self, issues: list[NseCurrentIssue] | None, subs: dict[str, NseSubscription] | None = None
+        self,
+        issues: list[NseCurrentIssue] | None,
+        subs: dict[str, NseSubscription] | None = None,
+        past: list[NsePastIssue] | None = None,
+        prices: dict[str, tuple[float, float] | None] | None = None,
     ) -> None:
         self._issues = issues
         self._subs = subs or {}
+        self._past = past
+        self._prices = prices or {}
 
     def current_issues(self) -> list[NseCurrentIssue]:
         if self._issues is None:
@@ -34,21 +40,37 @@ class _StubClient:
     def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
         return self._subs.get(symbol, NseSubscription(qib=None, nii=None, retail=None, total=None))
 
+    def past_issues(self, *, force: bool = False) -> list[NsePastIssue]:
+        if self._past is None:
+            raise SourceError("nse unreachable")
+        return self._past
+
+    def listing_prices(self, symbol: str, listing_day: date) -> tuple[float, float] | None:
+        return self._prices.get(symbol)
+
 
 class _Repo:
-    """Minimal in-memory Repository capturing upserts."""
+    """Minimal in-memory Repository; upserts replace by ipo_id like the real ParquetRepository."""
 
-    def __init__(self) -> None:
-        self.records: list[IPORecord] = []
+    def __init__(self, records: list[IPORecord] | None = None) -> None:
+        self.records: list[IPORecord] = list(records or [])
 
-    def upsert(self, record: IPORecord) -> None:
+    def _put(self, record: IPORecord) -> None:
+        for i, existing in enumerate(self.records):
+            if existing.ipo_id == record.ipo_id:
+                self.records[i] = record
+                return
         self.records.append(record)
 
+    def upsert(self, record: IPORecord) -> None:
+        self._put(record)
+
     def upsert_many(self, records: list[IPORecord]) -> None:
-        self.records.extend(records)
+        for record in records:
+            self._put(record)
 
     def get(self, ipo_id: str) -> IPORecord | None:
-        return None
+        return next((r for r in self.records if r.ipo_id == ipo_id), None)
 
     def list_all(self) -> list[IPORecord]:
         return list(self.records)
@@ -60,9 +82,12 @@ class _Repo:
 
 
 def _client(
-    issues: list[NseCurrentIssue] | None, subs: dict[str, NseSubscription] | None = None
+    issues: list[NseCurrentIssue] | None,
+    subs: dict[str, NseSubscription] | None = None,
+    past: list[NsePastIssue] | None = None,
+    prices: dict[str, tuple[float, float] | None] | None = None,
 ) -> NseClient:
-    return cast(NseClient, _StubClient(issues, subs))
+    return cast(NseClient, _StubClient(issues, subs, past, prices))
 
 
 _KNACK = NseCurrentIssue(
@@ -127,3 +152,129 @@ def test_refresh_never_raises_on_source_error() -> None:
         refresh_from_nse(cast(Repository, repo), _client(None)) == 0
     )  # fetch failed → 0, no raise
     assert repo.records == []
+
+
+# --- listing resolution (Live → History lifecycle) ---------------------------------------------
+
+_CLOCK = lambda: datetime(2026, 7, 10, 12, 0)  # noqa: E731 — 2026-07-10, a week after KNACK closed
+
+
+def _awaiting_knack() -> IPORecord:
+    """A stored KNACK record whose book has closed but which we haven't marked listed yet."""
+    return IPORecord(
+        ipo_id="knack",
+        name="Knack Packaging Limited",
+        segment=Segment("mainboard"),
+        price_band_low=161.0,
+        price_band_high=170.0,
+        open_date=date(2026, 7, 1),
+        close_date=date(2026, 7, 3),
+        qib_sub=3.48,
+        captured_at=datetime(2026, 7, 3, 17, 0),
+    )
+
+
+_KNACK_PAST = NsePastIssue(
+    symbol="KNACK",
+    company="Knack Packaging Limited",
+    segment="mainboard",
+    price_band_low=161.0,
+    price_band_high=170.0,
+    open_date=date(2026, 7, 1),
+    close_date=date(2026, 7, 3),
+    listing_date=date(2026, 7, 8),
+)
+
+
+def test_resolve_listings_marks_listed_with_prices() -> None:
+    repo = _Repo([_awaiting_knack()])
+    n = resolve_listings(
+        cast(Repository, repo),
+        _client(None, past=[_KNACK_PAST], prices={"KNACK": (175.0, 182.5)}),
+        clock=_CLOCK,
+    )
+    assert n == 1
+    r = repo.get("knack")
+    assert r is not None
+    assert r.listing_date == date(2026, 7, 8)  # now leaves Live, enters History
+    assert (r.listing_open, r.listing_close) == (175.0, 182.5)
+
+
+def test_resolve_listings_stamps_date_even_without_bhavcopy() -> None:
+    repo = _Repo([_awaiting_knack()])
+    n = resolve_listings(
+        cast(Repository, repo),
+        _client(None, past=[_KNACK_PAST], prices={"KNACK": None}),  # bhavcopy missing
+        clock=_CLOCK,
+    )
+    assert n == 1
+    r = repo.get("knack")
+    assert r is not None
+    assert r.listing_date == date(2026, 7, 8)  # still drops out of Live
+    assert r.listing_open is None and r.listing_close is None
+
+
+def test_resolve_listings_skips_not_yet_listed() -> None:
+    future = NsePastIssue(
+        symbol="KNACK",
+        company="Knack Packaging Limited",
+        segment="mainboard",
+        price_band_low=161.0,
+        price_band_high=170.0,
+        open_date=date(2026, 7, 1),
+        close_date=date(2026, 7, 3),
+        listing_date=date(2026, 7, 15),  # in the future relative to the clock
+    )
+    repo = _Repo([_awaiting_knack()])
+    n = resolve_listings(cast(Repository, repo), _client(None, past=[future]), clock=_CLOCK)
+    assert n == 0
+    assert repo.get("knack").listing_date is None  # untouched
+
+
+def test_resolve_listings_ignores_open_and_already_listed() -> None:
+    still_open = _awaiting_knack().model_copy(update={"close_date": date(2026, 7, 12)})  # book open
+    already = _awaiting_knack().model_copy(
+        update={"ipo_id": "done", "listing_date": date(2026, 7, 1)}
+    )
+    repo = _Repo([still_open, already])
+    # past_issues would resolve knack, but neither stored record is "closed & unlisted"
+    n = resolve_listings(
+        cast(Repository, repo),
+        _client(None, past=[_KNACK_PAST], prices={"KNACK": (175.0, 182.5)}),
+        clock=_CLOCK,
+    )
+    assert n == 0
+
+
+def test_resolve_listings_never_raises_when_past_fetch_fails() -> None:
+    repo = _Repo([_awaiting_knack()])
+    assert resolve_listings(cast(Repository, repo), _client(None, past=None), clock=_CLOCK) == 0
+    assert repo.get("knack").listing_date is None
+
+
+def test_refresh_resolves_after_upsert() -> None:
+    """End-to-end: a fresh current-issue upsert plus a separately-listed record both handled."""
+    subs = {"KNACK": NseSubscription(qib=3.48, nii=19.22, retail=4.23, total=7.21)}
+    other = _awaiting_knack().model_copy(
+        update={"ipo_id": "oldco", "name": "Old Co"}  # closed earlier, now listed
+    )
+    old_past = NsePastIssue(
+        symbol="OLDCO",
+        company="Old Co",
+        segment="mainboard",
+        price_band_low=161.0,
+        price_band_high=170.0,
+        open_date=date(2026, 7, 1),
+        close_date=date(2026, 7, 3),
+        listing_date=date(2026, 7, 8),
+    )
+    repo = _Repo([other])
+    n = refresh_from_nse(
+        cast(Repository, repo),
+        _client([_KNACK], subs, past=[old_past], prices={"OLDCO": (200.0, 210.0)}),
+        clock=_CLOCK,
+    )
+    assert n == 1  # one current issue ingested
+    assert repo.get("knack") is not None  # live upsert
+    resolved = repo.get("oldco")
+    assert resolved is not None and resolved.listing_date == date(2026, 7, 8)  # lifecycle completed

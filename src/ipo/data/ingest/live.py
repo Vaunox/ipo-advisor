@@ -73,20 +73,67 @@ def build_live_records(
     return records
 
 
+def resolve_listings(
+    repo: Repository, client: NseClient, *, clock: Callable[[], datetime] = now_ist
+) -> int:
+    """Mark stored issues that have LISTED — completing the Live → History lifecycle. Never raises.
+
+    A live-ingested issue leaves the ``ipo-current-issue`` feed once it lists, so without this it
+    would sit in Live forever with ``listing_date = None``. Here we take stored issues whose book
+    has closed but that we haven't marked listed, look them up in the (re-fetched) past-issues, and
+    if listed fetch the listing-day open/close (bhavcopy) and stamp the record — which drops it out
+    of Live and into History. Returns how many were resolved.
+    """
+    today = clock().date()
+    awaiting = [r for r in repo.list_all() if r.listing_date is None and r.close_date < today]
+    if not awaiting:
+        return 0
+    try:
+        past = {p.symbol.upper(): p for p in client.past_issues(force=True)}
+    except SourceError as exc:
+        _log.warning("listing_resolve_past_failed", extra={"error": str(exc)})
+        return 0
+
+    resolved = 0
+    for record in awaiting:
+        issue = past.get(record.ipo_id.upper())  # ipo_id is the NSE symbol, lower-cased
+        if issue is None or issue.listing_date is None or issue.listing_date > today:
+            continue  # not listed yet (or not on NSE)
+        update: dict[str, object] = {"listing_date": issue.listing_date}
+        try:
+            prices = client.listing_prices(issue.symbol, issue.listing_date)
+        except SourceError:
+            prices = None
+        if prices is not None:
+            update["listing_open"], update["listing_close"] = prices
+        try:
+            repo.upsert(record.model_copy(update=update))
+            resolved += 1
+        except (ValidationError, ValueError) as exc:
+            _log.warning(
+                "listing_resolve_skipped", extra={"symbol": issue.symbol, "error": str(exc)}
+            )
+    if resolved:
+        _log.info("listings_resolved", extra={"count": resolved})
+    return resolved
+
+
 def refresh_from_nse(
     repo: Repository, client: NseClient, *, clock: Callable[[], datetime] = now_ist
 ) -> int:
-    """Pull live current mainboard IPOs and upsert them; return how many. Never raises.
+    """Pull live current mainboard IPOs, resolve any that have listed, and upsert. Never raises.
 
     A whole-fetch failure (NSE unreachable, cookie/handshake, source drift) is logged and yields 0 —
-    the app keeps serving the last known store rather than going dark.
+    the app keeps serving the last known store rather than going dark. Listing resolution moves
+    just-listed issues out of Live and into History.
     """
     try:
         records = build_live_records(client, clock=clock)
     except SourceError as exc:
         _log.warning("live_refresh_failed", extra={"error": str(exc)})
-        return 0
+        records = []
     if records:
         repo.upsert_many(records)
+    resolve_listings(repo, client, clock=clock)  # complete the lifecycle; never raises
     _log.info("live_refresh_done", extra={"records": len(records)})
     return len(records)
