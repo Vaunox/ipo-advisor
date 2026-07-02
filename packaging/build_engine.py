@@ -20,12 +20,9 @@ _WORK = _ROOT / "packaging" / "build"
 
 
 def main() -> int:
-    """Seed the demo store, then freeze the engine into packaging/dist/ipo-engine/."""
-    # 1. Refresh the curated demo store + clean 6-transition log that get bundled as _seed.
-    print("[build] seeding demo store …")
-    subprocess.run([sys.executable, "-m", "scripts.seed_demo_store"], cwd=_ROOT, check=True)
-
-    # 2. Freeze the engine (onedir) via the spec.
+    """Freeze the engine into packaging/dist/ipo-engine/ (live-only — no bundled demo store)."""
+    # Freeze the engine (onedir) via the spec. No demo seed is bundled: the packaged app starts
+    # empty and fills purely from live NSE ingestion.
     print("[build] running PyInstaller …")
     subprocess.run(
         [

@@ -38,6 +38,11 @@ from ipo.service.transitions import TransitionStore
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
+# Bump whenever the bundled seed store changes so an *update* refreshes a user's data dir instead of
+# keeping stale records forever (provisioning otherwise never overwrites). v2 dropped the fabricated
+# demo companies; a mismatch clears the store so the clean seed + live ingest rebuild it.
+_SEED_VERSION = "2"
+
 
 def _resource_root() -> Path:
     """Where the read-only artifacts (models, nifty, seed store) live.
@@ -50,23 +55,37 @@ def _resource_root() -> Path:
     return Path(bundle) if bundle else _REPO_ROOT
 
 
-def _provision_data_dir(data_dir: Path, resource_root: Path) -> None:
-    """First-run seed: copy the bundled demo store into the writable data dir if it is empty.
+def _provision_data_dir(data_dir: Path, resource_root: Path, *, manage: bool) -> None:
+    """Prepare the packaged app's writable store (versioned); a no-op in dev.
 
-    The packaged app ships a curated sample store as a read-only resource (``_seed/``); on first
-    launch we copy it into the user-writable data dir so the app opens with content. Existing data
-    is never overwritten, so this is a no-op on every subsequent launch and in dev.
+    ``manage`` is True only for the packaged app. When False (dev-from-source) this returns
+    immediately — the developer owns ``data_store`` and it must never be cleared.
+
+    When True it is **versioned**: if the stored seed version differs from ``_SEED_VERSION`` (fresh
+    install, or an update that changed the shipped data) the old record store + transition log are
+    cleared, so stale/demo records from an earlier install never persist across an update. Any
+    bundled ``_seed/`` is then copied in; a **live-only build ships no seed**, so a mismatch simply
+    clears the store and live ingestion refills it. An unchanged version keeps the user's
+    live-accumulated data untouched.
     """
+    if not manage:
+        return
+
     import shutil
 
     data_dir.mkdir(parents=True, exist_ok=True)
+    marker = data_dir / "seed_version"
+    stored = marker.read_text(encoding="utf-8").strip() if marker.is_file() else ""
+    if stored != _SEED_VERSION:
+        for name in ("ipo_records.parquet", "verdict_transitions.json"):
+            (data_dir / name).unlink(missing_ok=True)
     seed = resource_root / "_seed"
-    if not seed.is_dir():
-        return
-    for name in ("ipo_records.parquet", "verdict_transitions.json"):
-        src, dst = seed / name, data_dir / name
-        if src.is_file() and not dst.exists():
-            shutil.copyfile(src, dst)
+    if seed.is_dir():
+        for name in ("ipo_records.parquet", "verdict_transitions.json"):
+            src, dst = seed / name, data_dir / name
+            if src.is_file() and not dst.exists():
+                shutil.copyfile(src, dst)
+    marker.write_text(_SEED_VERSION, encoding="utf-8")
 
 
 @dataclass
@@ -197,9 +216,10 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     # repo root otherwise — so feature weights/thresholds come from the SAME config the seed used,
     # not the empty defaults (a missing config silently changes verdicts).
     res = _resource_root()
+    frozen = getattr(sys, "_MEIPASS", None) is not None  # packaged app vs dev-from-source
     config = load_config(config_dir=res / "config")
     data_dir = Path(args.data_dir) if args.data_dir else Path(config.storage.data_dir)
-    _provision_data_dir(data_dir, res)
+    _provision_data_dir(data_dir, res, manage=frozen)
     repository = ParquetRepository(data_dir)
     service = build_service(
         config,

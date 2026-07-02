@@ -24,8 +24,8 @@ datas = [
     (str(ROOT / "models" / "calibrator.json"), "models"),
     (str(ROOT / "models" / "reliability.json"), "models"),
     (str(ROOT / "data" / "backfill" / "nifty.csv"), "data/backfill"),
-    (str(ROOT / "data_store" / "ipo_records.parquet"), "_seed"),
-    (str(ROOT / "data_store" / "verdict_transitions.json"), "_seed"),
+    # Live-only build: NO bundled demo record store. The app starts empty and fills purely from
+    # live NSE ingestion (ipo.data.ingest.live); no fabricated/curated companies ship.
 ]
 binaries: list = []
 # Our package plus the ASGI stack: uvicorn resolves its loop/protocol impls dynamically, so its

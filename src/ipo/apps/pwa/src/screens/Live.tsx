@@ -158,12 +158,19 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
   const lastSeen = getLastSeen()
   const ordered = useMemo(() => {
     if (!data) return []
+    // Live signals = the current pipeline: issues that have opened and not yet listed (open now, or
+    // closed and awaiting listing — where the verdict is live). Already-listed IPOs belong to
+    // History; not-yet-open ones to Upcoming.
+    const t = today()
+    const active = data.filter(
+      (r) => r.listing_date == null && midnight(r.open_date) <= t,
+    )
     const val = (r: IPOListRow): string | number => {
       if (sort.key === 'company') return r.name.toLowerCase()
       if (sort.key === 'verdict') return VMETA[r.verdict].rank
       return r.probability ?? -1
     }
-    return [...data].sort((a, b) => {
+    return active.sort((a, b) => {
       const pa = pinned.has(a.ipo_id) ? 0 : 1
       const pb = pinned.has(b.ipo_id) ? 0 : 1
       if (pa !== pb) return pa - pb
@@ -248,22 +255,33 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
         <div>Grounded reason</div>
       </div>
-      <div className="rows">
-        {ordered.map((row) => (
-          <Row
-            key={row.ipo_id}
-            row={row}
-            pinned={pinned.has(row.ipo_id)}
-            changed={!!lastSeen[row.ipo_id] && lastSeen[row.ipo_id] !== row.verdict}
-            onPin={onPin}
-            onOpen={onOpen}
-            setEl={(el) => {
-              if (el) els.current.set(row.ipo_id, el)
-              else els.current.delete(row.ipo_id)
-            }}
-          />
-        ))}
-      </div>
+      {ordered.length ? (
+        <div className="rows">
+          {ordered.map((row) => (
+            <Row
+              key={row.ipo_id}
+              row={row}
+              pinned={pinned.has(row.ipo_id)}
+              changed={!!lastSeen[row.ipo_id] && lastSeen[row.ipo_id] !== row.verdict}
+              onPin={onPin}
+              onOpen={onOpen}
+              setEl={(el) => {
+                if (el) els.current.set(row.ipo_id, el)
+                else els.current.delete(row.ipo_id)
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="state">
+          <h3>No IPOs open right now</h3>
+          <p>
+            No mainboard book is currently open. Live verdicts appear here the moment an issue opens
+            and its subscription data lands — check Upcoming for what's next, or History for past
+            calls.
+          </p>
+        </div>
+      )}
     </>
   )
 }
