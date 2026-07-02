@@ -49,7 +49,8 @@ html.theme-anim, html.theme-anim * {
 .dot.down { background:var(--skip); box-shadow:0 0 8px var(--skip); }
 
 /* main + top bar */
-.main { overflow:auto; position:relative; }
+.main { overflow-y:auto; overflow-x:hidden; position:relative; scrollbar-width:none; }
+.main::-webkit-scrollbar { width:0; height:0; }
 .top { position:sticky; top:0; z-index:6; background:color-mix(in srgb,var(--bg) 88%,transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; padding:15px 26px; }
 .top h1 { font-size:16px; font-weight:600; }
 .top .sub { font-size:11px; color:var(--tx3); margin-top:1px; font-family:'Fira Code'; }

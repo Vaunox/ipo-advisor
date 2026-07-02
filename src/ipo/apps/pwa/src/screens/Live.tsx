@@ -46,6 +46,18 @@ function closeCountdown(): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m ${s % 60}s`
 }
 
+// Self-contained ticking countdown so only THIS node re-renders each second — the row list never
+// re-renders on the timer, which keeps scrolling smooth (a list-wide re-render mid-scroll was what
+// made the FLIP animation misfire and "snap").
+function Countdown() {
+  const [, setNow] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setNow((n) => n + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  return <span className="cd">{closeCountdown()}</span>
+}
+
 type SortKey = 'company' | 'verdict' | 'prob'
 
 function Row({
@@ -137,18 +149,11 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: number }>({ key: 'verdict', dir: 1 })
   const [pinned, setPinned] = useState<Set<string>>(getPinned)
   const [attnDismissed, setAttnDismissed] = useState(false)
-  const [, tick] = useState(0)
 
   // seed last-seen verdicts once, so the CHANGED badge lights up on a *real* future change
   useEffect(() => {
     if (data) seedLastSeen(Object.fromEntries(data.map((r) => [r.ipo_id, r.verdict])))
   }, [data])
-
-  // re-tick the close countdown every second
-  useEffect(() => {
-    const id = window.setInterval(() => tick((n) => n + 1), 1000)
-    return () => window.clearInterval(id)
-  }, [])
 
   const lastSeen = getLastSeen()
   const ordered = useMemo(() => {
@@ -168,15 +173,19 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
     })
   }, [data, sort, pinned])
 
-  // FLIP: animate rows from their previous position to the new one on any reorder
+  // FLIP: animate rows to their new position when the ORDER changes (sort/pin). Keyed on the id
+  // sequence so it only runs on a real reorder — never on scroll or the countdown tick. Measures
+  // offsetTop (scroll-invariant), so scrolling can never be mistaken for a layout change.
   const els = useRef<Map<string, HTMLDivElement>>(new Map())
   const pos = useRef<Map<string, number>>(new Map())
+  const firstFlip = useRef(true)
+  const orderKey = ordered.map((r) => r.ipo_id).join('|')
   useLayoutEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     els.current.forEach((el, id) => {
-      const top = el.getBoundingClientRect().top
+      const top = el.offsetTop
       const prev = pos.current.get(id)
-      if (prev != null && Math.abs(prev - top) > 1) {
+      if (!firstFlip.current && !reduce && prev != null && Math.abs(prev - top) > 1) {
         el.animate([{ transform: `translateY(${prev - top}px)` }, { transform: 'none' }], {
           duration: 360,
           easing: 'cubic-bezier(.22,1,.36,1)',
@@ -184,7 +193,8 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
       }
       pos.current.set(id, top)
     })
-  })
+    firstFlip.current = false
+  }, [orderKey])
 
   if (isLoading) return <div className="state">Loading verdicts…</div>
   if (isError || !data)
@@ -219,7 +229,7 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
             <b>
               {closing.length} IPO{closing.length > 1 ? 's' : ''} close today
             </b>{' '}
-            — place bids before 17:00 IST · <span className="cd">{closeCountdown()}</span> left
+            — place bids before 17:00 IST · <Countdown /> left
           </span>
           <button className="att-x" onClick={() => setAttnDismissed(true)} title="Dismiss">
             ✕
