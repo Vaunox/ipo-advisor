@@ -6,12 +6,15 @@ import { toast } from '../toast'
 import {
   type Costs,
   type Density,
+  type Startup,
   type ThemeMode,
   getCosts,
   getDensity,
+  getStartup,
   getThemeMode,
   setCosts,
   setDensity,
+  setStartup,
   setThemeMode,
 } from '../state/prefs'
 
@@ -27,6 +30,7 @@ export function Settings() {
   const [density, setDens] = useState<Density>(getDensity())
   const [notif, setNotif] = useState({ native: true, applyCrossing: true, anyChange: false, quiet: true })
   const [costs, setCostsState] = useState<Costs>(getCosts())
+  const [startup, setStartupState] = useState<Startup>(getStartup())
   const engineUp = health.data?.status === 'ok'
 
   const updateCost = (k: keyof Costs, v: string) => {
@@ -34,6 +38,16 @@ export function Settings() {
     setCostsState(next)
     setCosts(next)
     void qc.invalidateQueries({ queryKey: ['history'] })
+  }
+
+  const toggleStartup = (k: keyof Startup) => {
+    const next = { ...startup, [k]: !startup[k] }
+    setStartupState(next)
+    setStartup(next)
+    const api = (window as unknown as { ipoDesktop?: { setStartupSettings?: (s: Startup) => void } })
+      .ipoDesktop
+    if (api?.setStartupSettings) api.setStartupSettings(next)
+    else toast('Saved — applies when running the desktop app')
   }
 
   const pickTheme = (m: ThemeMode) => {
@@ -126,6 +140,32 @@ export function Settings() {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 className="sec">Startup &amp; tray</h3>
+        <div className="set-row">
+          <div className="k">
+            Launch on system startup<small>open the app when Windows starts</small>
+          </div>
+          <Switch on={startup.launchOnStartup} onToggle={() => toggleStartup('launchOnStartup')} />
+        </div>
+        <div className="set-row">
+          <div className="k">
+            Minimize to tray on close<small>keep the engine running in the background</small>
+          </div>
+          <Switch on={startup.minimizeToTray} onToggle={() => toggleStartup('minimizeToTray')} />
+        </div>
+        <div className="set-row">
+          <div className="k">
+            Start minimized<small>launch to the tray, no window</small>
+          </div>
+          <Switch on={startup.startMinimized} onToggle={() => toggleStartup('startMinimized')} />
+        </div>
+        <div className="set-row">
+          <div className="k">Scope</div>
+          <div className="pending">applied by the desktop shell</div>
         </div>
       </div>
 

@@ -11,6 +11,11 @@ export interface Costs {
   dp: number
   oth: number
 }
+export interface Startup {
+  launchOnStartup: boolean
+  minimizeToTray: boolean
+  startMinimized: boolean
+}
 
 const KEY = 'ipoadv'
 
@@ -20,9 +25,15 @@ interface Prefs {
   pinned: string[]
   lastSeen: Record<string, VerdictType>
   costs: Costs
+  startup: Startup
 }
 
 const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
+const DEFAULT_STARTUP: Startup = {
+  launchOnStartup: false,
+  minimizeToTray: true,
+  startMinimized: false,
+}
 
 function load(): Prefs {
   try {
@@ -33,9 +44,20 @@ function load(): Prefs {
       pinned: Array.isArray(p.pinned) ? p.pinned : [],
       lastSeen: p.lastSeen && typeof p.lastSeen === 'object' ? p.lastSeen : {},
       costs: p.costs && typeof p.costs === 'object' ? { ...DEFAULT_COSTS, ...p.costs } : { ...DEFAULT_COSTS },
+      startup:
+        p.startup && typeof p.startup === 'object'
+          ? { ...DEFAULT_STARTUP, ...p.startup }
+          : { ...DEFAULT_STARTUP },
     }
   } catch {
-    return { theme: 'dark', density: 'comfortable', pinned: [], lastSeen: {}, costs: { ...DEFAULT_COSTS } }
+    return {
+      theme: 'dark',
+      density: 'comfortable',
+      pinned: [],
+      lastSeen: {},
+      costs: { ...DEFAULT_COSTS },
+      startup: { ...DEFAULT_STARTUP },
+    }
   }
 }
 
@@ -104,5 +126,12 @@ export function seedLastSeen(seed: Record<string, VerdictType>): void {
 export const getCosts = (): Costs => prefs.costs
 export function setCosts(costs: Costs): void {
   prefs = { ...prefs, costs }
+  save()
+}
+
+/* ---- startup & tray (applied by the desktop shell; persisted here) ---- */
+export const getStartup = (): Startup => prefs.startup
+export function setStartup(startup: Startup): void {
+  prefs = { ...prefs, startup }
   save()
 }
