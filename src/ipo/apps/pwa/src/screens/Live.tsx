@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBoard } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { getLastSeen, getPinned, seedLastSeen, togglePinned } from '../state/prefs'
+import { toast } from '../toast'
 import { VMETA } from '../verdict'
 
 const STAR = (
@@ -194,7 +195,11 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
       </div>
     )
 
-  const onPin = (id: string) => setPinned(new Set(togglePinned(id)))
+  const onPin = (id: string) => {
+    const s = togglePinned(id)
+    setPinned(new Set(s))
+    toast(s.has(id) ? 'Pinned to top' : 'Unpinned')
+  }
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: -s.dir } : { key, dir: key === 'prob' ? -1 : 1 }))
   const caret = (key: SortKey) => (sort.key === key ? (sort.dir > 0 ? '▲' : '▼') : '⇅')

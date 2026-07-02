@@ -45,6 +45,9 @@ class IPOListRow(BaseModel):
     name: str
     segment: str
     issue_size_cr: float | None
+    ofs_fraction: float | None
+    issue_pe: float | None
+    peer_median_pe: float | None
     open_date: date
     close_date: date
     listing_date: date | None

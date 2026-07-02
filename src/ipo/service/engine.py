@@ -24,7 +24,7 @@ from datetime import datetime
 from ipo.calibration.label import is_positive, net_listing_return
 from ipo.calibration.regime import NiftyRegime
 from ipo.core.calendar import now_ist
-from ipo.core.config import AppConfig
+from ipo.core.config import AppConfig, SellCosts
 from ipo.core.constants import IST
 from ipo.core.interfaces import Calibrator, Repository, ScoringModel
 from ipo.core.types import IPOFeatures, IPORecord, Verdict
@@ -139,6 +139,9 @@ class VerdictEngine:
                     name=record.name,
                     segment=str(record.segment),
                     issue_size_cr=record.issue_size_cr,
+                    ofs_fraction=record.ofs_fraction,
+                    issue_pe=record.issue_pe,
+                    peer_median_pe=record.peer_median_pe,
                     open_date=record.open_date,
                     close_date=record.close_date,
                     listing_date=record.listing_date,
@@ -151,7 +154,9 @@ class VerdictEngine:
             )
         return rows
 
-    def history(self) -> list[HistoryRow]:
+    def history(
+        self, *, stt: float | None = None, dp: float | None = None, oth: float | None = None
+    ) -> list[HistoryRow]:
         """As-of verdict + actual net-of-cost outcome for every LISTED stored IPO (read-only).
 
         A row exists only once a record has listed (``listing_open`` populated). The verdict is
@@ -159,8 +164,26 @@ class VerdictEngine:
         listing label (Inviolable Rule 2) — while the outcome uses the same net-of-cost label the
         model was trained on, so predicted and actual are directly comparable (History view +
         calibration scorecard). No recomputation: the verdict is verbatim ``verdict_for``.
+
+        ``stt``/``dp``/``oth`` (percent, rupees, percent) override the operator's broker sell-costs
+        for the net-of-cost DISPLAY only — this re-arithmetic on gross never touches a verdict or a
+        probability (Invariants 1 & 3). Absent → the configured rates.
         """
-        costs = self._config.sell_costs
+        base = self._config.sell_costs
+        if stt is None and dp is None and oth is None:
+            costs = base
+        else:
+            # Map the 3 UI knobs onto SellCosts: STT% and a combined "other %" (exchange+GST+SEBI)
+            # as sell-value fractions, plus the flat DP charge.
+            costs = SellCosts(
+                brokerage=0.0,
+                stt_rate=(stt / 100.0) if stt is not None else base.stt_rate,
+                dp_charge_per_isin=dp if dp is not None else base.dp_charge_per_isin,
+                exchange_rate=(oth / 100.0) if oth is not None else base.exchange_rate,
+                gst_rate=0.0 if oth is not None else base.gst_rate,
+                sebi_rate=0.0 if oth is not None else base.sebi_rate,
+                stamp_rate_sell=0.0 if oth is not None else base.stamp_rate_sell,
+            )
         nominal = self._config.calibration.nominal_application_value
         rows: list[HistoryRow] = []
         for record in self._repo.list_all():

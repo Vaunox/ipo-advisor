@@ -1,11 +1,16 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useCalibration, useHealth } from '../api/hooks'
 import { recalibrationCount } from '../recalib'
+import { toast } from '../toast'
 import {
+  type Costs,
   type Density,
   type ThemeMode,
+  getCosts,
   getDensity,
   getThemeMode,
+  setCosts,
   setDensity,
   setThemeMode,
 } from '../state/prefs'
@@ -15,12 +20,21 @@ function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 }
 
 export function Settings() {
+  const qc = useQueryClient()
   const health = useHealth()
   const cal = useCalibration()
   const [theme, setTheme] = useState<ThemeMode>(getThemeMode())
   const [density, setDens] = useState<Density>(getDensity())
   const [notif, setNotif] = useState({ native: true, applyCrossing: true, anyChange: false, quiet: true })
+  const [costs, setCostsState] = useState<Costs>(getCosts())
   const engineUp = health.data?.status === 'ok'
+
+  const updateCost = (k: keyof Costs, v: string) => {
+    const next = { ...costs, [k]: parseFloat(v) || 0 }
+    setCostsState(next)
+    setCosts(next)
+    void qc.invalidateQueries({ queryKey: ['history'] })
+  }
 
   const pickTheme = (m: ThemeMode) => {
     setThemeMode(m)
@@ -31,6 +45,15 @@ export function Settings() {
     setDens(d)
   }
   const toggle = (k: keyof typeof notif) => setNotif((n) => ({ ...n, [k]: !n[k] }))
+  const restartEngine = () => {
+    const api = (window as unknown as { ipoDesktop?: { restartEngine?: () => void } }).ipoDesktop
+    if (api?.restartEngine) {
+      api.restartEngine()
+      toast('Restarting engine…')
+    } else {
+      toast('Engine restart is available in the desktop app')
+    }
+  }
 
   return (
     <div className="set-grid">
@@ -55,6 +78,30 @@ export function Settings() {
         <div className="set-row">
           <div className="k">Quiet hours (22:00–08:00 IST)</div>
           <Switch on={notif.quiet} onToggle={() => toggle('quiet')} />
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 className="sec">Broker cost assumptions</h3>
+        <div className="set-row">
+          <div className="k">
+            STT on sell (%)<small>listing-day delivery sell</small>
+          </div>
+          <input className="num-in" value={costs.stt} onChange={(e) => updateCost('stt', e.target.value)} />
+        </div>
+        <div className="set-row">
+          <div className="k">
+            DP charge (₹, flat)<small>per ISIN per sell-day</small>
+          </div>
+          <input className="num-in" value={costs.dp} onChange={(e) => updateCost('dp', e.target.value)} />
+        </div>
+        <div className="set-row">
+          <div className="k">Exchange + GST + SEBI (%)</div>
+          <input className="num-in" value={costs.oth} onChange={(e) => updateCost('oth', e.target.value)} />
+        </div>
+        <div className="set-row">
+          <div className="k">Effect</div>
+          <div className="pending">applied to net-of-cost gains in History</div>
         </div>
       </div>
 
@@ -121,6 +168,23 @@ export function Settings() {
             </div>
           </div>
         )}
+        <div className="set-row">
+          <div className="k">Actions</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn"
+              onClick={() => {
+                void qc.invalidateQueries()
+                toast('Refreshing verdicts…')
+              }}
+            >
+              Refresh now
+            </button>
+            <button className="btn danger" onClick={restartEngine}>
+              Restart engine
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="card">

@@ -12,6 +12,7 @@ import { Live } from './screens/Live'
 import { Settings } from './screens/Settings'
 import { Upcoming } from './screens/Upcoming'
 import { setThemeMode } from './state/prefs'
+import { Toaster } from './components/Toaster'
 
 const TITLES: Record<View, [string, string]> = {
   live: ['Live signals', 'mainboard · updated live · IST'],
@@ -37,6 +38,16 @@ function EngineDown({ onRetry }: { onRetry: () => void }) {
     </div>
   )
 }
+
+const UncalBanner = () => (
+  <div className="uncal-banner">
+    <IconAlert />
+    <span>
+      <b>UNCALIBRATED — reliability gate not passed.</b> Verdicts are shown; probabilities are
+      withheld until the calibrator passes its out-of-sample check. No number the gate didn't bless.
+    </span>
+  </div>
+)
 
 const HelpOverlay = ({ onClose }: { onClose: () => void }) => (
   <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -133,6 +144,7 @@ export function App() {
           onSearch={() => setPaletteOpen(true)}
         />
         <div className="content">
+          {!engineDown && calibration.data && !calibration.data.gate_passed && <UncalBanner />}
           {engineDown ? (
             <EngineDown onRetry={() => void health.refetch()} />
           ) : detailId ? (
@@ -157,6 +169,7 @@ export function App() {
         />
       )}
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      <Toaster />
     </div>
   )
 }

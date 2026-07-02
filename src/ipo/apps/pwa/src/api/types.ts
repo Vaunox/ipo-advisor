@@ -61,6 +61,9 @@ export interface IPOListRow {
   name: string
   segment: string
   issue_size_cr: number | null
+  ofs_fraction: number | null
+  issue_pe: number | null
+  peer_median_pe: number | null
   open_date: string
   close_date: string
   listing_date: string | null

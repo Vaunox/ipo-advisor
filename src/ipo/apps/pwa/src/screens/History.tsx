@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useCalibration, useHistory } from '../api/hooks'
 import type { CalibrationView, HistoryRow, VerdictType } from '../api/types'
+import { getCosts } from '../state/prefs'
 import { VMETA } from '../verdict'
 
 const Search = () => (
@@ -172,7 +173,7 @@ function csvCell(v: string): string {
 }
 
 export function History() {
-  const { data: history, isLoading, isError } = useHistory()
+  const { data: history, isLoading, isError } = useHistory(getCosts())
   const cal = useCalibration()
   const [filter, setFilter] = useState<'all' | VerdictType>('all')
   const [query, setQuery] = useState('')

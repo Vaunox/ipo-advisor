@@ -95,6 +95,7 @@ html.theme-anim, html.theme-anim * {
 .enginedown h2 { font-size:19px; } .enginedown p { color:var(--tx2); max-width:400px; line-height:1.6; font-size:13px; }
 .btn { background:var(--panel2); border:1px solid var(--line2); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--tx); font-weight:500; }
 .btn:hover { border-color:var(--accent); color:var(--accent); }
+.btn.danger:hover { border-color:var(--skip); color:var(--skip); }
 
 /* detail view */
 .back { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--tx2); font-family:'Fira Code'; margin-bottom:18px; }
@@ -271,7 +272,9 @@ body.compact .co small { margin-top:2px; }
 body.compact .meter { margin-top:6px; }
 
 /* upcoming */
-.grid-up { grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(0,1.6fr) 96px; }
+.grid-up { grid-template-columns:minmax(0,1.9fr) minmax(0,1.3fr) minmax(0,1.5fr) minmax(0,1.4fr) 72px; }
+.struct { font-family:'Fira Code'; font-size:12px; color:var(--tx2); }
+.anchor-flag { color:var(--accent); font-family:'Fira Code'; font-size:11px; font-weight:600; }
 .lhead.grid-up .r { text-align:right; }
 .count-badge { font-family:'Fira Code'; font-size:12px; color:var(--marginal); font-weight:600; }
 .pending-sm { font-family:'Fira Code'; font-size:11px; color:var(--tx3); margin-top:3px; }
@@ -294,9 +297,22 @@ body.compact .meter { margin-top:6px; }
 .seg2 { display:flex; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:3px; }
 .seg2 button { padding:6px 12px; border-radius:6px; font-size:12px; color:var(--tx2); font-family:'Fira Code'; }
 .seg2 button.on { background:var(--tx); color:var(--bg); }
+.num-in { width:96px; background:var(--panel2); border:1px solid var(--line2); border-radius:7px; padding:7px 10px; color:var(--tx); font-family:'Fira Code'; font-size:12px; text-align:right; }
+.num-in:focus { outline:none; border-color:var(--accent); }
 .health { display:flex; align-items:center; gap:9px; font-family:'Fira Code'; font-size:12px; }
 .about { font-size:12px; color:var(--tx2); line-height:1.7; } .about b { color:var(--tx); }
 .disclaimer { font-size:11px; color:var(--tx3); line-height:1.6; font-style:italic; border-left:2px solid var(--line2); padding-left:12px; margin-top:12px; }
+
+/* UNCALIBRATED banner (reliability gate not passed) */
+.uncal-banner { display:flex; align-items:center; gap:11px; background:var(--marginal-bg); border:1px solid color-mix(in srgb, var(--marginal) 45%, transparent); border-radius:10px; padding:12px 16px; margin-bottom:18px; font-size:12.5px; color:var(--tx); }
+.uncal-banner svg { width:17px; height:17px; flex:none; stroke:var(--marginal); fill:none; stroke-width:1.9; }
+.uncal-banner b { color:var(--marginal); }
+
+/* toasts */
+.toaster { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:8px; z-index:70; align-items:center; }
+.toast { background:var(--panel); border:1px solid var(--line2); border-radius:10px; padding:12px 18px; font-size:12.5px; color:var(--tx); box-shadow:0 12px 30px rgba(0,0,0,.4); display:flex; align-items:center; gap:9px; animation:toastin .25s ease; }
+.toast svg { width:15px; height:15px; stroke:var(--apply); fill:none; stroke-width:2; }
+@keyframes toastin { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
 
 @media (prefers-reduced-motion:reduce) {
   * { animation:none !important; transition:none !important; }

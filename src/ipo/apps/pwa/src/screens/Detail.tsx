@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useIpo } from '../api/hooks'
 import type { IPODetail, IPOFeatures, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
+import { toast } from '../toast'
 import { VMETA } from '../verdict'
 
 const Check = () => (
@@ -103,6 +104,7 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
     const txt = `${r.name} — ${v.verdict}${showNumber ? ` (${pct}% calibrated)` : ''}. ${v.reason}. Advisory only, not financial advice.`
     void navigator.clipboard?.writeText(txt)
     setCopied(true)
+    toast('Verdict copied to clipboard')
     window.setTimeout(() => setCopied(false), 1600)
   }
 

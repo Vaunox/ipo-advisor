@@ -90,13 +90,17 @@ def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = 
         return engine.detail(record)
 
     @app.get("/history", response_model=list[HistoryRow])
-    def history() -> list[HistoryRow]:
+    def history(
+        stt: float | None = None, dp: float | None = None, oth: float | None = None
+    ) -> list[HistoryRow]:
         """Every listed IPO's point-in-time verdict paired with its actual net-of-cost outcome.
 
         Read-only accountability data for the History view + calibration scorecard: the verdict is
         verbatim ``verdict_for`` (point-in-time), the outcome is the model's own net-of-cost label.
+        ``stt``/``dp``/``oth`` optionally override the operator's broker sell-costs for the
+        net-of-cost display only — never a verdict or a probability.
         """
-        return engine.history()
+        return engine.history(stt=stt, dp=dp, oth=oth)
 
     @app.get("/calibration", response_model=CalibrationView)
     def calibration() -> CalibrationView:
