@@ -13,6 +13,7 @@ raw_cache/
 dist/
 build/
 release/
+store-assets/
 *.spec.bak
 *.exe
 *.apk
