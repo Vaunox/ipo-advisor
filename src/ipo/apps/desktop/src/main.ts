@@ -41,6 +41,11 @@ async function boot(): Promise<void> {
     console.error(`[engine] exited (code ${code})`)
   })
 
+  // Window/taskbar icon (the exe isn't rcedited in the unsigned build, so set it at runtime).
+  const iconPath = DEV
+    ? path.join(__dirname, '..', 'build', 'icon.ico')
+    : path.join(process.resourcesPath, 'icon.ico')
+
   win = new BrowserWindow({
     width: 1320,
     height: 860,
@@ -48,6 +53,7 @@ async function boot(): Promise<void> {
     minHeight: 700,
     backgroundColor: '#0a0d12',
     title: 'IPO Advisor',
+    icon: iconPath,
     autoHideMenuBar: true,
     show: false,
     webPreferences: {

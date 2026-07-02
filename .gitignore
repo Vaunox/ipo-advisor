@@ -12,6 +12,7 @@ raw_cache/
 # Build / packaging
 dist/
 build/
+release/
 *.spec.bak
 *.exe
 *.apk

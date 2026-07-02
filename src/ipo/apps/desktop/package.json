@@ -31,13 +31,15 @@
     ],
     "extraResources": [
       { "from": "../pwa/dist", "to": "pwa" },
-      { "from": "../../../../packaging/dist/ipo-engine", "to": "engine" }
+      { "from": "../../../../packaging/dist/ipo-engine", "to": "engine" },
+      { "from": "build/icon.ico", "to": "icon.ico" }
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
