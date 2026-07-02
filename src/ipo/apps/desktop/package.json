@@ -8,11 +8,45 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json && electron .",
     "start": "electron .",
-    "selftest": "tsc -p tsconfig.json && node dist/sidecar.js"
+    "selftest": "tsc -p tsconfig.json && node dist/sidecar.js",
+    "dist": "tsc -p tsconfig.json && electron-builder --win --publish never"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
     "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "com.ipoadvisor.app",
+    "productName": "IPO Advisor",
+    "artifactName": "IPO-Advisor-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "splash.html"
+    ],
+    "extraResources": [
+      { "from": "../pwa/dist", "to": "pwa" },
+      { "from": "../../../../packaging/dist/ipo-engine", "to": "engine" }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IPO Advisor",
+      "uninstallDisplayName": "IPO Advisor"
+    }
   }
 }

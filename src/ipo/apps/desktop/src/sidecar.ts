@@ -15,6 +15,8 @@ export interface SpawnOpts {
   repoRoot: string
   /** Path to the bundled PyInstaller engine binary (prod only). */
   enginePath?: string
+  /** Writable dir for the record store + transition log (the engine's --data-dir). */
+  dataDir?: string
 }
 
 /** Ask the OS for a free TCP port on 127.0.0.1. */
@@ -45,19 +47,22 @@ export function findRepoRoot(start: string): string {
 /** Spawn the engine on `port`. Dev runs the module from source with the venv python; prod runs the
  *  bundled PyInstaller binary. stdout/stderr are piped so the shell can log/observe the engine. */
 export function spawnEngine(port: number, opts: SpawnOpts): ChildProcess {
+  const dataDirArgs = opts.dataDir ? ['--data-dir', opts.dataDir] : []
   if (opts.dev) {
     const py =
       process.platform === 'win32'
         ? path.join(opts.repoRoot, '.venv', 'Scripts', 'python.exe')
         : path.join(opts.repoRoot, '.venv', 'bin', 'python')
-    return spawn(py, ['-m', 'ipo.service.runner', '--port', String(port)], {
+    return spawn(py, ['-m', 'ipo.service.runner', '--port', String(port), ...dataDirArgs], {
       cwd: opts.repoRoot,
       env: { ...process.env, PYTHONPATH: path.join(opts.repoRoot, 'src'), PYTHONUNBUFFERED: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   }
   if (!opts.enginePath) throw new Error('enginePath is required in production')
-  return spawn(opts.enginePath, ['--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
+  return spawn(opts.enginePath, ['--port', String(port), ...dataDirArgs], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
 }
 
 /** Poll GET {base}/health until it returns 200, or the timeout elapses. */

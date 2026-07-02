@@ -30,7 +30,10 @@ async function boot(): Promise<void> {
     'engine',
     process.platform === 'win32' ? 'ipo-engine.exe' : 'ipo-engine',
   )
-  child = spawnEngine(port, { dev: DEV, repoRoot, enginePath })
+  // Writable engine data lives in the per-user app-data dir in prod (the install dir under Program
+  // Files is read-only), and in the repo's data_store in dev so the working store is reused.
+  const dataDir = DEV ? path.join(repoRoot, 'data_store') : path.join(app.getPath('userData'), 'engine-data')
+  child = spawnEngine(port, { dev: DEV, repoRoot, enginePath, dataDir })
   child.stdout?.on('data', (d) => console.log(`[engine] ${String(d).trim()}`))
   child.stderr?.on('data', (d) => console.error(`[engine] ${String(d).trim()}`))
   child.on('exit', (code) => {
@@ -81,7 +84,8 @@ async function boot(): Promise<void> {
   if (DEV) {
     await win.loadURL('http://localhost:5173')
   } else {
-    await win.loadFile(path.join(__dirname, '..', '..', 'pwa', 'dist', 'index.html'))
+    // electron-builder copies the built PWA to resources/pwa/ (extraResources).
+    await win.loadFile(path.join(process.resourcesPath, 'pwa', 'index.html'))
   }
 }
 

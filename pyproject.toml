@@ -36,6 +36,7 @@ dev = [
 ]
 packaging = [
     "pyinstaller>=6.10",  # freeze the engine into the sidecar binary the desktop app ships (GATE 7)
+    "pillow>=10.0",  # generate the app icon (packaging/make_icon.py)
 ]
 
 [tool.setuptools.packages.find]
