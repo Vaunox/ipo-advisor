@@ -76,6 +76,10 @@ strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
 files = ["src", "tests", "scripts"]
+# Ignore JS/packaging build artifacts that live under src/ (electron-builder release/, the frozen
+# engine's bundled site-packages, node_modules) — they are not our source. mypy, unlike ruff/black,
+# does not honor .gitignore.
+exclude = '(^|/)(release|dist|build|node_modules)/'
 warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = true
