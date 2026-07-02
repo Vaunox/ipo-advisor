@@ -139,6 +139,16 @@ h3.sec { font-family:'Fira Code'; font-size:10px; letter-spacing:.14em; text-tra
 .kv .r { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
 .kv .r:last-child { border:none; } .kv .k { color:var(--tx2); }
 .kv .v { font-family:'Fira Code'; font-weight:600; }
+.kv .r.sub { padding:6px 0 6px 12px; border-bottom:1px dashed var(--line); font-size:11.5px; }
+.kv .r.sub .k { color:var(--tx3); } .kv .r.sub .v { font-weight:500; color:var(--tx2); }
+.sub-spark { margin-top:16px; }
+.sub-spark .ss-head { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--tx3); margin-bottom:6px; }
+.sub-spark .ss-final { text-transform:none; letter-spacing:0; color:var(--apply); font-weight:600; }
+.sub-spark .ss-svg { width:100%; height:54px; display:block; }
+.sub-spark .ss-area { fill:var(--apply); opacity:.10; stroke:none; }
+.sub-spark .ss-line { fill:none; stroke:var(--apply); stroke-width:1.6; vector-effect:non-scaling-stroke; }
+.sub-spark .ss-dot { fill:var(--apply); }
+.sub-spark .ss-axis { display:flex; justify-content:space-between; font-size:10.5px; color:var(--tx3); margin-top:3px; }
 .whatif { grid-column:1/-1; display:flex; gap:11px; align-items:flex-start; font-size:12.5px; color:var(--tx2); background:var(--panel); border:1px dashed var(--line2); border-radius:10px; padding:13px 16px; }
 .whatif svg { width:16px; height:16px; flex:none; stroke:var(--accent); fill:none; stroke-width:1.8; margin-top:1px; }
 .whatif b { color:var(--tx); }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useIpo } from '../api/hooks'
-import type { IPODetail, IPOFeatures, VerdictType } from '../api/types'
+import type { IPODetail, IPOFeatures, SubscriptionPoint, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
@@ -12,6 +12,52 @@ const Check = () => (
 )
 
 const x = (v: number | null): string => (v != null ? `${v}×` : '—')
+
+const fmtDay = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+
+// Demand-progression sparkline: how the overall subscription built through the bidding
+// window. Display-only — it ends at the same finals shown above, never a second number.
+function DemandSpark({ points }: { points: SubscriptionPoint[] }) {
+  const series = points.map((p) => p.overall ?? p.nii ?? 0)
+  if (series.length < 2) return null
+  const max = Math.max(...series, 1)
+  const W = 280
+  const H = 54
+  const pad = 5
+  const stepX = (W - pad * 2) / (series.length - 1)
+  const yOf = (v: number) => H - pad - (v / max) * (H - pad * 2)
+  const coords = series.map((v, i) => `${pad + i * stepX},${yOf(v)}`)
+  const line = `M${coords.join(' L')}`
+  const lastX = pad + (series.length - 1) * stepX
+  const area = `M${pad},${H - pad} L${coords.join(' L')} L${lastX},${H - pad} Z`
+  const last = series[series.length - 1]
+  return (
+    <div className="sub-spark">
+      <div className="ss-head">
+        <span>Demand progression · overall</span>
+        <span className="ss-final mono">{last}× final</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="ss-svg">
+        <path d={area} className="ss-area" />
+        <path d={line} className="ss-line" />
+        {series.map((v, i) => (
+          <circle
+            key={i}
+            cx={pad + i * stepX}
+            cy={yOf(v)}
+            r={i === series.length - 1 ? 2.8 : 1.7}
+            className="ss-dot"
+          />
+        ))}
+      </svg>
+      <div className="ss-axis mono">
+        <span>{fmtDay(points[0].asof)}</span>
+        <span>{fmtDay(points[points.length - 1].asof)}</span>
+      </div>
+    </div>
+  )
+}
 
 // Readable label for each contribution key, enriched with the feature value where available.
 function contribLabel(key: string, f: IPOFeatures): string {
@@ -175,7 +221,7 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
 
         <div className="card">
-          <h3 className="sec">Subscription (final)</h3>
+          <h3 className="sec">{f.book_closed ? 'Subscription (final)' : 'Subscription (live)'}</h3>
           <div className="kv">
             <div className="r">
               <span className="k gl" data-tip="Qualified Institutional Buyers — banks, mutual funds, insurers. Their subscription multiple is the strongest institutional-confidence signal.">QIB</span>
@@ -185,11 +231,32 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               <span className="k gl" data-tip="Non-Institutional Investors (HNIs). Split into small (sNII, ₹2–10L) and big (bNII, over ₹10L) buckets.">NII</span>
               <span className="v">{x(r.nii_sub)}</span>
             </div>
+            {r.nii_small_sub != null && (
+              <div className="r sub">
+                <span className="k">↳ sNII (₹2–10L)</span>
+                <span className="v">{x(r.nii_small_sub)}</span>
+              </div>
+            )}
+            {r.nii_big_sub != null && (
+              <div className="r sub">
+                <span className="k">↳ bNII (over ₹10L)</span>
+                <span className="v">{x(r.nii_big_sub)}</span>
+              </div>
+            )}
             <div className="r">
               <span className="k gl" data-tip="Retail Individual Investors — bids up to ₹2 lakh. A retail-led book is a weaker signal than a QIB-led one.">Retail</span>
               <span className="v">{x(r.retail_sub)}</span>
             </div>
+            {r.overall_sub != null && (
+              <div className="r">
+                <span className="k gl" data-tip="Total demand across all categories, weighted by each category's reserved portion of the book.">Overall</span>
+                <span className="v mono" style={{ fontWeight: 700 }}>{x(r.overall_sub)}</span>
+              </div>
+            )}
           </div>
+          {r.subscription_progression && r.subscription_progression.length >= 2 && (
+            <DemandSpark points={r.subscription_progression} />
+          )}
           <h3 className="sec" style={{ marginTop: 18 }}>
             Issue structure
           </h3>

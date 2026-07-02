@@ -13,6 +13,14 @@ export interface Verdict {
   kill_flags: string[]
 }
 
+export interface SubscriptionPoint {
+  asof: string
+  qib: number | null
+  nii: number | null
+  retail: number | null
+  overall: number | null
+}
+
 export interface IPORecord {
   ipo_id: string
   name: string
@@ -28,6 +36,10 @@ export interface IPORecord {
   qib_sub: number | null
   nii_sub: number | null
   retail_sub: number | null
+  nii_small_sub: number | null
+  nii_big_sub: number | null
+  overall_sub: number | null
+  subscription_progression: SubscriptionPoint[] | null
   issue_pe: number | null
   peer_median_pe: number | null
   promoter_litigation: boolean
