@@ -1,8 +1,10 @@
 """Generate the MSIX tile/logo assets (GATE 7 — Store) into the desktop app's build/appx/.
 
 electron-builder's appx target uses these branded PNGs instead of its placeholder "SampleAppx"
-tiles. Each is the same mark as the app icon/splash: a vertical apply-green gradient with a
-centered dark diamond, drawn full-bleed at the exact size Windows expects for each tile.
+tiles. For an MSIX app Windows draws the taskbar/Start icon from THESE assets (not the exe icon),
+so each is the SAME mark as the app icon (packaging/make_icon.py) and the splash: a green-gradient
+**rounded** square with a centered dark diamond, on a transparent background (the manifest's dark
+backgroundColor shows through), so the taskbar/Start/tile all match the in-app + splash mark.
 
     python packaging/make_appx_assets.py
 """
@@ -32,18 +34,38 @@ _TILES = {
 }
 
 
-def _tile(width: int, height: int) -> Image.Image:
-    """Full-bleed vertical green gradient with a centered dark diamond."""
-    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    for y in range(height):
-        t = y / max(height - 1, 1)
-        color = tuple(int(_TOP[i] + (_BOTTOM[i] - _TOP[i]) * t) for i in range(3))
-        draw.line([(0, y), (width, y)], fill=(*color, 255))
-    cx, cy = width / 2, height / 2
-    r = min(width, height) * 0.30
-    draw.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=(*_GLYPH, 255))
+def _mark(size: int) -> Image.Image:
+    """The brand mark at ``size`` — a green-gradient rounded square + diamond (matches icon.ico)."""
+    grad = Image.new("RGB", (size, size))
+    gd = ImageDraw.Draw(grad)
+    for y in range(size):
+        t = y / max(size - 1, 1)
+        gd.line(
+            [(0, y), (size, y)],
+            fill=tuple(int(_TOP[i] + (_BOTTOM[i] - _TOP[i]) * t) for i in range(3)),
+        )
+    mask = Image.new("L", (size, size), 0)
+    inset = max(1, round(size * 0.055))
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [inset, inset, size - inset, size - inset], radius=round(size * 0.20), fill=255
+    )
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    img.paste(grad, (0, 0), mask)
+    c, r = size / 2, size * 0.24
+    ImageDraw.Draw(img).polygon(
+        [(c, c - r), (c + r, c), (c, c + r), (c - r, c)], fill=(*_GLYPH, 255)
+    )
     return img
+
+
+def _tile(width: int, height: int) -> Image.Image:
+    """Square tiles ARE the mark; non-square tiles center the mark on transparent."""
+    if width == height:
+        return _mark(width)
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    mark = _mark(min(width, height))
+    canvas.paste(mark, ((width - mark.width) // 2, (height - mark.height) // 2), mark)
+    return canvas
 
 
 def main() -> None:
