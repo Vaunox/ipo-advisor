@@ -51,11 +51,11 @@
       "uninstallDisplayName": "IPO Advisor"
     },
     "appx": {
-      "identityName": "IPOAdvisorTest.Sideload",
-      "publisher": "CN=IPOAdvisorTest",
-      "publisherDisplayName": "IPO Advisor",
+      "identityName": "GenesisQuant.IPO-Advisor",
+      "publisher": "CN=67AC7CD3-A84A-457C-AA04-70E87719462E",
+      "publisherDisplayName": "Genesis Quant",
       "applicationId": "IPOAdvisor",
-      "displayName": "IPO Advisor",
+      "displayName": "IPO-Advisor",
       "backgroundColor": "#0a0d12",
       "languages": [
         "en-US"
