@@ -1,3 +1,11 @@
+# =============================================================================================
+# QUARANTINED — FAILED RE-CALIBRATION GATE (2026-07-03, hot-market N=293).
+# Retained in research/ for a possible v2 re-test (cold-market / larger sample); EXCLUDED FROM THE
+# BUILD. The shipped artifact bundles only src/ipo/ (PyInstaller collect_submodules("ipo")) + the
+# PWA; research/ is never packaged, so this code cannot ship or be wired live.
+# Do NOT ship or wire these features into live features without re-running the gate.
+# Evidence + findings: docs/ENHANCEMENT_GATE.md. Moved here from scripts/backfill_enhancement.py.
+# =============================================================================================
 """Backfill the three enhancement features (OFS / valuation / anchor) from Chittorgarh.
 
 Research-only, operator-directed historical pull (analogous to the IPOMatrix GMP trial):

@@ -62,6 +62,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]            # tests need not be docstring-complete
 "scripts/*" = ["D"]
+"research/*" = ["D"]         # dead code, excluded from the build (see research/README.md)
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -75,7 +76,7 @@ python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
-files = ["src", "tests", "scripts"]
+files = ["src", "tests", "scripts", "research"]  # research/ is dev-checked but never built/shipped
 # Ignore JS/packaging build artifacts that live under src/ (electron-builder release/, the frozen
 # engine's bundled site-packages, node_modules) — they are not our source. mypy, unlike ruff/black,
 # does not honor .gitignore.

@@ -1,3 +1,11 @@
+# =============================================================================================
+# QUARANTINED — FAILED RE-CALIBRATION GATE (2026-07-03, hot-market N=293).
+# Retained in research/ for a possible v2 re-test (cold-market / larger sample); EXCLUDED FROM THE
+# BUILD. The shipped artifact bundles only src/ipo/ (PyInstaller collect_submodules("ipo")) + the
+# PWA; research/ is never packaged, so this code cannot ship or be wired live.
+# Do NOT ship or wire these features into live features without re-running the gate.
+# Evidence + findings: docs/ENHANCEMENT_GATE.md. Moved here from scripts/run_enhancement_gate.py.
+# =============================================================================================
 """Enhancement re-calibration gate — do OFS / valuation / anchor earn their place?
 
 The same burden of proof GMP got (docs/GMP_GATE.md): each feature is scored WITH vs WITHOUT on

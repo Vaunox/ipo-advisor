@@ -28,6 +28,11 @@ datas = [
     # live NSE ingestion (ipo.data.ingest.live); no fabricated/curated companies ship.
 ]
 binaries: list = []
+# BUILD BOUNDARY: the engine bundles ONLY the `ipo` package (src/ipo/) + the deps below. Repo dirs
+# outside src/ipo/ — notably `scripts/` and `research/` (the FAILED-gate enhancement backfill; see
+# research/README.md, docs/ENHANCEMENT_GATE.md) — are NOT collected, NOT in `datas`, and NOT on
+# `pathex`, so they can never be bundled or wired live. Keep failed/experimental code in research/.
+#
 # Our package plus the ASGI stack: uvicorn resolves its loop/protocol impls dynamically, so its
 # submodules must be collected explicitly or the frozen server fails to start.
 hiddenimports = collect_submodules("ipo") + collect_submodules("uvicorn")

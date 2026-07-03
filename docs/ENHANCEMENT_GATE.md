@@ -7,7 +7,8 @@ paired-bootstrap CI on the AUC lift, across several walk-forward splits. Gated *
 feature so a brittle field (valuation) cannot contaminate a clean one (OFS). Data is a **Chittorgarh
 research pull** (operator-directed, one-time, rate-limited; **not** a sanctioned ongoing source),
 mapped to the 293 OOS-eligible official-NSE IPOs. Engineering/research reference — not financial
-advice. Reproduce: `scripts/backfill_enhancement.py` then `scripts/run_enhancement_gate.py`.*
+advice. Reproduce: `research/backfill_enhancement.py` then `research/run_enhancement_gate.py`
+(moved to `research/` — dead code, **excluded from the build**; see `research/README.md`).*
 
 ## Verdicts
 
@@ -158,3 +159,12 @@ MAX |Δprob|  = 0.000e+00      (walk-forward 175/58: 118 OOS · 146/43: 147 OOS)
 
 They provably cannot move the number. Revisit any of the three only via a fresh re-calibration gate
 on cleaner/larger data — never by wiring a live feed.
+
+**Code quarantine.** The backfill/extraction adapters (OFS extraction, peer-P/E parsing, RHP
+scraping, NSE↔Chittorgarh joins) live in **`research/`**, which is **excluded from the build** — the
+shipped artifact bundles only `src/ipo/` (PyInstaller `collect_submodules("ipo")`) + the PWA, so
+this code structurally *cannot* be packaged, wired up, or run in production. The inert scorer slots
+(`ofs_fraction` / `relative_valuation` / `anchor_quality`, weight 0, like `market_regime`) stay in
+`src/` and ship harmlessly. Marker: *failed re-calibration gate (2026-07-03, hot N=293); retained in
+`research/` for a possible v2 re-test; excluded from build; do NOT ship or wire live without
+re-running the gate.*
