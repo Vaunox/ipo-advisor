@@ -4,6 +4,7 @@
 
 | Date | Candidate | Track (A/B) | Outcome | Evidence | Notes |
 |---|---|---|---|---|---|
+| 2026-07-04 | A3 — retail allotment-odds estimate (P(allotment) only) | A | **BUILT** (display-only; no calibration impact) | `tests/unit/test_allotment.py` + `test_api.py`; [A3_ALLOTMENT_ODDS.md](A3_ALLOTMENT_ODDS.md) | Shows est. P(1-lot retail allotment) `= min(1, 1/retail_sub)` next to the verdict, in a **separate code path** (scorer/calibrator untouched). Honest back-check: proxy **under-states** actual by ~1.7× — **labelled an estimate, not tuned**. Scoped down from the full EV layer (gain-magnitude + opportunity-cost dropped). |
 | 2026-07-03 | **STANDING RULE** — live/forward data-recording jobs deferred | — | **DEFERRED (standing)** | Master blueprint **Part I-A** | Operator runs no standing/daily recorders → **A1** (removed), **A2** (cancelled), **B1**, **B4**, **B5**, and the **GMP recorder** are deferred (not rejected). NOT affected: the app's `live.py` in-session refresh; A4 occasional rituals. Lift when the operator opts to run a recorder. |
 | 2026-07-03 | B1 subscription trajectory (via the A1 day-wise recorder) | B / A | **NOT PURSUED** — A1 built (GATE A1 met) then **removed** (reverted) | Removal + research notes below | No gate-usable historical day-wise subscription exists (every source is final-only or GMP-only), so forward-collection was the *only* path to gate B1 — and it was judged not worth pursuing now. A1 (`40e9230`) reverted. The app's live-verdict ingestion (`data/ingest/live.py`) is untouched. |
 
