@@ -12,9 +12,11 @@
 
 **Decision.** The A1 day-wise subscription recorder was built (append-only bank, GATE A1 met,
 verified live on Knack Packaging's close day) and then **removed** — the A1 commit (`40e9230`) was
-reverted. **B1 (subscription trajectory) is not being pursued.** The research below established that
-the only route to a gate-grade trajectory dataset is *forward-collection* (no free historical
-day-wise, category-level archive exists), and that investment was judged not worthwhile now.
+reverted. **A2** (the standalone always-on cloud recorder that would have run A1's collection
+forward) is **dropped** — it was only ever uncommitted WIP and was never built. **B1 (subscription
+trajectory) is not being pursued.** The research below established that the only route to a
+gate-grade trajectory dataset is *forward-collection* (no free historical day-wise, category-level
+archive exists), and that whole line of work (A1 + A2) was judged not worthwhile now.
 
 **What the revert removed.** `data/ingest/daywise.py`, `data/store/daywise.py`,
 `scripts/run_daywise_recorder.py`, `tests/unit/test_daywise.py`, the `DaywiseSubscriptionRow` type
@@ -67,5 +69,8 @@ buildup exists to corroborate it. IPOMatrix is also, in v1's own words, a "trial
 NOT a sanctioned ongoing source."
 
 **Outcome.** Forward-collection was the only path to a gate-grade trajectory dataset. Rather than
-build and run that collection (A1/A2), the decision was to **not pursue B1** — A1 was removed and the
-A2 cloud recorder was not built. The finding stands as the honest record of why.
+build and run that collection, the decision was to **not pursue B1** — A1 was removed (reverted) and
+A2 was dropped without ever being committed. The finding stands as the honest record of why.
+
+*(A2 remains listed as a candidate in the master blueprint spec — this log records it as dropped, the
+way the graveyard records rejected features; the spec is the menu, this is the outcome.)*
