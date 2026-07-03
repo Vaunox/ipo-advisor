@@ -4,7 +4,29 @@
 
 | Date | Candidate | Track (A/B) | Outcome | Evidence | Notes |
 |---|---|---|---|---|---|
+| 2026-07-03 | **STANDING RULE** — live/forward data-recording jobs deferred | — | **DEFERRED (standing)** | Master blueprint **Part I-A** | Operator runs no standing/daily recorders → **A1** (removed), **A2** (cancelled), **B1**, **B4**, **B5**, and the **GMP recorder** are deferred (not rejected). NOT affected: the app's `live.py` in-session refresh; A4 occasional rituals. Lift when the operator opts to run a recorder. |
 | 2026-07-03 | B1 subscription trajectory (via the A1 day-wise recorder) | B / A | **NOT PURSUED** — A1 built (GATE A1 met) then **removed** (reverted) | Removal + research notes below | No gate-usable historical day-wise subscription exists (every source is final-only or GMP-only), so forward-collection was the *only* path to gate B1 — and it was judged not worth pursuing now. A1 (`40e9230`) reverted. The app's live-verdict ingestion (`data/ingest/live.py`) is untouched. |
+
+---
+
+## Standing decision — live/forward data-recording jobs are DEFERRED (2026-07-03)
+
+The operator is **not running standing scheduled or daily data-recording jobs**, so every v2 item
+that depends on **collecting data forward over time** is **deferred** — not rejected on the merits,
+deferred on operational choice. Full rule + rationale: **Part I-A** of the master blueprint.
+
+- **Deferred:** **A1** (day-wise subscription recorder — removed), **A2** (live subscription
+  auto-ingestion as a standing job — cancelled; the app's in-session refresh already covers live
+  verdicts), **B1** (subscription trajectory — needs A1's history), and the **GMP recorder** +
+  everything on it: **B4** (GMP cold re-test), **B5** (multi-source GMP confidence / spike-collapse).
+- **Not affected (stay):** the shipped app's own `live.py` ingestion (in-session refresh, **not** a
+  standing recorder); **A4** occasional rituals (quarterly recalibration, verdict-accuracy
+  monitoring — run periodically by the operator, not daily jobs).
+- **Still actionable (no recording dependency):** **A3** (allotment-EV), **B2** (VIX), **B3** (cheap
+  adds), **B6** (RHP kill-flags/context), **B9** (graded regime tiers), **B7** (TabPFN), **B8**
+  (conformal), **A4** (ops hardening).
+- **To lift:** the operator opts to run a recorder (a local scheduled task or an always-on service)
+  → the relevant deferred items become actionable again.
 
 ---
 

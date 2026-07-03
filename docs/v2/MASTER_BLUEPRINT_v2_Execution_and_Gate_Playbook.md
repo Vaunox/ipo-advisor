@@ -36,6 +36,50 @@ These are inherited from v1 and are non-negotiable. Every v2 change is checked a
 
 ---
 
+# PART I-A — STANDING RULE: live/forward data-recording jobs are DEFERRED
+
+*Governs the whole backlog — read before picking up any item. Operator decision, 2026-07-03.*
+
+**The operator is not running standing scheduled or daily data-recording jobs.** Therefore every candidate or task that requires **collecting data forward over time** — a recorder, a scheduler, an always-on job, or any "bank data going forward" dependency — is **DEFERRED**. Not rejected on the merits; just not pursued now, because the operator won't run the collection infrastructure they need.
+
+**Deferred under this rule:**
+- **A1** — day-wise subscription recorder (removed; feature not pursued).
+- **A2** — live subscription auto-ingestion as a standing job (cancelled; the app's in-session refresh already covers live verdicts).
+- **B1** — subscription trajectory / velocity (needs A1's banked history → deferred).
+- **The GMP recorder** (always-on forward GMP collection) and everything depending on it: **B4** (GMP cold-market re-test), **B5** (multi-source GMP confidence + spike-collapse flag) — all deferred, because they require forward GMP banking.
+
+**Explicitly NOT affected by this rule** (these are not forward-recording jobs):
+- **The shipped app's own live ingestion (`live.py`)** — it refreshes subscription and shows live verdicts *while the app is open*; it is not a standing recorder and stays.
+- **A4 occasional rituals** — quarterly recalibration and verdict-accuracy monitoring are run manually/periodically by the operator, not as daily jobs; they stay.
+
+**What remains actionable in v2** (no live-recording dependency): the allotment-EV layer (**A3**), India VIX (**B2** — free point-in-time series, no recording), cheap feature adds (**B3** — data already ingested), RHP kill-flags/context (**B6** — static filings), graded regime tiers (**B9** — annotation), the TabPFN bake-off (**B7**), the conformal layer (**B8**), and ops hardening (**A4**).
+
+**To lift this deferral later:** the operator decides to run a recorder (a local scheduled task or an always-on service), at which point the relevant deferred items become actionable again. Nothing here is rejected on the merits — it's **deferred on operational choice**.
+
+---
+
+# PART I-B — STANDING RULE: branch-first; main stays clean and only takes what earns it
+
+*Governs all v2 work. Operator decision, 2026-07-03.*
+
+**All v2 work happens on a branch, never directly on `main`.** `main` always stays green and shippable. Nothing merges to `main` until it has passed the correct standard **for its track**:
+
+- **BUILD-track items** (no calibration impact — e.g. allotment-EV, ops hardening): merge to `main` only when the code is complete, all tests pass, and ruff/black/mypy (full tree) are clean. **Working + green = merge.**
+- **GATE-track items** (candidate score features — e.g. VIX, cheap adds, TabPFN): green tests are **necessary but not sufficient**. The feature merges into the shipped model **only if it PASSES its gate** (with-vs-without, walk-forward OOS, CI not straddling zero, calibrator refit). A gate item that is perfectly working code but **fails its gate does NOT merge** — its code is quarantined in `research/` (excluded from the build) and the negative is logged. **"It runs" never earns a merge; "it earned its place" does.**
+
+**Workflow for every v2 item:**
+1. Create a branch off `main`.
+2. Build/test the item there in isolation.
+3. Validate to the right standard (green tests for BUILD; a **passed gate** for GATE).
+4. **Pause and report the result to the operator before merging** — show tests and, for gate items, the with-vs-without table with CI.
+5. Merge to `main` only on **operator approval** and only if it earned it. Otherwise **quarantine + log**; `main` is untouched.
+
+`main` never receives unvalidated, ungated, or gate-failed code. **The default path for a gate candidate ends in `research/`, not `main`.**
+
+**This formalizes how v1 was already built.** v1 shipped phase-by-phase, each gate tagged (`gate-0-foundation` … `gate-7-app`), with steps landing "green on [their] own branch, merged on approval" (`docs/PROGRESS.md`, Phase 6). Its gate-**failed** candidates — OFS / valuation / anchor (branch `enhancement-gate`) and GMP — were **quarantined in `research/` and zeroed, never merged into the score** (`docs/ENHANCEMENT_GATE.md`, `research/README.md`). v2 makes that lived practice the explicit, non-negotiable standard.
+
+---
+
 # PART II — THE GOVERNING GATE (every Track-B candidate)
 
 Full protocol in **Deep Dive #A**. The essence, repeated here because it governs everything:
@@ -74,10 +118,14 @@ Full protocol in **Deep Dive #A**. The essence, repeated here because it governs
 These do **not** touch the calibrated probability, so they need correctness + tests, not a gate. Each is one commit, green tree, tagged.
 
 ## A1. Start banking DAY-WISE subscription NOW ⏱️ (do first — clock-dependent)
+> ⛔ **DEFERRED — Part I-A (standing rule).** Built, then **removed**; feature not pursued (no gate-usable historical day-wise subscription exists — see `V2_PROGRESS.md`). Lift only if the operator opts to run a forward recorder.
+
 Official historical day-by-day subscription buildup is **not reliably archived free** — it can only be collected going forward. The best untested score candidate (Track B: subscription trajectory) depends on this data existing. So this is an **immediate collect-forward action**, independent of when trajectory is gated. Poll `ipo-active-category` with `updateTime`; append-only; same discipline as the GMP recorder. **Full spec: Deep Dive #B.**
 **GATE A1:** day-wise subscription rows land append-only for a live IPO, timestamped, no overwrite; a re-run produces no duplicates.
 
 ## A2. Live subscription auto-ingestion
+> ⛔ **DEFERRED / CANCELLED — Part I-A (standing rule).** Not built. The app's in-session `live.py` refresh already shows live verdicts while the app is open; a standing auto-ingestion job is not run. Lift only if the operator opts to run a standing service.
+
 Wire the existing `ipo-active-category` source into the scheduler so subscription refreshes automatically during the bidding window (advisory *service*, not *script*). Respect the T+3 close-day cutoffs (Deep Dive #B) for when the "book closed" cycle fires. Build defensively — NSE's endpoint is an undocumented internal API (session/cookie/UA handling, cloud-IP blocking, schema-validate + fail loud).
 **GATE A2:** subscription refreshes on cadence during an open book; schema-validation raises on an unexpected shape; the book-closed cycle fires at the correct cutoff.
 
@@ -100,6 +148,8 @@ The biggest decision-quality upgrade. Verdict today says "will it list positive?
 Each runs the Part-II / Deep-Dive-#A protocol. **Default expected outcome: logged negative.** Ordered by value-and-safety. Do not skip the cheap probe or the data-QA step.
 
 ## B1. Subscription trajectory / velocity ⭐ (best untested candidate — but needs A1's data)
+> ⛔ **DEFERRED — Part I-A (standing rule).** Needs A1's banked day-wise history, which is not being collected. Lift when forward collection resumes.
+
 **Hypothesis:** the *shape* of how subscription built (QIB surge timing, day-by-day velocity, late vs early demand) carries signal beyond the final multiple — right horizon, and not obviously QIB-redundant (the final number doesn't encode *how* it got there). Test a trajectory × issue-size interaction (research lead ◐).
 **Blocked on A1** — you can't gate this until day-wise history is banked. Cheap probe may use aggregator day-wise tables (trust-boundary rules), but the durable path is A1.
 
@@ -114,9 +164,13 @@ Each is a separate arm through the gate; all are ◐ research leads → **verify
 - **Bucketed issue size** — literature finds issue size *positively* related to underpricing (contra folk wisdom).
 
 ## B4. GMP cold-market re-test (the deferred Phase-5 question)
+> ⛔ **DEFERRED — Part I-A (standing rule).** Requires forward, cold-regime GMP from the always-on GMP recorder, which is not running. Lift when the recorder resumes.
+
 GMP failed the *hot* gate; the open question is whether it earns its weight **when QIB is weak** (cold market). **Commit to a trigger** ("re-run after N cold-regime IPOs banked"), don't leave open-ended. Re-run the exact gate on cold OOS data. Also test an **early-window GMP variant** (day 1–2, before subscription accumulates) — a narrower surviving lead. **Blocked on cold data from the recorder.**
 
 ## B5. Multi-source GMP confidence / spike-collapse flag
+> ⛔ **DEFERRED — Part I-A (standing rule).** Requires forward, multi-source, day-by-day GMP from the always-on recorder, which is not running. Lift when the recorder resumes.
+
 - **Multi-source divergence** as a confidence/abstention signal (the v1 GMP test was single-source). Blocked on recorder multi-source data.
 - **Spike-then-collapse manipulation flag** — a **kill-flag**, not a score input (independent of GMP's rejected ranking value). Gate: does flagging spike-collapse IPOs avoid listing-day losers? Blocked on recorder day-by-day GMP.
 
@@ -143,6 +197,7 @@ Recorded faithfully but **blocked**, because as specified it collides with two s
 
 # PART V — PARKED / WATCH
 
+- **GMP recorder (always-on forward GMP collection) — DEFERRED (Part I-A).** The separate always-on GMP-banking job is not being run, so no new forward / cold / multi-source GMP accrues; **B4** and **B5** (which depend on it) are deferred with it. Lift when the operator opts to run the recorder. (v1 already assessed the paid IPOMatrix archive as "poor value; not a sanctioned ongoing source" — see `docs/GMP_GATE.md`.)
 - **SME segment model — deferred.** Most-manipulated segment; research measures SME ~7× noisier than mainboard, and the mainboard GMP-proxy relationship doesn't transfer. If ever taken up: own dataset, own calibration, own gate — never mixed into the mainboard calibrator.
 - **SEBI "when-issued" pre-listing platform — watch.** If launched, it becomes an official free GMP substitute; adopt and retire the recorder's scraping.
 - **Mega-IPO MPO tiers — watch** the issue-size feature's tail behavior forward (affects only the largest IPOs).
@@ -151,16 +206,16 @@ Recorded faithfully but **blocked**, because as specified it collides with two s
 
 # PART VI — PRIORITY ORDER (what to actually do)
 
-1. **Ship v1 (Phase 7) first** — nothing below is visible without the app.
-2. **A1 — bank day-wise subscription now** (clock-dependent; gates B1).
-3. **A2 + A3 + A4 T+3 encoding** — build items, immediate decision-quality gain.
-4. **B2 VIX flag-enrichment** (safe half) — free, annotation-only proof.
-5. **B1 subscription trajectory** — once A1 has banked enough history.
-6. **B3 cheap adds + B7 TabPFN + B8 conformal** — one recalibration pass; verify ◐ leads; TabPFN clears the interpretability bar.
-7. **B4/B5 GMP cold + variants + spike-collapse** — when the recorder has banked cold, multi-source, day-by-day GMP.
-8. **B6 RHP kill-flags/context** — after the free HF-dataset probe.
-9. **B9 graded regime tiers** — anytime, isolated commit.
-10. **A4 standing ops** from launch; parked items stay parked until triggers fire.
+**v1 is shipped (Phase 7 done).** Under the **Part I-A standing deferral**, the forward-recording items — **A1, A2, B1, B4, B5, and the GMP recorder** — are **DEFERRED**. The actionable order among the rest:
+
+1. **A3 — allotment-EV layer** — the biggest decision-quality upgrade; a downstream computation on the probability, no recording dependency.
+2. **B2 VIX flag-enrichment** (safe half) — free, point-in-time, annotation-only proof.
+3. **B3 cheap adds + B7 TabPFN + B8 conformal** — one recalibration pass; verify ◐ leads first; TabPFN must clear the interpretability bar.
+4. **B6 RHP kill-flags/context** — after the free HF-dataset probe.
+5. **B9 graded regime tiers** — anytime, isolated commit.
+6. **A4 standing ops** — quarterly recalibration + verdict-accuracy monitoring (operator-run rituals, **not** daily jobs) and the T+3 `t3_regime` dummy; parked items stay parked until triggers fire.
+
+**Deferred until the operator opts to run a recorder (Part I-A):** **A1** (removed), **A2** (cancelled — the app's in-session `live.py` refresh already covers live verdicts), **B1** (needs A1's history), and **B4 / B5 + the GMP recorder** (need forward GMP banking).
 
 ---
 
