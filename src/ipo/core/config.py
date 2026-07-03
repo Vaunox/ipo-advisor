@@ -53,9 +53,6 @@ class StorageConfig(_Section):
 
     data_dir: str = "data_store"
     calibrator_dir: str = "data_store/calibrators"
-    # Append-only, collect-forward day-wise subscription bank (v2 A1). Under the
-    # gitignored data_store/ — banked observations are local data, never committed.
-    daywise_dir: str = "data_store/daywise"
 
 
 class ScrapeConfig(_Section):

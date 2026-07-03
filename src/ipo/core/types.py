@@ -85,42 +85,6 @@ class RawResponse(_Frozen):
     content_hash: str
 
 
-class DaywiseSubscriptionRow(_Frozen):
-    """One append-only, timestamped poll of an IPO's live subscription buildup (v2 A1).
-
-    Official day-by-day subscription history is not reliably archived for free, so it
-    can only be *collected forward*: the recorder polls NSE's ``ipo-active-category``
-    several times a day through each open book and appends one of these per poll (never
-    overwriting). The natural key ``(ipo_id, captured_at)`` makes the store idempotent;
-    ``captured_at`` is the honest IST poll time and is load-bearing — the downstream
-    subscription-trajectory candidate (v2 B1) reconstructs the buildup curve as-of any
-    point in the window from these rows. ``source_update_time`` (NSE's own "Updated as
-    on …" stamp) and ``raw_response_hash`` are retained for provenance and drift
-    detection; a poll that repeats the last banked observation is not re-appended.
-
-    This is a *collect-forward record*, never a scoring input — it does not touch the
-    calibrated probability (Track A). Multiples are the point-in-time oversubscription
-    ratios NSE reports; ``None`` means the category had no reading at that poll.
-    """
-
-    ipo_id: str
-    symbol: str
-    captured_at: datetime  # IST poll time — the point-in-time anchor (Rule 2)
-
-    qib_sub: float | None = Field(default=None, ge=0)
-    nii_sub: float | None = Field(default=None, ge=0)
-    snii_sub: float | None = Field(default=None, ge=0)  # sNII: ₹2L–10L
-    bnii_sub: float | None = Field(default=None, ge=0)  # bNII: > ₹10L
-    retail_sub: float | None = Field(default=None, ge=0)
-    total_sub: float | None = Field(default=None, ge=0)
-
-    # Provenance (Deep Dive #B storage contract): NSE's own stamp + the raw-response
-    # hash. The hash is the source-drift tripwire; both let the recorder dedupe an
-    # unchanged poll without re-reading the numbers.
-    source_update_time: str | None = None
-    raw_response_hash: str
-
-
 class IPORecord(_Frozen):
     """The canonical, point-in-time record for one IPO (Deep Dive #1, Module 1).
 

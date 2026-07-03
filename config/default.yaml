@@ -11,7 +11,6 @@ logging:
 storage:
   data_dir: data_store        # local parquet cache (gitignored)
   calibrator_dir: data_store/calibrators
-  daywise_dir: data_store/daywise   # append-only day-wise subscription bank (v2 A1, collect-forward)
 
 scrape:
   # Polite-scraper contract (Deep Dive #1, Module 3).

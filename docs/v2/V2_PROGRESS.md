@@ -4,67 +4,41 @@
 
 | Date | Candidate | Track (A/B) | Outcome | Evidence | Notes |
 |---|---|---|---|---|---|
-| 2026-07-03 | A1 — day-wise subscription recorder | A | **BUILT** (GATE A1 met) | `tests/unit/test_daywise.py` (13 tests); live run banked KNACK QIB 154× then **0 on re-run** (see below) | Append-only bank keyed `(ipo_id, captured_at)`; polls `ipo-active-category` through open books, retains NSE `updateTime` + `raw_response_hash`; content-dedupes an unchanged poll. Collect-forward data for B1 (trajectory). Does **not** touch the calibrated score. |
-| 2026-07-03 | B1 data-sourcing — is historical day-wise subscription already archived? (InvestorGain / IPOGyani / IPOMatrix) | B (research) | **Forward-collection required** — no gate-usable historical archive | Research note below | Confirms Deep Dive #B. No aggregator archives day-wise **category-level** subscription with intraday resolution + point-in-time provenance. IPOMatrix (operator trial): Subscription tab = **final basis-of-allotment only**; its day-wise/timewise archive is **GMP**, not subscription. Keeps A1/A2 justified; **probe B1 cheaply before heavy investment**. |
+| 2026-07-03 | B1 subscription trajectory (via the A1 day-wise recorder) | B / A | **NOT PURSUED** — A1 built (GATE A1 met) then **removed** (reverted) | Removal + research notes below | No gate-usable historical day-wise subscription exists (every source is final-only or GMP-only), so forward-collection was the *only* path to gate B1 — and it was judged not worth pursuing now. A1 (`40e9230`) reverted. The app's live-verdict ingestion (`data/ingest/live.py`) is untouched. |
 
 ---
 
-## GATE A1 — met (2026-07-03)
+## A1 removed / B1 (subscription trajectory) not pursued (2026-07-03)
 
-**Item:** A1 — start banking day-wise subscription now (Track A / BUILD; Deep Dive #B, Module B1).
-The clock-dependent collect-forward action: official day-by-day subscription buildup isn't
-archived free, so it only exists if recorded going forward. Gates B1 (subscription trajectory).
+**Decision.** The A1 day-wise subscription recorder was built (append-only bank, GATE A1 met,
+verified live on Knack Packaging's close day) and then **removed** — the A1 commit (`40e9230`) was
+reverted. **B1 (subscription trajectory) is not being pursued.** The research below established that
+the only route to a gate-grade trajectory dataset is *forward-collection* (no free historical
+day-wise, category-level archive exists), and that investment was judged not worthwhile now.
 
-**What was built**
-- `core/types.py::DaywiseSubscriptionRow` — the append-only storage-contract row (Deep Dive #B):
-  `ipo_id, symbol, captured_at, qib/nii/snii/bnii/retail/total_sub, source_update_time,
-  raw_response_hash`. A collect-forward record, never a scoring input.
-- `data/store/daywise.py::DaywiseSubscriptionStore` — append-only Parquet bank; natural key
-  `(ipo_id, captured_at)`; never overwrites an existing observation; `rows_for` reconstructs the
-  curve in capture order.
-- `data/sources/nse.py` — `parse_subscription_update_time` (retains NSE's own stamp verbatim) +
-  `NseClient.subscription_snapshot` (one **live/uncached** poll → multiples + stamp + response
-  hash). `subscription()` behaviour is unchanged (shared `_subscription_raw` helper).
-- `data/ingest/daywise.py::record_daywise_subscription` — polls every **open** mainboard book,
-  appends new observations, content-dedupes an unchanged poll (same `updateTime` + multiples; or
-  raw-hash identity when NSE omits the stamp). Never raises; per-issue failures skip and log.
-- `scripts/run_daywise_recorder.py` — one recording pass, so banking can start on a cadence NOW
-  (before A2 wires it into the scheduler). Config: `storage.daywise_dir` (under gitignored
-  `data_store/`, so banked observations never commit).
+**What the revert removed.** `data/ingest/daywise.py`, `data/store/daywise.py`,
+`scripts/run_daywise_recorder.py`, `tests/unit/test_daywise.py`, the `DaywiseSubscriptionRow` type
+(`core/types.py`), the `nse.py` snapshot helpers (`subscription_snapshot`,
+`parse_subscription_update_time`, the `_subscription_raw` split), and the `storage.daywise_dir`
+config. The `gate-a1` tag and the unmerged `a2-daywise-cloud-recorder` WIP branch were deleted.
 
-**GATE A1 criteria (Deep Dive #B) — all met**
-- *Rows land append-only + timestamped for a live IPO* — a live pass on 2026-07-03 (Knack
-  Packaging's **close day** — the high-value QIB surge) banked one row: `qib_sub 154.34×`,
-  `captured_at 2026-07-03T22:32:23+05:30`, `source_update_time "Updated as on 03-Jul-2026
-  19:00:00"`, `raw_response_hash b70b7b17…`. (QIB 154× matches the app's live Knack verdict —
-  same official feed.)
-- *A re-run produces no duplicates* — an immediate second pass banked **0** (NSE `updateTime`
-  unchanged).
-- *Never overwrites; idempotent on the natural key* — `test_store_append_idempotent_on_natural_key`.
-- *Reconstructed curve matches the observed progression* —
-  `test_reconstructed_curve_matches_progression` (ascending QIB curve, strictly-increasing
-  `captured_at`).
-
-**Tree:** ruff + black + mypy (strict, full tree, 113 files) clean; **241 tests** pass (228 prior
-+ 13 new). Invariants held: advisory-only (record-only, no order path), point-in-time (honest IST
-`captured_at`), calibration untouched (no scorer/calibrator change). Defensive NSE posture reused
-(cookie handshake, schema-validate-fail-loud, sanity via the frozen `ge=0` row model).
-
-**Next (per Priority Order):** A2 (wire the recorder into the scheduler cadence with the T+3
-close-day cutoff) + A3 (allotment-EV layer) + A4 (T+3 dummy). B1 (trajectory) stays blocked until
-this bank has accrued enough day-by-day history.
+**Untouched.** The shipped engine, scorer, and calibrator (no scoring path changed). The app's own
+live-verdict ingestion — `data/ingest/live.py` (`refresh_from_nse`) — was always separate from the
+recorder and is unaffected; the revert restores the pre-A1 `nse.py` that `live.py` already used.
 
 ---
 
 ## Research note — do the aggregators already hold gate-usable day-wise subscription? (2026-07-03)
 
-**Question (would have let us skip forward-collection).** Before investing further in the recorder,
-we checked whether InvestorGain, IPOGyani, or IPOMatrix already archive **historical day-by-day,
-category-level** subscription for past mainboard IPOs — enough to gate B1 (trajectory) directly.
+*Retained as the record of why B1 was not pursued. If trajectory is ever revisited, start here.*
 
-**Verdict: no. Forward-collection stays required.** This confirms Deep Dive #B's premise ("official
-sources publish live figures during the window, but the historical day-by-day path is not cleanly
-archived… aggregator day-wise is the cheap-probe exception, never the real gate").
+**Question (would have let us skip forward-collection).** We checked whether InvestorGain, IPOGyani,
+or IPOMatrix already archive **historical day-by-day, category-level** subscription for past
+mainboard IPOs — enough to gate B1 (trajectory) directly.
+
+**Verdict: no.** This confirms Deep Dive #B's premise ("official sources publish live figures during
+the window, but the historical day-by-day path is not cleanly archived… aggregator day-wise is the
+cheap-probe exception, never the real gate").
 
 | Source | Historical day-wise, category-level subscription? | Verdict |
 |---|---|---|
@@ -78,24 +52,20 @@ archived… aggregator day-wise is the cheap-probe exception, never the real gat
 - **GMP tab** *does* keep a day-by-day (21-day) trend with a **"Timewise History"** button and
   per-reading timestamps — i.e. IPOMatrix archives day-wise **GMP** (as the v1 GMP gate used), **not
   day-wise subscription**. Each GMP-day row carries only a **total-only** "Subscription" annotation,
-  flat post-close (20.43×). Whether the *open-window* rows show a daily total building is the one
-  remaining check — even if so, it is **daily, total-only** (misses the intraday close-day QIB surge
-  and the category split where B1's signal is hypothesised to live).
+  flat post-close (20.43×). Even if the *open-window* rows show a daily total building, it is
+  **daily, total-only** (misses the intraday close-day QIB surge and the category split where B1's
+  signal is hypothesised to live).
 - Caveat: one example, and an **InvIT** (institutional-only — no retail/sNII/bNII by instrument type);
   the tab *structure* (Subscription = final, GMP = day-wise) is a platform layout, so it should hold
-  for equity IPOs, worth a 30-second confirm on one.
+  for equity IPOs.
 
-**Why none of them can gate B1 regardless of the above.** Subscription (`qib_sub`/`nii_sub`/
-`retail_sub`) is a label/backtest-critical field in the trust boundary (`ingest.official_required_fields`)
-— it must be cross-checked against official NSE/BSE and **never taken from a single aggregator alone**.
-So aggregator day-wise could only ever be **probe** data, and no official archive of the intraday
+**Why none of them could gate B1 regardless.** Subscription (`qib_sub`/`nii_sub`/`retail_sub`) is a
+label/backtest-critical field in the trust boundary (`ingest.official_required_fields`) — it must be
+cross-checked against official NSE/BSE and **never taken from a single aggregator alone**. So
+aggregator day-wise could only ever be **probe** data, and no official archive of the intraday
 buildup exists to corroborate it. IPOMatrix is also, in v1's own words, a "trial-only research pull,
 NOT a sanctioned ongoing source."
 
-**Implication.** A1 (banked, merged) and A2 (forward-collection) remain the durable path to a
-gate-grade trajectory dataset — category-split, intraday, official-anchored, point-in-time-honest.
-But per Deep Dive #A Step 2, **probe B1 cheaply first** (e.g. IPOMatrix's daily figures, or the banked
-history as it accrues): does subscription *shape/velocity* add anything beyond the final QIB multiple?
-No pulse → shelve B1, and the recorder is low-priority insurance. Pulse → forward-collection is
-justified. A2's scope (standalone always-on cloud recorder) is **parked** on branch
-`a2-daywise-cloud-recorder` pending this decision.
+**Outcome.** Forward-collection was the only path to a gate-grade trajectory dataset. Rather than
+build and run that collection (A1/A2), the decision was to **not pursue B1** — A1 was removed and the
+A2 cloud recorder was not built. The finding stands as the honest record of why.
