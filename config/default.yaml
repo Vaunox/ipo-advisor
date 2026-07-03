@@ -108,13 +108,17 @@ feature_weights:
   qib_sub: 0.20
   nii_sub: 0.10
   retail_sub: 0.05
-  anchor_quality: 0.10
-  relative_valuation: 0.10   # brake: subtracted when issue P/E > peer median
-  ofs_fraction: 0.05         # brake: subtracted as OFS fraction rises
-  # FLAG-ONLY: market_regime is kept OUT of the calibrated number (weight 0). The cold-market
-  # flag reads the feature, but it must not move the probability the Phase-4 calibrator was fit
-  # on — REGIME_FIX landed on "flag, don't force". A feature stays out of the number until
-  # calibration earns it (same principle as GMP; see docs/GMP_GATE.md, docs/REGIME_FIX.md).
+  # OUT of the calibrated number (weight 0) — features that did NOT earn their place, so a future
+  # live feed can never silently inject a disproven contribution into the probability the Phase-4
+  # calibrator was fit on. Each stays dead until a re-calibration gate earns it:
+  #   * ofs_fraction / relative_valuation / anchor_quality — CUT / not-earned / not-tested by the
+  #     enhancement gate (docs/ENHANCEMENT_GATE.md): QIB-redundant, same as GMP (docs/GMP_GATE.md).
+  #     (Scorer still owns their sign semantics — valuation/OFS brakes — but weight 0 = no effect.)
+  #   * market_regime — flag-only; the cold-market flag reads it but must not move the number
+  #     (REGIME_FIX: "flag, don't force"; docs/REGIME_FIX.md).
+  anchor_quality: 0.0
+  relative_valuation: 0.0
+  ofs_fraction: 0.0
   market_regime: 0.0
 
 killflags:

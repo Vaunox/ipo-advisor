@@ -21,6 +21,17 @@ advice. Reproduce: `scripts/backfill_enhancement.py` then `scripts/run_enhanceme
 outcome). This is consistent with the design thesis (Deep Dive #3): the model is subscription-led
 (QIB), and the brakes/confirmation features are largely **redundant with QIB**.
 
+### ⚠️ Two findings that contradict the blueprint's assumptions
+
+1. **The OFS kill-flag is BACKWARDS on our data.** The blueprint assumed high OFS (promoter exit) ⇒
+   more listing losses. The opposite holds: near-total-OFS loss rate **17%** vs pure-fresh **26%**
+   (table below) — high-OFS issues (big established firms) list *better*. **A naive "OFS → SKIP"
+   flag would hurt. Do not implement it.**
+2. **Valuation's apparent lift was an outlier artifact.** On the loose 147 it looked
+   calibration-helpful; on the hand-QA'd trustworthy 93 it *worsened* ECE. **This is the concrete
+   case for why data-QA *before* the gate is essential** — an outlier-dominated peer median
+   manufactured a signal that evaporated once the junk was removed.
+
 ---
 
 ## Backfill coverage (of 293 OOS-eligible mainboard IPOs)
@@ -108,10 +119,12 @@ anchor *total* (₹), not the per-investor book; the per-IPO anchor-investor lis
 on Chittorgarh and not cleanly extractable from the static/JSON pages (unlike OFS and peers). A
 faithful anchor gate therefore needs a separate anchor-data source. Deferred.
 
-**Prior (why it's the least-promising):** the blueprint itself calls marquee anchors and strong QIB
-"the same sentiment twice" (Deep Dive #3) — anchor is the feature *most* redundant with QIB. Given
-OFS and valuation (the latter with a *better* theoretical claim) both failed to earn their place, an
-anchor "EARNED" outcome is unlikely. Not a reason to skip it, but a reason not to over-invest.
+**v2 roadmap entry:** *Anchor not tested — the anchor-investor list is API-rendered on Chittorgarh,
+not cleanly sourceable. Strong prior it is QIB-redundant like OFS / valuation / GMP (the blueprint
+calls marquee anchors and strong QIB "the same sentiment twice", Deep Dive #3), so an "EARNED"
+outcome is unlikely and the brittle scrape isn't worth it now. Revisit only if a clean anchor source
+becomes available.* Given OFS and valuation (the latter with a *better* theoretical claim) both
+failed on redundancy, this is a deliberate stop, not an oversight.
 
 ---
 
@@ -126,9 +139,22 @@ anchor "EARNED" outcome is unlikely. Not a reason to skip it, but a reason not t
 - **Point-in-time safe:** these are static issue characteristics (known at/before close), so no
   as-of leakage — the concern is signal, not timing.
 
-## Recommendation
+## Outcome — weights zeroed, shipped calibrator untouched
 
-**Do not promote any of the three.** Keep `ofs_fraction`, `relative_valuation`, and `anchor_quality`
-out of the shipped score. Their scorer weights are dormant only because the live features are `None`;
-consider zeroing them (as `market_regime` was) to make the dormancy explicit and prevent a future
-live feed from silently entering an unvalidated contribution — the same discipline that cut GMP.
+`ofs_fraction`, `relative_valuation`, and `anchor_quality` scorer weights are set to **0.0** in
+`config/default.yaml` (exactly as `market_regime` was), so that if their backfilled data is ever
+wired into live features it **cannot silently inject a now-disproven contribution** into the
+calibrated score. The shipped QIB-led calibrator (`models/calibrator.json`) is **unchanged** — the
+weights just go to 0 for the dead features.
+
+**Byte-for-byte confirmation** (same guard used for `market_regime`): with all three features
+**populated** (real OFS on 293, real valuation on 147, a synthetic marquee anchor on all) but at
+weight 0, the walk-forward OOS probabilities are **identical** to the current shipped model:
+
+```
+MAX |Δscore| = 0.000e+00      (shipped official-only vs populated-at-weight-0)
+MAX |Δprob|  = 0.000e+00      (walk-forward 175/58: 118 OOS · 146/43: 147 OOS)
+```
+
+They provably cannot move the number. Revisit any of the three only via a fresh re-calibration gate
+on cleaner/larger data — never by wiring a live feed.

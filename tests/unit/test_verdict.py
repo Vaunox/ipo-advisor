@@ -167,16 +167,16 @@ def test_hot_market_not_flagged(config: AppConfig) -> None:
 
 
 def test_weak_issue_skips(config: AppConfig) -> None:
+    # Weakness comes from the LIVE drivers — thin subscription and falling GMP. The OFS /
+    # valuation / regime brakes are weight-0 (disproven by the enhancement gate, docs/
+    # ENHANCEMENT_GATE.md), so they can no longer manufacture a SKIP; this keeps the test honest
+    # about what actually moves the score.
     weak = _feats(
-        gmp_level=2.0,
-        gmp_slope=-1.0,
-        qib_sub=1.1,
-        nii_sub=0.5,
-        retail_sub=0.8,
-        anchor_quality=None,
-        relative_valuation=2.0,
-        ofs_fraction=0.6,
-        market_regime=-0.5,
+        gmp_level=1.0,
+        gmp_slope=-3.0,
+        qib_sub=0.3,
+        nii_sub=0.2,
+        retail_sub=0.3,
     )
     v = evaluate(
         _record(), weak, scorer=_scorer(config), calibrator=PlaceholderCalibrator(), config=config
