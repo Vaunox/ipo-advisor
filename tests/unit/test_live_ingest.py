@@ -159,6 +159,13 @@ def test_refresh_never_raises_on_source_error() -> None:
 _CLOCK = lambda: datetime(2026, 7, 10, 12, 0)  # noqa: E731 — 2026-07-10, a week after KNACK closed
 
 
+def _require(repo: _Repo, ipo_id: str) -> IPORecord:
+    """Fetch a record that must exist (narrows ``get``'s ``Optional`` for the assertions)."""
+    r = repo.get(ipo_id)
+    assert r is not None
+    return r
+
+
 def _awaiting_knack() -> IPORecord:
     """A stored KNACK record whose book has closed but which we haven't marked listed yet."""
     return IPORecord(
@@ -228,7 +235,7 @@ def test_resolve_listings_skips_not_yet_listed() -> None:
     repo = _Repo([_awaiting_knack()])
     n = resolve_listings(cast(Repository, repo), _client(None, past=[future]), clock=_CLOCK)
     assert n == 0
-    assert repo.get("knack").listing_date is None  # untouched
+    assert _require(repo, "knack").listing_date is None  # untouched
 
 
 def test_resolve_listings_ignores_open_and_fully_resolved() -> None:
@@ -262,7 +269,7 @@ def test_resolve_listings_backfills_missing_price_after_stamp() -> None:
         clock=_CLOCK,
     )
     assert n == 1
-    r = repo.get("knack")
+    r = _require(repo, "knack")
     assert (r.listing_open, r.listing_close) == (175.0, 182.5)
     assert r.listing_date == date(2026, 7, 8)  # unchanged
 
@@ -276,13 +283,13 @@ def test_resolve_listings_stops_backfilling_past_window() -> None:
     # a raising client proves past_issues isn't even fetched (row isn't a candidate)
     n = resolve_listings(cast(Repository, repo), _client(None, past=None), clock=_CLOCK)
     assert n == 0
-    assert repo.get("knack").listing_open is None
+    assert _require(repo, "knack").listing_open is None
 
 
 def test_resolve_listings_never_raises_when_past_fetch_fails() -> None:
     repo = _Repo([_awaiting_knack()])
     assert resolve_listings(cast(Repository, repo), _client(None, past=None), clock=_CLOCK) == 0
-    assert repo.get("knack").listing_date is None
+    assert _require(repo, "knack").listing_date is None
 
 
 def test_refresh_resolves_after_upsert() -> None:
