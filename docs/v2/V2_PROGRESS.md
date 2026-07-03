@@ -5,6 +5,7 @@
 | Date | Candidate | Track (A/B) | Outcome | Evidence | Notes |
 |---|---|---|---|---|---|
 | 2026-07-03 | A1 — day-wise subscription recorder | A | **BUILT** (GATE A1 met) | `tests/unit/test_daywise.py` (13 tests); live run banked KNACK QIB 154× then **0 on re-run** (see below) | Append-only bank keyed `(ipo_id, captured_at)`; polls `ipo-active-category` through open books, retains NSE `updateTime` + `raw_response_hash`; content-dedupes an unchanged poll. Collect-forward data for B1 (trajectory). Does **not** touch the calibrated score. |
+| 2026-07-03 | B1 data-sourcing — is historical day-wise subscription already archived? (InvestorGain / IPOGyani / IPOMatrix) | B (research) | **Forward-collection required** — no gate-usable historical archive | Research note below | Confirms Deep Dive #B. No aggregator archives day-wise **category-level** subscription with intraday resolution + point-in-time provenance. IPOMatrix (operator trial): Subscription tab = **final basis-of-allotment only**; its day-wise/timewise archive is **GMP**, not subscription. Keeps A1/A2 justified; **probe B1 cheaply before heavy investment**. |
 
 ---
 
@@ -52,3 +53,49 @@ archived free, so it only exists if recorded going forward. Gates B1 (subscripti
 **Next (per Priority Order):** A2 (wire the recorder into the scheduler cadence with the T+3
 close-day cutoff) + A3 (allotment-EV layer) + A4 (T+3 dummy). B1 (trajectory) stays blocked until
 this bank has accrued enough day-by-day history.
+
+---
+
+## Research note — do the aggregators already hold gate-usable day-wise subscription? (2026-07-03)
+
+**Question (would have let us skip forward-collection).** Before investing further in the recorder,
+we checked whether InvestorGain, IPOGyani, or IPOMatrix already archive **historical day-by-day,
+category-level** subscription for past mainboard IPOs — enough to gate B1 (trajectory) directly.
+
+**Verdict: no. Forward-collection stays required.** This confirms Deep Dive #B's premise ("official
+sources publish live figures during the window, but the historical day-by-day path is not cleanly
+archived… aggregator day-wise is the cheap-probe exception, never the real gate").
+
+| Source | Historical day-wise, category-level subscription? | Verdict |
+|---|---|---|
+| **IPOGyani** | Past IPOs collapse to **total only** (e.g. Knack Packaging → just `83.33×`; no category, no daily). Category/day-wise is a live-window feature only. | **(c) Not usable** |
+| **InvestorGain** | Historical report = **final per-category** (one row/IPO, sortable by final QIB); no day-by-day archive. Cloudflare/JS → brittle to extract. | **(b) Probe-only** (thin) |
+| **IPOMatrix** (Chittorgarh, paid) | **Subscription tab = final basis-of-allotment only.** Its day-by-day / timewise archive is **GMP** (+ price), not subscription. | **(b) Probe-only** (strongest, but not day-wise subscription) |
+
+**IPOMatrix — direct evidence (operator's free-trial screenshots, InvIT *Citius Transnet*, 2862).**
+- **Subscription tab** shows the **final** basis of allotment, category-wise — QIB(Total) 9.97×,
+  Anchor 1.00×, QIB(Ex-Anchor) 23.43×, NII 16.65×, Total 11.64× — **no Day 1/2/3 buildup**.
+- **GMP tab** *does* keep a day-by-day (21-day) trend with a **"Timewise History"** button and
+  per-reading timestamps — i.e. IPOMatrix archives day-wise **GMP** (as the v1 GMP gate used), **not
+  day-wise subscription**. Each GMP-day row carries only a **total-only** "Subscription" annotation,
+  flat post-close (20.43×). Whether the *open-window* rows show a daily total building is the one
+  remaining check — even if so, it is **daily, total-only** (misses the intraday close-day QIB surge
+  and the category split where B1's signal is hypothesised to live).
+- Caveat: one example, and an **InvIT** (institutional-only — no retail/sNII/bNII by instrument type);
+  the tab *structure* (Subscription = final, GMP = day-wise) is a platform layout, so it should hold
+  for equity IPOs, worth a 30-second confirm on one.
+
+**Why none of them can gate B1 regardless of the above.** Subscription (`qib_sub`/`nii_sub`/
+`retail_sub`) is a label/backtest-critical field in the trust boundary (`ingest.official_required_fields`)
+— it must be cross-checked against official NSE/BSE and **never taken from a single aggregator alone**.
+So aggregator day-wise could only ever be **probe** data, and no official archive of the intraday
+buildup exists to corroborate it. IPOMatrix is also, in v1's own words, a "trial-only research pull,
+NOT a sanctioned ongoing source."
+
+**Implication.** A1 (banked, merged) and A2 (forward-collection) remain the durable path to a
+gate-grade trajectory dataset — category-split, intraday, official-anchored, point-in-time-honest.
+But per Deep Dive #A Step 2, **probe B1 cheaply first** (e.g. IPOMatrix's daily figures, or the banked
+history as it accrues): does subscription *shape/velocity* add anything beyond the final QIB multiple?
+No pulse → shelve B1, and the recorder is low-priority insurance. Pulse → forward-collection is
+justified. A2's scope (standalone always-on cloud recorder) is **parked** on branch
+`a2-daywise-cloud-recorder` pending this decision.
