@@ -15,10 +15,10 @@ green (lint + types + tests) at every phase commit.
 | 2026-06-30 | P5+ | ◐ gate run | `test(p5): GMP gate on real IPOMatrix GMP` | 174 passing | **Real gate RAN** on 99 point-in-time 2025-26 IPOs (IPOMatrix trial). **GMP NOT earned** — clean as-of-close AUC lift ~0 (leaky +0.133 collapsed); keep/cut flips with split. Official-only ships; recorder keeps banking (esp. cold). See [GMP_GATE.md](GMP_GATE.md). |
 | 2026-07-03 | P5++ | ◐ gate run | `test(enh): enhancement re-calibration gate` (branch `enhancement-gate`) | 197 passing | **OFS / valuation / anchor gated (GMP-parity).** Backfill **293/293** Chittorgarh research pull, name-verified (0 false joins). **All fail:** OFS **CUT**, valuation **NOT EARNED**, anchor **NOT TESTED** (list API-rendered) — QIB-redundant like GMP. **Finding 1:** OFS kill-flag is **backwards** (near-total-OFS 17% loss vs pure-fresh 26%) — do NOT implement `OFS→SKIP`. **Finding 2:** valuation's lift was an **outlier artifact** (evaporated on the hand-QA'd 93) — data-QA before the gate was essential. Dead-feature weights → **0.0** (byte-equality MAX\|Δprob\|=0.0); shipped calibrator untouched. **Backfill/extraction adapters quarantined to `research/`** — *failed re-calibration gate [2026-07-03, hot N=293]; retained for possible v2 re-test; excluded from build (bundle = `src/ipo/` only); do NOT ship or wire live without re-running the gate.* Inert scorer slots stay in `src/`. See [ENHANCEMENT_GATE.md](ENHANCEMENT_GATE.md), [research/README.md](../research/README.md). |
 | 2026-06-30 | P6 | ☑ done | `feat(p6-s6): service composition root + GATE 6` / `gate-6-service` | 197 passing | **GATE 6 PASSED** — advisory service (engine/API/scheduler/notify) composed; all five invariants survive end-to-end. Cold flag now LIVE (prereqs #1/#2 resolved); live GMP stays None. |
-| | P7 | ☐ todo | | | Windows `.exe` native shell (APK deferred). |
+| 2026-07-03 | P7 | ☑ done | tag `gate-7-app` (s21 packaging) · live in `p7-s28…s34` | 228 passing | **GATE 7 PASSED** — installs like real software, launches the bundled engine, shows **live** NSE verdicts, fires native APPLY notifications; all five invariants hold. NSIS `.exe` + Store MSIX. See details below. |
 | | P8 | — | | | Operate & maintain (ongoing). |
 
-**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ · 5 ☐ · 6 ☑ · 7 ☐
+**Gate status:** 0 ☑ · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ · 5 ☐ · 6 ☑ · 7 ☑
 
 ---
 
@@ -284,7 +284,77 @@ Tag `gate-6-service`. **197 tests green; ruff/black/mypy (full tree) clean.** Sc
 
 ### Follow-ups
 - **Live GMP** (ipoalerts) stays out of the score until a **cold-market re-run of the Phase-5 gate** earns it; the recorder keeps banking.
-- **Phase 7:** Windows `.exe` native shell (APK deferred).
+- **Phase 7:** Windows `.exe` native shell (APK deferred). **(Done — see Phase 7 below.)**
+
+---
+
+## Phase 7 — The app (Windows `.exe`, genuine native software) — done (GATE 7 PASSED)
+
+**Goal:** put a body on the gated Phase-6 brain — ship it as genuine Windows desktop software
+(Discord/Steam class), UI designed in Figma first. Built in two loops (design → build) over a
+reviewed step sequence `p7-s1 … p7-s34`. Full spec: [mini-blueprint](deep_dives/07_Phase7_App.md).
+
+### DESIGN loop — approved
+- AI proposed a complete first direction; the operator approved **V1 "Terminal"** (dark, verdict-forward).
+  Locked spec in `design/DESIGN_HANDOFF.md`; comp in `design/mockups/v1-terminal.html`
+  (`feat(p7): locked design (V1 Terminal) + handoff and build plan`). No build work started before approval.
+
+### BUILD loop — deliverables built
+- **Read-only API enrichment** (s1–s4): `/history` (as-of verdict vs **actual net-of-cost** outcome,
+  with optional cost overrides), `/calibration` (held-out reliability report), `/board` (list +
+  verdict in one read), detail enrichment. Thin readers — never re-derive a number.
+- **PWA / React front end** (s5–s17): four views (**Live, Upcoming, History, Settings**) + **Detail** —
+  verdict badge, gated calibrated probability, grounded reason + contribution bars, watch-items +
+  kill-flags, cold-market caveat, subscription (QIB/NII/**sNII/bNII**/retail/overall) + demand-progression
+  sparkline, **UNCALIBRATED** banner, editable net-of-cost cost assumptions, command palette, alert
+  center, keyboard shortcuts, durable verdict-transition history, glossary tooltips.
+- **Electron shell + Python sidecar** (s9, s18) — the four build-critical lifecycle rules: **free-port**
+  selection, **`/health` readiness gate** before the UI calls the engine, **clean teardown** on every
+  exit path (no orphaned Python), and an explicit **engine-down** UI state. Engine frozen with
+  PyInstaller (onedir), path-configurable, per-user data dir with versioned provisioning.
+- **Genuine-software packaging** (s19–s26): electron-builder **NSIS installer** (Program Files, Start
+  Menu + desktop shortcuts, registered uninstaller), app **icon** embedded via rcedit, clean native
+  window, **system tray**, **native OS notifications** on APPLY crossings, remembered window state,
+  startup toggle. Ships **unsigned** via a no-op sign hook (operator signs with their own cert; Claude
+  never holds signing keys). **Microsoft Store MSIX** (s24–s25): `appx` target + Win11 makeappx
+  workaround, real product identity `GenesisQuant.IPO-Advisor`, branded tiles, full-trust manifest.
+- **Genuinely live** (s28–s34): **live NSE ingestion** (current issues + per-category subscription)
+  wired as the scheduler `refresh`; **live-only** build (no demo records ship; stale data self-heals on
+  update); **Live → History lifecycle** — listing resolution stamps `listing_date` (+ bhavcopy
+  open/close) so a listed IPO leaves Live and enters History, with a bounded price-backfill retry for
+  the throttle-prone archive host.
+
+### GATE 7 — PASSED
+| Requirement | Evidence |
+|---|---|
+| Installs like real software | NSIS `.exe`: Program Files, Start Menu + desktop shortcuts, registered uninstaller in Add/Remove |
+| Launches the bundled engine | Electron spawns the PyInstaller engine on a **free port**, polls **`/health`** before showing the UI; "Engine online" status; no orphaned process on quit |
+| Shows **live** verdicts | Live NSE ingest scores real current IPOs — e.g. **Knack Packaging APPLY (P 91%)** off live QIB 154× (reproduced from source) |
+| Native notifications on APPLY crossing | [`notifications.ts`](../src/ipo/apps/pwa/src/notifications.ts): polls `/transitions`, fires once per **new** crossing (deduped, first-run silent), body *"Advisory only — no orders placed."* |
+| INV 1 — no recomputation | UI reads the **GET-only** API; no second scoring path in the front end |
+| INV 2 — reliability gate holds | gate passed → probability shown; un-gated → **UNCALIBRATED** banner and **no number** |
+| INV 3 — calibration sacred | cold-market caveat is **annotation only** (`market_regime` weight 0); the number never moves |
+| INV 4 — advisory-only | **no** buy/order/trade/apply-for-me control anywhere in the PWA — it cannot transact |
+| INV 5 — GMP not a scoring input | GMP absent from the UI except a Settings disclaimer stating *"GMP is not a scoring input."* |
+
+Tagged `gate-7-app` at the packaging milestone (`p7-s21`); the "shows **live** verdicts" bar was
+then fully met by the live NSE ingestion in `p7-s28…s34`. Tree now green: **228 tests; ruff + black
++ mypy (full tree, 97 files) clean.**
+
+### Decisions / notes
+- **Live ingest uses only decision-time official facts** (symbol/dates/band + QIB/NII/retail/sNII/bNII/
+  overall). Anchor/valuation/OFS have no official live feed → `None`; the engine still scores
+  (`qib_sub` is the only critical feature) and abstains until the book closes. The **enhancement gate**
+  (P5++) zeroed those three weights anyway, so live records are unaffected either way.
+- **Net-of-cost:** the model outputs a calibrated **probability**, not a gain magnitude — so there is no
+  per-IPO rupee estimate pre-listing; History shows the **actual** net-of-cost outcome for listed IPOs.
+- **Distribution:** the app pulls live NSE **from the user's machine** (`respect_robots=False` for `/api`,
+  operator-authorized public data). Wide public distribution would want a hosted API instead.
+
+### Follow-ups
+- **Signing:** operator signs the NSIS `.exe` + binaries with their own certificate; MS re-signs the MSIX
+  free on Store submission.
+- **Live GMP** stays out of the score until a cold-market re-run of the Phase-5 gate earns it.
 
 ---
 
