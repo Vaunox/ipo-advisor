@@ -358,6 +358,23 @@ then fully met by the live NSE ingestion in `p7-s28…s34`. Tree now green: **22
 
 ---
 
+## v2 — the research backlog (begun 2026-07-03)
+
+v1 shipped through Phase 7 (above). v2 is **not** a linear build — it's a gate-driven research
+backlog where the default outcome of every score candidate is a *logged negative*. Spec:
+[docs/v2/MASTER_BLUEPRINT_v2_Execution_and_Gate_Playbook.md](v2/MASTER_BLUEPRINT_v2_Execution_and_Gate_Playbook.md)
++ deep dives A/B/C. Progress is tracked in
+[docs/v2/V2_PROGRESS.md](v2/V2_PROGRESS.md) (every candidate ends PROMOTED or REJECTED; Track-A
+build items end BUILT).
+
+- **A1 — day-wise subscription recorder — BUILT (GATE A1 met, 2026-07-03).** Append-only,
+  timestamped bank of the subscription buildup curve (Track A; does not touch the score),
+  collected forward for the B1 trajectory candidate. Verified **live** on Knack Packaging's close
+  day (banked QIB 154×, then 0 on re-run — no duplicate). 13 new tests; **241 total** green. Full
+  evidence: [docs/v2/V2_PROGRESS.md](v2/V2_PROGRESS.md).
+
+---
+
 ## Housekeeping backlog (address in a dedicated pass AFTER Phase 6 — not mid-step)
 
 - **Benign third-party test warning (Phase 6 step 3, the REST API):** `starlette.testclient`

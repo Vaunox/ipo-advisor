@@ -87,6 +87,21 @@ class NseSubscription:
     nii_big: float | None = None  # bNII: bid > ₹10L
 
 
+@dataclass(frozen=True)
+class NseSubscriptionSnapshot:
+    """A single live subscription poll: the multiples plus the provenance to bank them.
+
+    Used by the day-wise recorder (v2 A1). ``source_update_time`` is NSE's own
+    "Updated as on …" stamp (retained verbatim — parsing it is not needed to record it),
+    and ``raw_hash`` is the response's content hash (the drift tripwire and the dedupe key
+    for an unchanged poll).
+    """
+
+    subscription: NseSubscription
+    source_update_time: str | None
+    raw_hash: str
+
+
 # --- pure parsing helpers ---------------------------------------------------
 
 
@@ -187,6 +202,27 @@ def parse_subscription(raw: RawResponse) -> NseSubscription:
         nii_small=value_for(lambda c: "Two Lakh Rupees upto Ten Lakh" in c),
         nii_big=value_for(lambda c: "more than Ten Lakh Rupees" in c),
     )
+
+
+def parse_subscription_update_time(raw: RawResponse) -> str | None:
+    """Return NSE's own ``updateTime`` stamp from a bid-details response, or ``None``.
+
+    The stamp (e.g. ``"Updated as on 02-Jul-2026 17:03:00"``) is the source's notion of
+    when the figures were last refreshed. It is retained verbatim for provenance (v2 A1)
+    — kept as the raw string rather than parsed, so a format tweak never silently drops
+    it. Fails loud only on non-JSON (same tripwire as ``parse_subscription``).
+    """
+    try:
+        data = json.loads(raw.content)
+    except json.JSONDecodeError as exc:
+        raise SourceError("nse: subscription is not valid JSON") from exc
+    if not isinstance(data, dict):
+        return None
+    stamp = data.get("updateTime")
+    if not isinstance(stamp, str):
+        return None
+    text = stamp.strip()
+    return text or None
 
 
 def parse_current_issues(raw: RawResponse) -> list[NseCurrentIssue]:
@@ -310,16 +346,33 @@ class NseClient:
             self._get_json("nse_current", CURRENT_ISSUES_URL, referer=NSE_HOMEPAGE)
         )
 
-    def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
-        """Fetch + parse subscription for one symbol (``force`` re-fetches live, skipping cache)."""
+    def _subscription_raw(self, symbol: str, *, force: bool) -> RawResponse:
+        """Fetch the raw bid-details response for one symbol (live when ``force``, else cached)."""
         url = f"{SUBSCRIPTION_URL}?symbol={symbol}"
         if force:
             self._ensure_cookies()
-            resp = self._client.fetch(
+            return self._client.fetch(
                 "nse_sub", url, headers={"Accept": "application/json", "Referer": NSE_HOMEPAGE}
             )
-            return parse_subscription(resp)
-        return parse_subscription(self._get_json("nse_sub", url, referer=NSE_HOMEPAGE))
+        return self._get_json("nse_sub", url, referer=NSE_HOMEPAGE)
+
+    def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
+        """Fetch + parse subscription for one symbol (``force`` re-fetches live, skipping cache)."""
+        return parse_subscription(self._subscription_raw(symbol, force=force))
+
+    def subscription_snapshot(self, symbol: str, *, force: bool = True) -> NseSubscriptionSnapshot:
+        """Fetch one live subscription poll with provenance for the day-wise recorder (v2 A1).
+
+        Defaults to ``force`` (live, uncached) — collect-forward polling must see the *current*
+        figure at each poll, never a cached first snapshot. Returns the parsed multiples plus
+        NSE's ``updateTime`` stamp and the response's content hash.
+        """
+        raw = self._subscription_raw(symbol, force=force)
+        return NseSubscriptionSnapshot(
+            subscription=parse_subscription(raw),
+            source_update_time=parse_subscription_update_time(raw),
+            raw_hash=raw.content_hash,
+        )
 
     def listing_prices(self, symbol: str, listing_day: date) -> tuple[float, float] | None:
         """Fetch (cached) the bhavcopy for ``listing_day`` and return (open, close).
