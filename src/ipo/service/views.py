@@ -24,12 +24,20 @@ class IPODetail(BaseModel):
     arithmetic behind ``verdict``, not a narrative — empty/partial when the engine abstained
     (a blind record is never scored). ``features`` are the same point-in-time inputs the verdict
     was scored on (regime flag-only, GMP absent).
+
+    ``retail_allotment_odds`` (v2 A3) is a **separate, downstream, display-only estimate** — the
+    approximate probability a minimum-lot retail application is allotted (``min(1, 1/retail_sub)``,
+    a conservative proxy for a whole-lot lottery; see ``service.allotment``). It is computed
+    entirely outside the scoring path and must be shown as an **estimate distinct from**
+    ``verdict.probability`` (the calibrated P(positive listing)) — the two are different numbers.
+    ``None`` when the retail multiple is unknown.
     """
 
     record: IPORecord
     verdict: Verdict
     features: IPOFeatures
     contributions: dict[str, float]
+    retail_allotment_odds: float | None = None
 
 
 class IPOListRow(BaseModel):

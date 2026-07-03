@@ -144,6 +144,13 @@ def test_ipo_detail_is_enriched_and_consistent() -> None:
     # NO recomputation / no second scoring path: the detail's verdict is byte-for-byte /verdict.
     assert body["verdict"] == client.get(f"/verdict/{rec.ipo_id}").json()
 
+    # v2 A3: a separate downstream allotment-odds estimate rides along (display-only), computed
+    # outside the scoring path and equal to min(1, 1/retail_sub) for this record's retail multiple.
+    from ipo.service.allotment import retail_allotment_odds
+
+    assert "retail_allotment_odds" in body
+    assert body["retail_allotment_odds"] == retail_allotment_odds(rec.retail_sub)
+
 
 def test_history_pairs_asof_verdict_with_actual_outcome() -> None:
     client, _ = _client(load_calibrator(_CAL))

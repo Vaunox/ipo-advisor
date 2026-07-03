@@ -294,6 +294,19 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               <span className="k gl" data-tip="Retail Individual Investors — bids up to ₹2 lakh. A retail-led book is a weaker signal than a QIB-led one.">Retail</span>
               <span className="v">{x(r.retail_sub)}</span>
             </div>
+            {d.retail_allotment_odds != null && (
+              <div className="r sub">
+                <span
+                  className="k gl"
+                  data-tip="Rough estimate of the chance a minimum-lot (1-lot) retail application is allotted ≈ min(1, 1 ÷ retail subscription). An approximation of the whole-lot allotment lottery — it tends to UNDER-state the real odds, since retail applicants average more than one lot. This is the chance of GETTING allotted, NOT the calibrated probability of a positive listing shown at the top."
+                >
+                  ↳ Est. allotment odds (1 lot)
+                </span>
+                <span className="v">
+                  ≈ {d.retail_allotment_odds >= 0.005 ? `${Math.round(d.retail_allotment_odds * 100)}%` : '<1%'}
+                </span>
+              </div>
+            )}
             {r.overall_sub != null && (
               <div className="r">
                 <span className="k gl" data-tip="Total demand across all categories, weighted by each category's reserved portion of the book.">Overall</span>

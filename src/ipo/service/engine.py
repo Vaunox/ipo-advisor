@@ -30,6 +30,7 @@ from ipo.core.interfaces import Calibrator, Repository, ScoringModel
 from ipo.core.types import IPOFeatures, IPORecord, Verdict
 from ipo.features.build import build_features
 from ipo.model.verdict import evaluate
+from ipo.service.allotment import retail_allotment_odds
 from ipo.service.transitions import TransitionStore
 from ipo.service.views import HistoryRow, IPODetail, IPOListRow, VerdictTransitionView
 
@@ -121,6 +122,9 @@ class VerdictEngine:
             verdict=verdict,
             features=features,
             contributions=self._scorer.contributions(features),
+            # v2 A3: a separate downstream display estimate — computed here, never in the scoring
+            # path above; does not and cannot affect ``verdict`` / ``probability``.
+            retail_allotment_odds=retail_allotment_odds(record.retail_sub),
         )
 
     def verdicts(self, *, asof: datetime | None = None) -> list[Verdict]:

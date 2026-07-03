@@ -66,6 +66,9 @@ export interface IPODetail {
   verdict: Verdict
   features: IPOFeatures
   contributions: Record<string, number>
+  // v2 A3 — separate downstream display estimate: approx P(1-lot retail allotment),
+  // min(1, 1/retail_sub). Distinct from `verdict.probability`; show as an estimate. null = unknown.
+  retail_allotment_odds: number | null
 }
 
 export interface IPOListRow {

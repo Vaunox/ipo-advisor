@@ -1,0 +1,23 @@
+{
+  "_about": "Curated real past-IPO retail allotment ratios for back-checking the min(1, 1/retail_sub) proxy (v2 A3). retail_sub is the shares-based retail subscription multiple (NSE); actual_retail_allotment is the observed per-application allotment probability from the registrar's basis-of-allotment lottery ratio, NOT the circular 1/subscription figure many aggregators quote. Small by design — authoritative basis-of-allotment data is not cleanly machine-sourceable (Cloudflare / registrar PDFs); expand from IPOMatrix's basis-of-allotment tab (applies/allottees per category) when available. See docs/v2/A3_ALLOTMENT_ODDS.md.",
+  "rows": [
+    {
+      "name": "Tata Technologies",
+      "year": 2023,
+      "retail_sub": 16.5,
+      "actual_retail_allotment": 0.1205,
+      "actual_ratio_text": "10 out of 83 applications allotted (retail lottery)",
+      "source": "Published retail allotment matrix from the registrar basis-of-allotment; retail subscription 16.5x (NSE).",
+      "confidence": "high"
+    },
+    {
+      "name": "Bajaj Housing Finance",
+      "year": 2024,
+      "retail_sub": 7.04,
+      "actual_retail_allotment": 0.20,
+      "actual_ratio_text": "1 in 5 applications allotted (214-share lot)",
+      "source": "Business Today, citing the basis-of-allotment document; retail subscription 7.04x (NSE).",
+      "confidence": "medium"
+    }
+  ]
+}
