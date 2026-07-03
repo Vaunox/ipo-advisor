@@ -231,19 +231,52 @@ def test_resolve_listings_skips_not_yet_listed() -> None:
     assert repo.get("knack").listing_date is None  # untouched
 
 
-def test_resolve_listings_ignores_open_and_already_listed() -> None:
+def test_resolve_listings_ignores_open_and_fully_resolved() -> None:
     still_open = _awaiting_knack().model_copy(update={"close_date": date(2026, 7, 12)})  # book open
-    already = _awaiting_knack().model_copy(
-        update={"ipo_id": "done", "listing_date": date(2026, 7, 1)}
+    done = _awaiting_knack().model_copy(  # already listed *with* prices → nothing to do
+        update={
+            "ipo_id": "done",
+            "listing_date": date(2026, 7, 1),
+            "listing_open": 200.0,
+            "listing_close": 210.0,
+        }
     )
-    repo = _Repo([still_open, already])
-    # past_issues would resolve knack, but neither stored record is "closed & unlisted"
+    repo = _Repo([still_open, done])
     n = resolve_listings(
         cast(Repository, repo),
         _client(None, past=[_KNACK_PAST], prices={"KNACK": (175.0, 182.5)}),
         clock=_CLOCK,
     )
     assert n == 0
+
+
+def test_resolve_listings_backfills_missing_price_after_stamp() -> None:
+    """A row stamped listed but with no price (throttled bhavcopy) is retried and backfilled."""
+    stamped_no_price = _awaiting_knack().model_copy(
+        update={"listing_date": date(2026, 7, 8)}  # listed 2 days ago, price still missing
+    )
+    repo = _Repo([stamped_no_price])
+    n = resolve_listings(
+        cast(Repository, repo),
+        _client(None, past=[_KNACK_PAST], prices={"KNACK": (175.0, 182.5)}),  # now available
+        clock=_CLOCK,
+    )
+    assert n == 1
+    r = repo.get("knack")
+    assert (r.listing_open, r.listing_close) == (175.0, 182.5)
+    assert r.listing_date == date(2026, 7, 8)  # unchanged
+
+
+def test_resolve_listings_stops_backfilling_past_window() -> None:
+    """Beyond the backfill window a still-priceless row is left alone (no perpetual re-fetch)."""
+    old = _awaiting_knack().model_copy(
+        update={"listing_date": date(2026, 6, 1)}  # >10 days before the clock
+    )
+    repo = _Repo([old])
+    # a raising client proves past_issues isn't even fetched (row isn't a candidate)
+    n = resolve_listings(cast(Repository, repo), _client(None, past=None), clock=_CLOCK)
+    assert n == 0
+    assert repo.get("knack").listing_open is None
 
 
 def test_resolve_listings_never_raises_when_past_fetch_fails() -> None:

@@ -73,6 +73,13 @@ def build_live_records(
     return records
 
 
+# How long after listing we keep retrying the (throttle-prone) bhavcopy price backfill. The price is
+# a label-only annotation, but a transient archive-host failure on the one cycle that stamps the
+# listing must not lose it forever — so a just-listed issue whose price is still missing is re-tried
+# for a bounded window, then left as-is (avoids re-fetching the master list for stale rows forever).
+_PRICE_BACKFILL_DAYS = 10
+
+
 def resolve_listings(
     repo: Repository, client: NseClient, *, clock: Callable[[], datetime] = now_ist
 ) -> int:
@@ -80,12 +87,23 @@ def resolve_listings(
 
     A live-ingested issue leaves the ``ipo-current-issue`` feed once it lists, so without this it
     would sit in Live forever with ``listing_date = None``. Here we take stored issues whose book
-    has closed but that we haven't marked listed, look them up in the (re-fetched) past-issues, and
-    if listed fetch the listing-day open/close (bhavcopy) and stamp the record — which drops it out
-    of Live and into History. Returns how many were resolved.
+    has closed but that we haven't fully resolved, look them up in the (re-fetched) past-issues, and
+    if listed stamp ``listing_date`` (+ listing-day open/close from the bhavcopy) — which drops the
+    issue out of Live and into History. A row whose date is stamped but whose price is still missing
+    is retried for ``_PRICE_BACKFILL_DAYS`` so a throttled bhavcopy fetch isn't lost. Returns how
+    many rows were changed.
     """
     today = clock().date()
-    awaiting = [r for r in repo.list_all() if r.listing_date is None and r.close_date < today]
+
+    def needs_resolution(r: IPORecord) -> bool:
+        if r.close_date >= today:
+            return False  # book still open — not a lifecycle candidate
+        if r.listing_date is None:
+            return True  # closed but unmarked → resolve
+        # marked listed but price still missing → retry the bhavcopy for a bounded window
+        return r.listing_open is None and (today - r.listing_date).days <= _PRICE_BACKFILL_DAYS
+
+    awaiting = [r for r in repo.list_all() if needs_resolution(r)]
     if not awaiting:
         return 0
     try:
@@ -99,13 +117,18 @@ def resolve_listings(
         issue = past.get(record.ipo_id.upper())  # ipo_id is the NSE symbol, lower-cased
         if issue is None or issue.listing_date is None or issue.listing_date > today:
             continue  # not listed yet (or not on NSE)
-        update: dict[str, object] = {"listing_date": issue.listing_date}
-        try:
-            prices = client.listing_prices(issue.symbol, issue.listing_date)
-        except SourceError:
-            prices = None
-        if prices is not None:
-            update["listing_open"], update["listing_close"] = prices
+        update: dict[str, object] = {}
+        if record.listing_date is None:
+            update["listing_date"] = issue.listing_date
+        if record.listing_open is None:
+            try:
+                prices = client.listing_prices(issue.symbol, issue.listing_date)
+            except SourceError:
+                prices = None
+            if prices is not None:
+                update["listing_open"], update["listing_close"] = prices
+        if not update:
+            continue  # nothing new (price still unavailable) — don't rewrite an identical row
         try:
             repo.upsert(record.model_copy(update=update))
             resolved += 1
