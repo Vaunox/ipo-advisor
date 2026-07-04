@@ -112,8 +112,9 @@ Full protocol in **Deep Dive #A**. The essence, repeated here because it governs
 | B3: bucketed issue size | NOT EARNED | Chittorgarh, hot N=293 | Positive but small lift; CI includes zero on 2/3 splits and the call flips — the *least-unpromising*, still not earned. |
 | B3: pricing-vs-band (cut-off vs band top) | **NOT EARNED — structural** | Chittorgarh, N=293 | **292/293 mainboard IPOs price the cut-off at the band top** → the voluntary-underpricing-via-cut-off channel **does not exist for mainboard book-builds**. Near-constant feature (lift +0.000). This closes the **entire cut-off-pricing idea category** — a permanent market fact; do not re-chase without evidence the pricing behaviour changed. |
 | B3: BRLM reputation (point-in-time league share) | NOT EARNED | Chittorgarh, N=292 | AUC lift is noise (CI straddles zero). **ECE improved (0.087→0.068) but the discrimination lift was noise → not earned** (calibration alone is not a pass). Built **leakage-safe** (point-in-time league table) → **no fake lift**, validating the leakage discipline (cf. GMP's leaked +0.133 — an honest construction makes a redundant feature show ~zero, not a fake signal). |
+| B6: RHP litigation-summary extraction (display context, Option B) | **NOT VIABLE** — display not wired | HF prospectus corpus, N=100 | Section detected 81%, but the structured litigation count/amount is extractable only **6/100 (~7% recall)** — a **data ceiling** (OCR'd scanned PDFs, reflowed/garbled mandated tables), not a fixable regex. **Precision high & safe** (0 fabricated of 6; abstains rather than guesses — validates the never-invent safeguard). Related-party 100/100 = a **constant** (zero discrimination). See `docs/B6_RHP_PROBE.md`. |
 
-**Code status:** quarantined in `research/` (excluded from build), scorer slots inert at weight 0 (`MAX |Δprob| = 0.0` confirmed), evidence in `docs/` (`B3_GATE.md`, `ENHANCEMENT_GATE.md`, `GMP_GATE.md`). B3 gate scripts (`run_b3_gate.py`, `gate_b3_deferred.py`) live in `research/` too. Cannot ship or move the score.
+**Code status:** quarantined in `research/` (excluded from build), scorer slots inert at weight 0 (`MAX |Δprob| = 0.0` confirmed), evidence in `docs/` (`B3_GATE.md`, `ENHANCEMENT_GATE.md`, `GMP_GATE.md`). B3 gate scripts (`run_b3_gate.py`, `gate_b3_deferred.py`) live in `research/` too. **B6's RHP extractor + probe (`research/rhp_extract.py`, `rhp_probe.py`) are quarantined there as well — never a score feature, never wired to the UI.** Cannot ship or move the score.
 
 ---
 
@@ -181,6 +182,14 @@ GMP failed the *hot* gate; the open question is whether it earns its weight **wh
 - **Spike-then-collapse manipulation flag** — a **kill-flag**, not a score input (independent of GMP's rejected ranking value). Gate: does flagging spike-collapse IPOs avoid listing-day losers? Blocked on recorder day-by-day GMP.
 
 ## B6. RHP / filing-text mining → kill-flags + operator context (NOT a score feature)
+> ⛔ **PROBED → NOT VIABLE (2026-07-04).** Scoped to Option B (informational context only, no
+> kill-flags, no scoring impact) and probed the cheap way first. The mandated litigation summary is
+> extractable at only **~7% recall** from the HF prospectus corpus (OCR'd scanned PDFs — a data
+> ceiling, not a regex to tune); precision was safe (0 fabricated, abstains rather than guesses).
+> Display **not wired**; extractor dropped from `src/`, kept quarantined in `research/` as evidence.
+> Full result: `docs/B6_RHP_PROBE.md` + Part III graveyard. Revisit only with clean machine-readable
+> RHP tables (which we do not have).
+
 **Default: do not add as a score feature** (fundamental, wrong horizon, likely QIB-redundant). Worthwhile uses: **auto-populate kill-flags** (promoter litigation, adverse audit opinions, related-party, regulatory actions — automating the manual flag) and **operator context** (surface RHP facts alongside the verdict; never touches the number). One ✅-confirmed paper shows prospectus text *did* predict listing-day underpricing, and its dataset is free on Hugging Face → the **cheap probe is nearly free**; run it before the default-skip stands. Gate (kill-flag use): do the flags avoid losers on the backtest?
 
 ## B7. Model-architecture bake-off (one-day experiment)

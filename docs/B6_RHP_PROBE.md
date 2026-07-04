@@ -3,14 +3,19 @@
 *Option B only (informational context, no kill-flags, no scoring impact). Before wiring any
 detail-page display, prove the extraction against real prospectuses. This is the probe-before-build
 gate: if extraction is reliable → wire the context-only display in a follow-up; if it is poor →
-keep B6 minimal or drop it, having spent almost nothing. The scorer/verdict/calibrator are **not
-touched** — `ipo.service.rhp` is pure text extraction and is **unwired**. Engineering/research
-reference, not financial advice.*
+keep B6 minimal or drop it, having spent almost nothing. The scorer/verdict/calibrator were **not
+touched** — the extractor was pure text extraction, **unwired**, and was never a scoring input.
+Engineering/research reference, not financial advice.*
+
+> **Decision (2026-07-04): DROPPED.** On this evidence B6's display was not wired. The extractor was
+> **removed from `src/`** (no dead code shipped) and quarantined in `research/` as the tested artifact
+> behind the negative. Logged with the other honest negatives in `V2_PROGRESS.md` and the blueprint
+> Part III graveyard. The calibrator and the app frontend are byte-for-byte untouched.
 
 **Corpus:** `scholarly360/indian_ipo_prospectus_data` (Hugging Face) — 100 real Indian IPO
 prospectuses (full OCR'd text; ~90 unique companies, some repeated across the train/test splits).
-Probe: `research/rhp_probe.py`. Extractor: `src/ipo/service/rhp.py`. Unit tests:
-`tests/unit/test_rhp.py`.
+Probe + extractor (quarantined in `research/`, never shipped): `research/rhp_probe.py` +
+`research/rhp_extract.py`.
 
 ## Verdict: extraction is high-precision but far too low-coverage to display the numbers
 

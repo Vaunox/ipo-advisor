@@ -1,11 +1,11 @@
 # =============================================================================================
 # QUARANTINED — B6 RHP-extraction accuracy probe. EXCLUDED FROM BUILD (research/ is never packaged).
-# Validates ipo.service.rhp against the free HF prospectus dataset before any display is wired.
+# Validates research/rhp_extract.py against the free HF prospectus dataset; display was NOT wired.
 # Evidence: docs/B6_RHP_PROBE.md. Downloads ~141MB to data_store/_rhp/ (gitignored) and caches.
 # =============================================================================================
 """B6 probe — how accurately does the RHP extractor read the mandated litigation summary?
 
-Runs ``ipo.service.rhp.extract_rhp_context`` over the free Hugging Face dataset
+Runs ``rhp_extract.extract_rhp_context`` over the free Hugging Face dataset
 ``scholarly360/indian_ipo_prospectus_data`` (100 real Indian IPO prospectuses) and reports,
 honestly: section-detection recall, structured-value coverage, and — for a hand-checked sample —
 the precision (does it invent figures?) and recall (does it catch the real ones?) of the
@@ -21,8 +21,7 @@ from collections import Counter
 from pathlib import Path
 
 import pyarrow.parquet as pq
-
-from ipo.service.rhp import extract_rhp_context
+from rhp_extract import extract_rhp_context
 
 _ROOT = Path(__file__).resolve().parents[1]
 _CACHE = _ROOT / "data_store" / "_rhp"

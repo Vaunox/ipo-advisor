@@ -1,3 +1,8 @@
+# =============================================================================================
+# QUARANTINED — B6 RHP extractor. EXCLUDED FROM BUILD (research/ is never packaged). Built as a
+# src/ candidate, then DROPPED from src on the probe's evidence (6% recall on structured
+# litigation — docs/B6_RHP_PROBE.md); kept here as the tested artifact behind that honest negative.
+# =============================================================================================
 """RHP mandated-disclosure extraction (v2 B6, Option B — informational context only).
 
 Reads the SEBI-mandated disclosure sections of a Red Herring Prospectus and returns a
@@ -6,12 +11,12 @@ Litigation* table (Schedule VI / SEBI Master Circular), the auditor's opinion, a
 related-party transactions are disclosed. It targets the fixed-format mandated sections, not
 freeform prose.
 
-**This never touches the score.** It is pure text extraction that produces display context;
-nothing here feeds a feature, a kill-flag, or the calibrator. Every field is honestly
-``None`` ("not available") when it cannot be reliably parsed — the module never guesses a
-number. Whether the extraction is accurate *enough* to surface in the UI is an empirical
-question answered by the probe (``research/rhp_probe.py`` → ``docs/B6_RHP_PROBE.md``), not by
-this module; it is deliberately **unwired** until that evidence is in.
+**This never touched the score.** It is pure text extraction that produces display context;
+nothing here fed a feature, a kill-flag, or the calibrator. Every field is honestly ``None``
+("not available") when it cannot be reliably parsed — the module never guesses a number. Whether
+the extraction was accurate *enough* to surface in the UI was the empirical question the probe
+(``research/rhp_probe.py`` → ``docs/B6_RHP_PROBE.md``) answered: **no** (6% recall on the mandated
+litigation values), so it was never wired and now lives here as evidence only.
 
 RHP text is OCR-extracted and noisy (reflowed table columns, garbled tokens), so the parser
 prefers robust coarse signals (was the section found? is litigation disclosed against the
