@@ -139,11 +139,13 @@ The biggest decision-quality upgrade. Verdict today says "will it list positive?
 **GATE A3:** P(allotment) reproduces known historical allotment ratios within tolerance on a back-check; the EV output is displayed as a distinct, clearly-labeled figure (not confused with the calibrated probability).
 
 ## A4. Operate-phase hardening (standing ops, from launch)
+> ✅ **BUILT (2026-07-04) — as operator-run rituals, not standing daemons (Part I-A).** Five read-only tools, calibrator byte-for-byte untouched: monitoring → `scripts/run_accuracy_monitor.py` (`service/monitoring.py`); T+3 stability → `scripts/run_t3_stability.py` (`service/stability.py`, `docs/T3_STABILITY.md` = **STABLE**); drift heartbeat → `scripts/run_heartbeat.py` (`service/heartbeat.py`); housekeeping → NSE 2026 holidays from the official circular (Holi 03-17→03-03 corrected), calendar staleness guard, httpx pin + warning-clean suite; recalibration-reproduces → `scripts/run_recalibration_check.py` (**REPRODUCES**, Δ 0.0). See `V2_PROGRESS.md`.
+
 - **Live verdict-accuracy monitoring** — rolling APPLY precision vs the backtest number, rolling ECE on realized outcomes; alert on departure.
 - **Scheduled recalibration ritual** — re-run the Phase-4 calibration quarterly and after regime shifts, via the versioned calibrator machinery. Encode the **T+3 structural break** (the 2021+ sample straddles the T+6→T+3 mandatory cutover, Dec 1 2023) as a `t3_regime` dummy; check calibration stability across the break.
 - **Data-source drift monitoring** — the recorder heartbeat model, applied to every scraper/feed.
 - **Housekeeping** — httpx/starlette pin; forward NSE holiday sets.
-**GATE A4:** monitoring alerts fire on injected drift; a dry-run recalibration reproduces the current calibrator; the t3 dummy is present and its cross-break stability is reported.
+**GATE A4:** monitoring alerts fire on injected drift; a dry-run recalibration reproduces the current calibrator; the t3 dummy is present and its cross-break stability is reported. — ✅ **all three met (2026-07-04):** injected-drift test in `test_monitoring.py`; `run_recalibration_check.py` → REPRODUCES (Δ 0.0); `t3_regime` dummy + `docs/T3_STABILITY.md` (STABLE).
 
 ---
 

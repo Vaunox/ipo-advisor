@@ -4,6 +4,7 @@
 
 | Date | Candidate | Track (A/B) | Outcome | Evidence | Notes |
 |---|---|---|---|---|---|
+| 2026-07-04 | A4 — operate-phase hardening (monitoring · T+3 stability · housekeeping · heartbeat · recalibration check) | A | **BUILT** — GATE A4 met (3/3 clauses); no scoring path touched | `tests/unit/{test_monitoring,test_stability,test_heartbeat,test_calendar}.py`; `scripts/run_{accuracy_monitor,t3_stability,heartbeat,recalibration_check}.py`; [T3_STABILITY.md](../T3_STABILITY.md) | Five operator-run rituals/tools; **calibrator byte-for-byte untouched**. (1) **Drift monitor** — recent-window APPLY precision/ECE vs the walk-forward OOS baseline; alerts only on a *real* departure (recent Wilson-CI entirely below baseline). (2) **T+3 stability** — cross-break calibration report: **STABLE** (pre n=52 ECE 0.098 / post n=181 ECE 0.089, shift −0.009; CIs overlap). (3) **Housekeeping** — NSE 2026 holidays completed from the official circular (**fixed Holi 03-17→03-03**, a lunar-guess error), `latest_covered_year`/`review_due` staleness guard, httpx `<1.0` pin + warning-clean suite. (4) **Heartbeat** — feed freshness (flagged Nifty 15d stale, calendar needs 2027). (5) **Recalibration reproduces** the shipped calibrator (max Δ 0.0, GATE A4 clause 2). +28 tests → 269. |
 | 2026-07-04 | A3 — retail allotment-odds estimate (P(allotment) only) | A | **BUILT** (display-only; no calibration impact) | `tests/unit/test_allotment.py` + `test_api.py`; [A3_ALLOTMENT_ODDS.md](A3_ALLOTMENT_ODDS.md) | Shows est. P(1-lot retail allotment) `= min(1, 1/retail_sub)` next to the verdict, in a **separate code path** (scorer/calibrator untouched). Honest back-check: proxy **under-states** actual by ~1.7× — **labelled an estimate, not tuned**. Scoped down from the full EV layer (gain-magnitude + opportunity-cost dropped). |
 | 2026-07-04 | B2 — India VIX flag-enrichment (safe half) | B (annotation) | **BUILT** — weight 0, byte-equality proven | `tests/integration/test_vix_flag_wiring.py` + `tests/unit/test_vix.py`; [B2_VIX_FLAG.md](B2_VIX_FLAG.md) | Blends India VIX into the cold-market flag (`market_regime`, weight 0) — annotation-only; OOS probabilities **byte-for-byte identical** (proven). `vix.csv` from Yahoo `^INDIAVIX` (2008→2026). **Add-only** blend: on the backfill 59→61 cold flags (VIX +2 / −0) — only tightens, never loosens. The **score-feature** half (gated) is separate/deferred. |
 | 2026-07-04 | B9 — graded regime-flag tiers (normal/soft/cold) | B (annotation) | **BUILT** — weight 0, byte-equality proven | `tests/unit/test_regime_tiers.py` + `tests/integration/test_regime_tiers_wiring.py`; [B9_REGIME_TIERS.md](B9_REGIME_TIERS.md) | Binary cold flag → normal/soft/cold tiers (untuned boundaries soft −0.15 / cold −0.3), each its own caveat. Annotation-only: **MAX \|Δprob\| = 0.0** proven, each tier populated. Backfill: 239 normal / **13 soft** (new gentle caveat) / 59 cold (unchanged). No new data, no gate. |
@@ -26,9 +27,11 @@ deferred on operational choice. Full rule + rationale: **Part I-A** of the maste
 - **Not affected (stay):** the shipped app's own `live.py` ingestion (in-session refresh, **not** a
   standing recorder); **A4** occasional rituals (quarterly recalibration, verdict-accuracy
   monitoring — run periodically by the operator, not daily jobs).
-- **Still actionable (no recording dependency):** **A3** (allotment-EV), **B2** (VIX), **B3** (cheap
-  adds), **B6** (RHP kill-flags/context), **B9** (graded regime tiers), **B7** (TabPFN), **B8**
-  (conformal), **A4** (ops hardening).
+- **Built / gated so far (no recording dependency):** **A3** (allotment odds), **B2** (VIX safe
+  half), **B9** (graded regime tiers), **A4** (ops hardening) — all built; **B3** (cheap adds) gated →
+  all shelved.
+- **Still actionable (no recording dependency):** **B6** (RHP kill-flags/context), **B7** (TabPFN),
+  **B8** (conformal).
 - **To lift:** the operator opts to run a recorder (a local scheduled task or an always-on service)
   → the relevant deferred items become actionable again.
 
