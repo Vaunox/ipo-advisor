@@ -108,8 +108,12 @@ Full protocol in **Deep Dive #A**. The essence, repeated here because it governs
 | `ofs_fraction` | CUT (both ways) | Clean backfill, hot N=293 | No lift, ECE worse; kill-flag rationale **backwards** (high-OFS lists *better* — 17% vs 26% loss). |
 | `relative_valuation` | NOT EARNED | Hand-QA'd N=93, hot | CI includes zero; apparent lift was outlier artifact, evaporated on clean data. |
 | `anchor_quality` | Deferred, data-limited | — | Anchor list not cleanly sourceable; blueprint's "most redundant with QIB"; both siblings failed on redundancy. |
+| B3: NII split (sNII/bNII) | NOT EARNED | Cached NSE raws, hot N=235 | AUC lift ≈0, CI straddles zero, keep/cut flips — the small/big split adds nothing beyond aggregate NII (QIB-redundant). See `docs/B3_GATE.md`. |
+| B3: bucketed issue size | NOT EARNED | Chittorgarh, hot N=293 | Positive but small lift; CI includes zero on 2/3 splits and the call flips — the *least-unpromising*, still not earned. |
+| B3: pricing-vs-band (cut-off vs band top) | **NOT EARNED — structural** | Chittorgarh, N=293 | **292/293 mainboard IPOs price the cut-off at the band top** → the voluntary-underpricing-via-cut-off channel **does not exist for mainboard book-builds**. Near-constant feature (lift +0.000). This closes the **entire cut-off-pricing idea category** — a permanent market fact; do not re-chase without evidence the pricing behaviour changed. |
+| B3: BRLM reputation (point-in-time league share) | NOT EARNED | Chittorgarh, N=292 | AUC lift is noise (CI straddles zero). **ECE improved (0.087→0.068) but the discrimination lift was noise → not earned** (calibration alone is not a pass). Built **leakage-safe** (point-in-time league table) → **no fake lift**, validating the leakage discipline (cf. GMP's leaked +0.133 — an honest construction makes a redundant feature show ~zero, not a fake signal). |
 
-**Code status:** quarantined in `research/` (excluded from build), scorer slots inert at weight 0 (`MAX |Δprob| = 0.0` confirmed), evidence in `docs/`. Cannot ship or move the score.
+**Code status:** quarantined in `research/` (excluded from build), scorer slots inert at weight 0 (`MAX |Δprob| = 0.0` confirmed), evidence in `docs/` (`B3_GATE.md`, `ENHANCEMENT_GATE.md`, `GMP_GATE.md`). B3 gate scripts (`run_b3_gate.py`, `gate_b3_deferred.py`) live in `research/` too. Cannot ship or move the score.
 
 ---
 
