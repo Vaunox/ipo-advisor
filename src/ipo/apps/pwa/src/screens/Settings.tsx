@@ -6,14 +6,17 @@ import { toast } from '../toast'
 import {
   type Costs,
   type Density,
+  type NotifPrefs,
   type Startup,
   type ThemeMode,
   getCosts,
   getDensity,
+  getNotifications,
   getStartup,
   getThemeMode,
   setCosts,
   setDensity,
+  setNotifications,
   setStartup,
   setThemeMode,
 } from '../state/prefs'
@@ -39,7 +42,7 @@ export function Settings() {
       : null
   const [theme, setTheme] = useState<ThemeMode>(getThemeMode())
   const [density, setDens] = useState<Density>(getDensity())
-  const [notif, setNotif] = useState({ native: true, applyCrossing: true, anyChange: false, quiet: true })
+  const [notif, setNotifState] = useState<NotifPrefs>(getNotifications())
   const [costs, setCostsState] = useState<Costs>(getCosts())
   const [startup, setStartupState] = useState<Startup>(getStartup())
   const engineUp = health.data?.status === 'ok'
@@ -69,7 +72,11 @@ export function Settings() {
     setDensity(d)
     setDens(d)
   }
-  const toggle = (k: keyof typeof notif) => setNotif((n) => ({ ...n, [k]: !n[k] }))
+  const toggle = (k: keyof NotifPrefs) => {
+    const next = { ...notif, [k]: !notif[k] }
+    setNotifState(next)
+    setNotifications(next)
+  }
   const restartEngine = () => {
     const api = (window as unknown as { ipoDesktop?: { restartEngine?: () => void } }).ipoDesktop
     if (api?.restartEngine) {

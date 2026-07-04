@@ -23,12 +23,67 @@ export interface StartupPrefs {
 export interface AppSettings {
   bounds?: WindowBounds
   startup: StartupPrefs
+  // UI/display preferences (theme, density, broker-cost display, notifications, pinned IPOs),
+  // mirrored from the renderer so they persist in this config file rather than the fragile
+  // file:// localStorage. `undefined` until first persisted — that lets the renderer migrate a
+  // pre-existing localStorage config on upgrade instead of clobbering it with defaults. Every
+  // field here is a display/OS pref: none is a scoring input (the engine owns verdicts).
+  ui?: UiPrefs
+}
+
+export type ThemeMode = 'dark' | 'light' | 'system'
+export type Density = 'comfortable' | 'compact'
+
+export interface Costs {
+  stt: number
+  dp: number
+  oth: number
+}
+
+export interface NotifPrefs {
+  native: boolean
+  applyCrossing: boolean
+  anyChange: boolean
+  quiet: boolean
+}
+
+export interface UiPrefs {
+  theme: ThemeMode
+  density: Density
+  costs: Costs
+  notifications: NotifPrefs
+  pinned: string[]
 }
 
 export const DEFAULT_STARTUP: StartupPrefs = {
   launchOnStartup: false,
   minimizeToTray: true,
   startMinimized: false,
+}
+
+export const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
+export const DEFAULT_NOTIF: NotifPrefs = {
+  native: true,
+  applyCrossing: true,
+  anyChange: false,
+  quiet: true,
+}
+
+/** Coerce arbitrary JSON into a valid UiPrefs, falling back to defaults field-by-field (so a
+ *  partial or hand-edited config file can never crash the load or smuggle in a bad value). */
+export function normalizeUi(raw: unknown): UiPrefs {
+  const u = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const costs = (u.costs && typeof u.costs === 'object' ? u.costs : {}) as Partial<Costs>
+  const notif = (u.notifications && typeof u.notifications === 'object'
+    ? u.notifications
+    : {}) as Partial<NotifPrefs>
+  return {
+    theme: u.theme === 'light' || u.theme === 'system' ? u.theme : 'dark',
+    density: u.density === 'compact' ? 'compact' : 'comfortable',
+    costs: { ...DEFAULT_COSTS, ...costs },
+    notifications: { ...DEFAULT_NOTIF, ...notif },
+    pinned: Array.isArray(u.pinned) ? u.pinned.filter((x): x is string => typeof x === 'string') : [],
+  }
 }
 
 function settingsFile(userDataDir: string): string {
@@ -42,6 +97,7 @@ export function loadSettings(userDataDir: string): AppSettings {
     return {
       bounds: raw.bounds,
       startup: { ...DEFAULT_STARTUP, ...(raw.startup ?? {}) },
+      ui: raw.ui ? normalizeUi(raw.ui) : undefined,
     }
   } catch {
     return { startup: { ...DEFAULT_STARTUP } }

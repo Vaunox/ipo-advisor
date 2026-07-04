@@ -16,6 +16,12 @@ export interface Startup {
   minimizeToTray: boolean
   startMinimized: boolean
 }
+export interface NotifPrefs {
+  native: boolean
+  applyCrossing: boolean
+  anyChange: boolean
+  quiet: boolean
+}
 
 const KEY = 'ipoadv'
 
@@ -26,12 +32,14 @@ interface Prefs {
   lastSeen: Record<string, VerdictType>
   costs: Costs
   startup: Startup
+  notifications: NotifPrefs
   alertsSeen: string[]
   notifiedCrossings: string[]
   notifSeeded: boolean
 }
 
 const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
+const DEFAULT_NOTIF: NotifPrefs = { native: true, applyCrossing: true, anyChange: false, quiet: true }
 const DEFAULT_STARTUP: Startup = {
   launchOnStartup: false,
   minimizeToTray: true,
@@ -51,6 +59,10 @@ function load(): Prefs {
         p.startup && typeof p.startup === 'object'
           ? { ...DEFAULT_STARTUP, ...p.startup }
           : { ...DEFAULT_STARTUP },
+      notifications:
+        p.notifications && typeof p.notifications === 'object'
+          ? { ...DEFAULT_NOTIF, ...p.notifications }
+          : { ...DEFAULT_NOTIF },
       alertsSeen: Array.isArray(p.alertsSeen) ? p.alertsSeen : [],
       notifiedCrossings: Array.isArray(p.notifiedCrossings) ? p.notifiedCrossings : [],
       notifSeeded: p.notifSeeded === true,
@@ -63,6 +75,7 @@ function load(): Prefs {
       lastSeen: {},
       costs: { ...DEFAULT_COSTS },
       startup: { ...DEFAULT_STARTUP },
+      notifications: { ...DEFAULT_NOTIF },
       alertsSeen: [],
       notifiedCrossings: [],
       notifSeeded: false,
@@ -72,11 +85,75 @@ function load(): Prefs {
 
 let prefs = load()
 
+// Durable store: in the packaged desktop shell the source of truth is the app's config file
+// (settings.json in the Electron user-data dir), reached over IPC via the preload bridge — because
+// localStorage under the file:// origin the shell loads is not reliably persisted across restarts.
+// In the browser / dev preview there is no bridge, so localStorage is the store. window.ipoDesktop
+// is injected by apps/desktop/src/preload.ts.
+interface UiPrefs {
+  theme: ThemeMode
+  density: Density
+  costs: Costs
+  notifications: NotifPrefs
+  pinned: string[]
+}
+interface DesktopBridge {
+  getPrefs?: () => Promise<UiPrefs | null>
+  setPrefs?: (ui: UiPrefs) => Promise<void>
+}
+const desktop: DesktopBridge | null =
+  typeof window !== 'undefined' ? ((window as { ipoDesktop?: DesktopBridge }).ipoDesktop ?? null) : null
+
+function uiSnapshot(): UiPrefs {
+  return {
+    theme: prefs.theme,
+    density: prefs.density,
+    costs: prefs.costs,
+    notifications: prefs.notifications,
+    pinned: prefs.pinned,
+  }
+}
+
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(prefs))
   } catch {
     /* ignore quota / disabled storage */
+  }
+  // Desktop: write through to the durable config file. Fire-and-forget — a failed IPC must never
+  // break the UI (the localStorage mirror above still holds within the session).
+  if (desktop?.setPrefs) void desktop.setPrefs(uiSnapshot())
+}
+
+/**
+ * Desktop only: hydrate the in-memory prefs from the durable config file before first paint, so a
+ * restart shows the saved settings rather than defaults. On first run after upgrade the config file
+ * has no UI prefs yet (getPrefs resolves null); we then migrate the current localStorage prefs into
+ * it, so an existing user keeps their theme/density/costs. No-op in the browser / preview.
+ */
+export async function hydrateFromDesktop(): Promise<void> {
+  if (!desktop?.getPrefs) return
+  try {
+    const ui = await desktop.getPrefs()
+    if (ui === null) {
+      if (desktop.setPrefs) void desktop.setPrefs(uiSnapshot()) // migrate localStorage -> config file
+      return
+    }
+    prefs = {
+      ...prefs,
+      theme: ui.theme === 'light' || ui.theme === 'system' ? ui.theme : 'dark',
+      density: ui.density === 'compact' ? 'compact' : 'comfortable',
+      costs: { ...DEFAULT_COSTS, ...ui.costs },
+      notifications: { ...DEFAULT_NOTIF, ...ui.notifications },
+      pinned: Array.isArray(ui.pinned) ? ui.pinned : prefs.pinned,
+    }
+    try {
+      localStorage.setItem(KEY, JSON.stringify(prefs)) // keep the mirror fresh for next cold start
+    } catch {
+      /* ignore */
+    }
+  } catch {
+    /* IPC failed — keep the localStorage-loaded prefs already in memory */
   }
 }
 
@@ -142,6 +219,13 @@ export function setCosts(costs: Costs): void {
 export const getStartup = (): Startup => prefs.startup
 export function setStartup(startup: Startup): void {
   prefs = { ...prefs, startup }
+  save()
+}
+
+/* ---- native-notification preferences (persisted; read by notifications.ts) ---- */
+export const getNotifications = (): NotifPrefs => prefs.notifications
+export function setNotifications(notifications: NotifPrefs): void {
+  prefs = { ...prefs, notifications }
   save()
 }
 

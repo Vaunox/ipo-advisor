@@ -2,7 +2,14 @@ import { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray } from 'electron'
 import { type ChildProcess } from 'node:child_process'
 import path from 'node:path'
 import { findRepoRoot, freePort, killEngine, spawnEngine, waitForHealth } from './sidecar'
-import { type AppSettings, type StartupPrefs, loadSettings, saveSettings } from './settings'
+import {
+  type AppSettings,
+  type StartupPrefs,
+  type UiPrefs,
+  loadSettings,
+  normalizeUi,
+  saveSettings,
+} from './settings'
 
 const DEV = !app.isPackaged
 let child: ChildProcess | null = null
@@ -198,6 +205,16 @@ ipcMain.handle('startup:set', (_e, prefs: StartupPrefs): void => {
   saveSettings(userDataDir, settings)
   // Registering a login item only makes sense for the installed app (not the dev electron.exe).
   if (!DEV) app.setLoginItemSettings({ openAtLogin: settings.startup.launchOnStartup })
+})
+
+// UI/display preferences durable store. `prefs:get` returns null until the renderer has persisted
+// once, so the renderer can migrate a pre-existing localStorage config on first upgrade. Nothing
+// here can affect a verdict or a probability — these are display/OS prefs (Inviolable Rule 6).
+ipcMain.handle('prefs:get', (): UiPrefs | null => settings.ui ?? null)
+
+ipcMain.handle('prefs:set', (_e, ui: UiPrefs): void => {
+  settings.ui = normalizeUi(ui)
+  saveSettings(userDataDir, settings)
 })
 
 ipcMain.handle('engine:restart', (): Promise<boolean> => restartEngine())
