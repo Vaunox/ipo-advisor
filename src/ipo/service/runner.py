@@ -23,7 +23,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from ipo.calibration.calibrate import load_calibrator
-from ipo.calibration.regime import NiftyRegime
+from ipo.calibration.regime import NiftyRegime, VixSeries
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, load_config
 from ipo.core.interfaces import Calibrator, Notifier, Repository
@@ -115,6 +115,7 @@ def build_service(
     repository: Repository,
     calibrator: Calibrator,
     nifty_path: Path,
+    vix_path: Path | None = None,
     calibration_report_path: Path | None = None,
     transition_store: TransitionStore | None = None,
     push_transport: Callable[[str], None] | None = None,
@@ -128,6 +129,13 @@ def build_service(
     """
     scorer = WeightedScorer(config.feature_weights, config.features)
     regime = NiftyRegime(nifty_path)
+    # v2 B2: layer India VIX onto the cold-market flag when present (flag-only, weight 0).
+    rc = config.features.regime
+    vix = (
+        VixSeries(vix_path, reference=rc.vix_reference, scale=rc.vix_scale)
+        if vix_path is not None and vix_path.is_file()
+        else None
+    )
     transitions = transition_store or TransitionStore(
         Path(config.storage.data_dir) / "verdict_transitions.json"
     )
@@ -137,6 +145,7 @@ def build_service(
         scorer=scorer,
         config=config,
         regime=regime,
+        vix=vix,
         transitions=transitions,
         clock=clock,
     )
@@ -226,6 +235,7 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         repository=repository,
         calibrator=load_calibrator(res / "models" / "calibrator.json"),
         nifty_path=res / "data" / "backfill" / "nifty.csv",
+        vix_path=res / "data" / "backfill" / "vix.csv",
         calibration_report_path=res / "models" / "reliability.json",
         transition_store=TransitionStore(data_dir / "verdict_transitions.json"),
         refresh=_live_refresh(config, repository, data_dir),

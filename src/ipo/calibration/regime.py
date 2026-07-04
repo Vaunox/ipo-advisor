@@ -86,6 +86,35 @@ class NiftyRegime:
         return clamp(trend / _REGIME_FEATURE_SCALE, -1.0, 1.0)
 
 
+class VixSeries:
+    """India VIX daily series → a point-in-time volatility-stress read in [-1, 1] (v2 B2).
+
+    Feeds the regime **cold-market flag only** (weight 0). ``vol_stress = clamp((vix - reference) /
+    scale, -1, 1)`` — elevated VIX (fear) → +1 (stressed), calm VIX → -1. Point-in-time by
+    construction (``bisect`` reads only closes at/before the decision day), so a later refresh of
+    the series can never change a past IPO's stress read. ``reference`` / ``scale`` are a-priori
+    (config), NOT fit to listing outcomes.
+    """
+
+    def __init__(self, csv_path: Path, *, reference: float = 15.0, scale: float = 15.0) -> None:
+        """Load the India VIX (date, close) series and set the neutral reference + stress scale."""
+        self._dates: list[date] = []
+        self._closes: list[float] = []
+        with csv_path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                self._dates.append(date.fromisoformat(row["date"]))
+                self._closes.append(float(row["close"]))
+        self._reference = reference
+        self._scale = scale
+
+    def vol_stress_at(self, day: date) -> float | None:
+        """VIX volatility-stress in [-1, 1] from the last close at/before ``day`` (None if none)."""
+        idx = bisect.bisect_right(self._dates, day) - 1
+        if idx < 0:
+            return None
+        return clamp((self._closes[idx] - self._reference) / self._scale, -1.0, 1.0)
+
+
 def merge_nifty_closes(
     existing: list[tuple[date, float]], new: list[tuple[date, float]]
 ) -> list[tuple[date, float]]:

@@ -19,16 +19,17 @@ else "now" — an open book yields INSUFFICIENT_SIGNAL until it closes.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime
 
 from ipo.calibration.label import is_positive, net_listing_return
-from ipo.calibration.regime import NiftyRegime
+from ipo.calibration.regime import NiftyRegime, VixSeries
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, SellCosts
 from ipo.core.constants import IST
 from ipo.core.interfaces import Calibrator, Repository, ScoringModel
 from ipo.core.types import IPOFeatures, IPORecord, Verdict
 from ipo.features.build import build_features
+from ipo.features.regime import compute_regime
 from ipo.model.verdict import evaluate
 from ipo.service.allotment import retail_allotment_odds
 from ipo.service.transitions import TransitionStore
@@ -48,15 +49,22 @@ class VerdictEngine:
         scorer: ScoringModel,
         config: AppConfig,
         regime: NiftyRegime | None = None,
+        vix: VixSeries | None = None,
         transitions: TransitionStore | None = None,
         clock: Callable[[], datetime] = now_ist,
     ) -> None:
-        """Bind the composed dependencies; ``regime=None`` disables the cold-market flag."""
+        """Bind the composed dependencies.
+
+        ``regime=None`` disables the cold-market flag; ``vix=None`` keeps the flag trend-only (VIX
+        enrichment, v2 B2, is layered only when a VIX series is supplied). Both are flag-only —
+        scorer weight 0 — so neither can move the calibrated probability.
+        """
         self._repo = repository
         self._calibrator = calibrator
         self._scorer = scorer
         self._config = config
         self._regime = regime
+        self._vix = vix
         self._transitions = transitions
         self._clock = clock
 
@@ -72,6 +80,28 @@ class VerdictEngine:
         now = self._clock()
         return close_eod if now >= close_eod else now
 
+    def _market_regime_at(self, day: date) -> float | None:
+        """The point-in-time ``market_regime`` that drives the cold-market FLAG (weight 0).
+
+        The Nifty trend read at full weight, with an India-VIX volatility-stress read layered on
+        (v2 B2): a neutral-VIX day reproduces the trend-only baseline, while elevated VIX nudges the
+        regime toward the cold flag. ``None`` when there is no trend history; a VIX-absent day falls
+        back to trend-only. Annotation-only — its scorer weight is 0, so it never moves the
+        calibrated probability (the blend changes *which* IPOs are flagged, never their number).
+        """
+        if self._regime is None:
+            return None
+        trend = self._regime.market_regime_feature(day)
+        if trend is None or self._vix is None:
+            return trend
+        vol_stress = self._vix.vol_stress_at(day)
+        if vol_stress is None:
+            return trend
+        rc = self._config.features.regime
+        return compute_regime(
+            trend, vol_stress, trend_weight=rc.trend_weight, vol_weight=rc.vol_weight
+        )
+
     def features_for(self, record: IPORecord, *, asof: datetime | None = None) -> IPOFeatures:
         """Build the point-in-time feature vector exactly as ``verdict_for`` scores it.
 
@@ -81,9 +111,7 @@ class VerdictEngine:
         point-in-time as-of the decision clock (weight 0 → flag-only); GMP is ``None``.
         """
         when = asof if asof is not None else self.decision_asof(record)
-        market_regime = (
-            self._regime.market_regime_feature(when.date()) if self._regime is not None else None
-        )
+        market_regime = self._market_regime_at(when.date())
         return build_features(
             record, when, market_regime=market_regime, config=self._config.features
         )

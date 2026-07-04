@@ -24,6 +24,7 @@ datas = [
     (str(ROOT / "models" / "calibrator.json"), "models"),
     (str(ROOT / "models" / "reliability.json"), "models"),
     (str(ROOT / "data" / "backfill" / "nifty.csv"), "data/backfill"),
+    (str(ROOT / "data" / "backfill" / "vix.csv"), "data/backfill"),  # v2 B2 — cold-flag VIX read
     # Live-only build: NO bundled demo record store. The app starts empty and fills purely from
     # live NSE ingestion (ipo.data.ingest.live); no fabricated/curated companies ship.
 ]

@@ -185,10 +185,21 @@ class ValuationFeatureConfig(_Section):
 
 
 class RegimeFeatureConfig(_Section):
-    """Market-regime blend weights (trend vs volatility)."""
+    """Market-regime blend weights + India-VIX mapping (v2 B2 — cold-market FLAG only, weight 0).
 
-    trend_weight: float = 0.6
+    The live flag blends the Nifty trend read with a VIX volatility-stress read:
+    ``market_regime = clamp(trend_weight*trend - vol_weight*vol_stress)``. ``trend_weight = 1.0``
+    keeps the trend read at full weight (so a neutral-VIX day reproduces the old trend-only flag
+    baseline); ``vol_weight`` is how hard elevated VIX nudges the regime toward the cold flag. All
+    a-priori, NOT fit to listing outcomes — and none of it moves the probability (regime weight 0).
+    """
+
+    trend_weight: float = 1.0
     vol_weight: float = 0.4
+    # India VIX level mapped to neutral stress (vol_stress 0); the span above it maps to full
+    # stress (vol_stress +1 at reference + scale, i.e. VIX ~30). a-priori round numbers.
+    vix_reference: float = 15.0
+    vix_scale: float = 15.0
 
 
 class FeaturesConfig(_Section):

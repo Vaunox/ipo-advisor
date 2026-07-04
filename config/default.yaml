@@ -90,8 +90,13 @@ features:
   valuation:
     peerless_policy: neutral_flag   # neutral_flag | mild_negative
   regime:
-    trend_weight: 0.6
+    # Cold-market FLAG blend (v2 B2, weight 0 — never moves the probability). trend_weight 1.0
+    # keeps the trend read at full weight (a neutral-VIX day = the old trend-only flag); vol_weight
+    # is how hard elevated India VIX nudges toward the cold flag. a-priori, untuned.
+    trend_weight: 1.0
     vol_weight: 0.4
+    vix_reference: 15.0   # India VIX ~15 = neutral volatility (vol_stress 0)
+    vix_scale: 15.0       # VIX ~30 (ref+scale) = full stress (vol_stress +1)
   # Missing a critical feature (or an unclosed book) -> INSUFFICIENT_SIGNAL (Layer 3).
   # Phase 4 is the official-only model (no GMP yet), so QIB is the critical signal.
   # Phase 5 re-adds `gmp_level` here once the GMP scraper is integrated and recalibrated.
