@@ -75,8 +75,11 @@ NSE_TRADING_HOLIDAYS: frozenset[date] = frozenset(
         date(2025, 10, 22),  # Diwali Balipratipada
         date(2025, 11, 5),  # Gurunanak Jayanti
         date(2025, 12, 25),  # Christmas
-        # 2026 — NSE 2026 trading-holiday circular (CMTR71775), cross-checked across
-        # Zerodha / ClearTax / Kotak Neo (unanimous on all 16 weekday dates).
+        # 2026 — dates triangulated from aggregators (Zerodha / ClearTax / Kotak Neo,
+        # unanimous on all 16 weekday dates); verify against the official NSE circular
+        # CMTR71775. Strong secondary evidence, not primary confirmation (aggregators are
+        # a fast path, not authoritative) — if a date proves wrong or NSE amends the 2026
+        # calendar, this is the breadcrumb for why.
         date(2026, 1, 15),  # Municipal Election, Maharashtra
         date(2026, 1, 26),  # Republic Day
         date(2026, 3, 3),  # Holi
