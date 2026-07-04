@@ -28,6 +28,15 @@ SEGMENT_SME = "sme"
 # active hours (Inviolable Rule 5). Used only to set scrape cadence expectations.
 GMP_REFRESH_CADENCE_MINUTES = 30
 
+# --- T+3 settlement cutover -------------------------------------------------
+# SEBI shortened the IPO listing timeline from T+6 to T+3 working days: optional
+# from 1 Sep 2023, MANDATORY from 1 Dec 2023. The 2021+ backfill straddles this
+# structural break, which shortens the ASBA blocked-capital window and may shift
+# listing-day behaviour — so it is the natural regime axis for a calibration
+# stability check (A4). This is the mandatory-effect date.
+# Source: SEBI circular SEBI/HO/CFD/PoD-2/P/CIR/2023/140 (9 Aug 2023).
+T3_MANDATORY_CUTOVER: date = date(2023, 12, 1)
+
 # --- NSE trading holidays ---------------------------------------------------
 # Maintained list of NSE equity-segment trading holidays. This MUST be reviewed
 # annually (NSE publishes the next year's calendar each December). Weekends are
