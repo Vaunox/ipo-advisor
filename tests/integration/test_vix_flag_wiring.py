@@ -50,8 +50,8 @@ def _blend(
         vol_stress = vix.vol_stress_at(day)
         if vol_stress is None:
             return trend
-        return compute_regime(
-            trend, vol_stress, trend_weight=rc.trend_weight, vol_weight=rc.vol_weight
+        return compute_regime(  # add-only: floor stress at 0 (VIX only tightens the flag)
+            trend, max(0.0, vol_stress), trend_weight=rc.trend_weight, vol_weight=rc.vol_weight
         )
 
     return of
@@ -139,8 +139,8 @@ def test_engine_uses_vix_when_supplied() -> None:
         vol_stress = vix.vol_stress_at(r.close_date)
         if trend is None or vol_stress is None:
             return -1.0
-        blended = compute_regime(
-            trend, vol_stress, trend_weight=rc.trend_weight, vol_weight=rc.vol_weight
+        blended = compute_regime(  # add-only, matching the engine
+            trend, max(0.0, vol_stress), trend_weight=rc.trend_weight, vol_weight=rc.vol_weight
         )
         return abs(blended - trend)
 

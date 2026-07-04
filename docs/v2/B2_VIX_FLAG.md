@@ -14,9 +14,11 @@ flag** at **weight 0** — annotation-only, byte-equality proven. The **score-fe
   reference)/scale, -1, 1)`; elevated VIX → +1 (stressed), calm → -1. `reference=15`, `scale=15`
   (a-priori round numbers, NOT fit to outcomes).
 - **The blend** (engine `_market_regime_at`, reusing the existing `compute_regime`):
-  `market_regime = clamp(trend_weight·trend − vol_weight·vol_stress)` with **`trend_weight = 1.0`**
-  (the trend read is kept at full weight, so a neutral-VIX day reproduces the old trend-only flag
-  exactly) and `vol_weight = 0.4`. The cold flag fires at `market_regime ≤ −0.3`, unchanged.
+  `market_regime = clamp(trend − vol_weight·max(0, vol_stress))` with the trend read kept at **full
+  weight** (`trend_weight = 1.0`) and `vol_weight = 0.4`. It is **add-only** (operator decision): the
+  stress is floored at 0, so elevated VIX only *tightens* the flag and a calm VIX **never lifts** a
+  caveat the trend alone would raise. A neutral-/low-VIX day reproduces the old trend-only flag
+  exactly. The cold flag fires at `market_regime ≤ −0.3`, unchanged.
 - **Composition.** `build_service` loads `VixSeries` from `vix.csv` and injects it; `vix=None` keeps
   the old trend-only flag (backward compatible). Wired end-to-end into the live engine.
 
@@ -34,20 +36,17 @@ actually blends it). The shipped calibrator is untouched.
 | | cold-flagged |
 |---|---|
 | trend-only (before) | 59 |
-| trend + VIX (after) | 51 |
+| trend + VIX (after) | **61** |
 
-VIX **added** the caveat to **2** IPOs (they closed during volatility spikes) and **removed** it from
-**10** (they closed in demonstrably calm, low-VIX tapes where a mildly-weak trend isn't really an
-adverse regime). Net −8 on this **hot 2021–26 sample**, which was mostly calm-VIX — so the flag
-becomes *volatility-aware*: fewer "less certain" caveats when the tape is quiet, more when it's
-turbulent. The caveat wording ("cold market — probability less certain") is unchanged (the UI keys on
-it); it's now driven by weak-trend **and/or** high volatility.
+**Add-only:** VIX **added** the caveat to **2** IPOs — *Anand Rathi* and *Adani Wilmar*, both of which
+closed during volatility spikes — and **removed it from none**. On the mostly-calm hot 2021–26 sample
+that's a small, conservative tightening: the flag now also fires when a turbulent tape makes the
+listing less predictable, but VIX never *drops* a caveat the trend alone raised. The caveat wording
+("cold market — probability less certain") is unchanged (the UI keys on it); it's now driven by
+weak-trend **and/or** high volatility.
 
-**One design choice for review.** The blend is **symmetric**: calm VIX can *remove* the caveat, high
-VIX can *add* it. The alternative is **add-only** (clamp `vol_stress` at 0 on the low side, so VIX can
-only *tighten* the flag, never loosen it) — stricter, never drops an existing caveat. I built the
-symmetric version (the natural "blend both ways"); happy to switch to add-only if you'd rather VIX
-only ever add caveats.
+*(Design decision, 2026-07-04: add-only, not symmetric. A symmetric blend — where calm VIX also
+*removes* caveats — was considered and rejected in favour of never loosening an existing caveat.)*
 
 ## Honest prior (blueprint)
 

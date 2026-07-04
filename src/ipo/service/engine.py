@@ -84,10 +84,12 @@ class VerdictEngine:
         """The point-in-time ``market_regime`` that drives the cold-market FLAG (weight 0).
 
         The Nifty trend read at full weight, with an India-VIX volatility-stress read layered on
-        (v2 B2): a neutral-VIX day reproduces the trend-only baseline, while elevated VIX nudges the
-        regime toward the cold flag. ``None`` when there is no trend history; a VIX-absent day falls
-        back to trend-only. Annotation-only — its scorer weight is 0, so it never moves the
-        calibrated probability (the blend changes *which* IPOs are flagged, never their number).
+        **add-only** (v2 B2): elevated VIX nudges the regime toward the cold flag, but a calm VIX
+        never *lifts* a caveat the trend alone would raise (the stress is floored at 0). So a
+        neutral- or low-VIX day reproduces the trend-only baseline exactly; only turbulence tightens
+        the flag. ``None`` with no trend history; a VIX-absent day falls back to trend-only.
+        Annotation-only — scorer weight 0, so it never moves the probability (the blend changes
+        *which* IPOs are flagged, never their number).
         """
         if self._regime is None:
             return None
@@ -98,8 +100,9 @@ class VerdictEngine:
         if vol_stress is None:
             return trend
         rc = self._config.features.regime
+        # Add-only: floor the stress at 0 so VIX can only *tighten* the flag (operator decision).
         return compute_regime(
-            trend, vol_stress, trend_weight=rc.trend_weight, vol_weight=rc.vol_weight
+            trend, max(0.0, vol_stress), trend_weight=rc.trend_weight, vol_weight=rc.vol_weight
         )
 
     def features_for(self, record: IPORecord, *, asof: datetime | None = None) -> IPOFeatures:
