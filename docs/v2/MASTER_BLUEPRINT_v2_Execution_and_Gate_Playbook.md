@@ -104,6 +104,7 @@ Full protocol in **Deep Dive #A**. The essence, repeated here because it governs
 | Rejected | Result | Sample / date | Why |
 |---|---|---|---|
 | `market_regime` as a score feature | CUT → weight 0 (flag-only) | OOS walk-forward | Regime-aware / per-regime calibration didn't converge on the thin cold sample. Kept live as annotation only. |
+| B2: India VIX as a score feature | **CUT — NOT EARNED** | Expanded N=358, 3 splits | AUC lift ≈0 (CI straddles zero on every split), **ECE worsens on all 3** → QIB-redundant (fear already echoes through cautious QIB bidding). The weight-0 VIX *flag* (B2 first half) stays shipped; VIX earns no *weight*. `research/run_b2_gate.py`, `docs/B2_SCORE_GATE.md`. |
 | GMP (hot-market) | NOT EARNED | Real point-in-time, hot N≈99/39 OOS | Lift ≈ 0, CI straddles zero; earlier +0.133 was leakage. Echoes QIB. (Cold re-test is a *different* open question — Track B.) |
 | `ofs_fraction` | CUT (both ways) | Clean backfill, hot N=293 | No lift, ECE worse; kill-flag rationale **backwards** (high-OFS lists *better* — 17% vs 26% loss). |
 | `relative_valuation` | NOT EARNED | Hand-QA'd N=93, hot | CI includes zero; apparent lift was outlier artifact, evaporated on clean data. |
@@ -161,6 +162,12 @@ Each runs the Part-II / Deep-Dive-#A protocol. **Default expected outcome: logge
 **Blocked on A1** — you can't gate this until day-wise history is banked. Cheap probe may use aggregator day-wise tables (trust-boundary rules), but the durable path is A1.
 
 ## B2. India VIX ⭐ (do the safe half first)
+> **CLOSED (2026-07-04): safe half BUILT, score-feature half GATED → CUT.** (1) Flag-enrichment
+> shipped (VIX into the cold flag, weight 0, byte-equality proven). (2) The score-feature half was
+> gated on the expanded 358 sample and **NOT EARNED** — AUC lift ≈0 (CI straddles zero every split),
+> ECE worsens on all 3 splits → **QIB-redundant**, the honest prior confirmed. Evidence:
+> `docs/B2_SCORE_GATE.md` + Part III graveyard.
+
 **Two uses:** (1) **flag-enrichment (safe, no gate):** blend Nifty-trend + VIX into the regime *flag* at weight 0 — annotation-only, prove with the byte-equality test; (2) **score feature (full gate)** afterwards. Free, point-in-time-clean data (NSE daily series). **Honest prior:** VIX may partly echo through cautious QIB bidding — measure, don't assume.
 
 ## B3. Cheap feature adds (bundle into one recalibration pass; verify ◐ leads first)
