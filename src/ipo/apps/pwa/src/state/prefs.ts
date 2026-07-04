@@ -114,14 +114,23 @@ function uiSnapshot(): UiPrefs {
   }
 }
 
-function save() {
+// localStorage mirror only. Used by ephemeral view-state (last-seen verdicts, alert-read, native-
+// notification dedup) and the startup mirror — bookkeeping that must never reach the durable config
+// file (its durable home, for startup, is the separate startup:set IPC path).
+function saveLocal() {
   try {
     localStorage.setItem(KEY, JSON.stringify(prefs))
   } catch {
     /* ignore quota / disabled storage */
   }
-  // Desktop: write through to the durable config file. Fire-and-forget — a failed IPC must never
-  // break the UI (the localStorage mirror above still holds within the session).
+}
+
+// Durable save: the localStorage mirror PLUS a write-through to the app config file (desktop). Only
+// the five durable UI settings (theme, density, costs, notifications, pinned) call this, so the
+// config file holds genuinely durable preferences and incidental bookkeeping never rewrites it.
+function save() {
+  saveLocal()
+  // Fire-and-forget — a failed IPC must never break the UI (the mirror above still holds).
   if (desktop?.setPrefs) void desktop.setPrefs(uiSnapshot())
 }
 
@@ -204,7 +213,7 @@ export const getLastSeen = (): Record<string, VerdictType> => prefs.lastSeen
 export function seedLastSeen(seed: Record<string, VerdictType>): void {
   if (Object.keys(prefs.lastSeen).length === 0) {
     prefs = { ...prefs, lastSeen: seed }
-    save()
+    saveLocal()
   }
 }
 
@@ -219,7 +228,7 @@ export function setCosts(costs: Costs): void {
 export const getStartup = (): Startup => prefs.startup
 export function setStartup(startup: Startup): void {
   prefs = { ...prefs, startup }
-  save()
+  saveLocal() // durable startup persistence is the desktop shell's startup:set path, not the ui blob
 }
 
 /* ---- native-notification preferences (persisted; read by notifications.ts) ---- */
@@ -233,17 +242,17 @@ export function setNotifications(notifications: NotifPrefs): void {
 export const getAlertsSeen = (): string[] => prefs.alertsSeen
 export function setAlertsSeen(ids: string[]): void {
   prefs = { ...prefs, alertsSeen: ids }
-  save()
+  saveLocal()
 }
 
 /* ---- native notifications (which APPLY crossings have already fired an OS toast) ---- */
 export const getNotifiedCrossings = (): string[] => prefs.notifiedCrossings
 export function setNotifiedCrossings(keys: string[]): void {
   prefs = { ...prefs, notifiedCrossings: keys }
-  save()
+  saveLocal()
 }
 export const isNotifSeeded = (): boolean => prefs.notifSeeded
 export function markNotifSeeded(): void {
   prefs = { ...prefs, notifSeeded: true }
-  save()
+  saveLocal()
 }
