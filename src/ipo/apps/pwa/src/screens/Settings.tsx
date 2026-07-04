@@ -22,7 +22,21 @@ import {
 } from '../state/prefs'
 
 function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return <div className={on ? 'switch on' : 'switch'} role="switch" aria-checked={on} onClick={onToggle} />
+  return (
+    <div
+      className={on ? 'switch on' : 'switch'}
+      role="switch"
+      aria-checked={on}
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onToggle()
+        }
+      }}
+    />
+  )
 }
 
 export function Settings() {

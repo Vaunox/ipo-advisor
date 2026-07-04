@@ -171,9 +171,9 @@ export function App() {
           ) : view === 'live' ? (
             <Live onOpen={setDetailId} />
           ) : view === 'history' ? (
-            <History />
+            <History onOpen={setDetailId} />
           ) : view === 'upcoming' ? (
-            <Upcoming />
+            <Upcoming onOpen={setDetailId} />
           ) : (
             <Settings />
           )}

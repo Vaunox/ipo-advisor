@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useCalibration, useHistory } from '../api/hooks'
 import type { CalibrationView, HistoryRow, VerdictType } from '../api/types'
+import { Loading } from '../components/Loading'
 import { getCosts } from '../state/prefs'
 import { VMETA } from '../verdict'
 
@@ -172,8 +173,8 @@ function csvCell(v: string): string {
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 
-export function History() {
-  const { data: history, isLoading, isError } = useHistory(getCosts())
+export function History({ onOpen }: { onOpen: (id: string) => void }) {
+  const { data: history, isLoading, isError, refetch } = useHistory(getCosts())
   const cal = useCalibration()
   const [filter, setFilter] = useState<'all' | VerdictType>('all')
   const [query, setQuery] = useState('')
@@ -207,12 +208,15 @@ export function History() {
     return r
   }, [history, filter, query, sort])
 
-  if (isLoading) return <div className="state">Loading history…</div>
+  if (isLoading) return <Loading label="Loading history…" />
   if (isError || !history)
     return (
       <div className="state">
         <h3>Couldn't load history</h3>
         <p>The engine isn't responding.</p>
+        <button className="btn" onClick={() => void refetch()}>
+          Retry
+        </button>
       </div>
     )
 
@@ -245,89 +249,112 @@ export function History() {
   }
 
   const chips: ('all' | VerdictType)[] = ['all', 'APPLY', 'MARGINAL', 'SKIP']
+  const noHistory = history.length === 0
 
   return (
     <>
-      <Scorecard history={history} cal={cal.data} />
+      {!noHistory && <Scorecard history={history} cal={cal.data} />}
       {cal.data && <ReliabilityDiagram cal={cal.data} />}
-      <div className="hist-tools">
-        <div className="hist-search">
-          <Search />
-          <input
-            placeholder="Search history…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        <div className="chips">
-          {chips.map((c) => (
-            <button
-              key={c}
-              className={filter === c ? 'chip on' : 'chip'}
-              onClick={() => setFilter(c)}
-            >
-              {c === 'all' ? 'All' : c}
-            </button>
-          ))}
-        </div>
-        <span className="spacer" />
-        <button className="btn" onClick={exportCSV}>
-          Export CSV
-        </button>
-      </div>
-      <div className="lhead grid-hist">
-        <div data-sort="company" className={sort.key === 'company' ? 'sorted' : ''} onClick={() => toggleSort('company')}>
-          Company<span className="caret">{caret('company')}</span>
-        </div>
-        <div data-sort="verdict" className={sort.key === 'verdict' ? 'sorted' : ''} onClick={() => toggleSort('verdict')}>
-          Verdict<span className="caret">{caret('verdict')}</span>
-        </div>
-        <div data-sort="prob" className={sort.key === 'prob' ? 'sorted' : ''} onClick={() => toggleSort('prob')}>
-          Predicted<span className="caret">{caret('prob')}</span>
-        </div>
-        <div data-sort="actual" className={sort.key === 'actual' ? 'sorted' : ''} onClick={() => toggleSort('actual')}>
-          Actual (net)<span className="caret">{caret('actual')}</span>
-        </div>
-        <div className="r">Call</div>
-      </div>
-      {rows.length ? (
-        <div className="rows">
-          {rows.map((h) => {
-            const m = VMETA[h.verdict]
-            const cm = callMark(h)
-            const pos = h.net_return > 0
-            return (
-              <div className="row grid-hist" key={h.ipo_id} style={{ cursor: 'default' }}>
-                <div className="co">
-                  <div className="name">{h.name}</div>
-                  <small>{h.listing_date ?? '—'}</small>
-                </div>
-                <div>
-                  <span className={`tag t-${m.cls}`}>{m.label}</span>
-                </div>
-                <div>
-                  {h.probability != null ? (
-                    <span className="mono">{pctOf(h.probability)}%</span>
-                  ) : (
-                    <span className="pending">n/a</span>
-                  )}
-                </div>
-                <div className={`actual ${pos ? 'pos' : 'neg'}`}>
-                  {pos ? '+' : ''}
-                  {(h.net_return * 100).toFixed(1)}%
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span className={`hitmark ${cm.c}`}>{cm.t}</span>
-                </div>
-              </div>
-            )
-          })}
+      {noHistory ? (
+        <div className="state">
+          <h3>No listed IPOs yet</h3>
+          <p>Past calls and their actual net-of-cost outcomes appear here once an IPO lists.</p>
         </div>
       ) : (
-        <div className="state">
-          <h3>No matching IPOs</h3>
-          <p>Nothing matches this filter and search.</p>
-        </div>
+        <>
+          <div className="hist-tools">
+            <div className="hist-search">
+              <Search />
+              <input
+                placeholder="Search history…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <div className="chips">
+              {chips.map((c) => (
+                <button
+                  key={c}
+                  className={filter === c ? 'chip on' : 'chip'}
+                  onClick={() => setFilter(c)}
+                >
+                  {c === 'all' ? 'All' : c}
+                </button>
+              ))}
+            </div>
+            <span className="spacer" />
+            <button className="btn" onClick={exportCSV}>
+              Export CSV
+            </button>
+          </div>
+          <div className="lhead grid-hist">
+            <div data-sort="company" className={sort.key === 'company' ? 'sorted' : ''} onClick={() => toggleSort('company')}>
+              Company<span className="caret">{caret('company')}</span>
+            </div>
+            <div data-sort="verdict" className={sort.key === 'verdict' ? 'sorted' : ''} onClick={() => toggleSort('verdict')}>
+              Verdict<span className="caret">{caret('verdict')}</span>
+            </div>
+            <div data-sort="prob" className={sort.key === 'prob' ? 'sorted' : ''} onClick={() => toggleSort('prob')}>
+              Predicted<span className="caret">{caret('prob')}</span>
+            </div>
+            <div data-sort="actual" className={sort.key === 'actual' ? 'sorted' : ''} onClick={() => toggleSort('actual')}>
+              Actual (net)<span className="caret">{caret('actual')}</span>
+            </div>
+            <div className="r">Call</div>
+          </div>
+          {rows.length ? (
+            <div className="rows">
+              {rows.map((h) => {
+                const m = VMETA[h.verdict]
+                const cm = callMark(h)
+                const pos = h.net_return > 0
+                return (
+                  <div
+                    className="row grid-hist"
+                    key={h.ipo_id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${h.name}, open detail`}
+                    onClick={() => onOpen(h.ipo_id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onOpen(h.ipo_id)
+                      }
+                    }}
+                  >
+                    <div className="co">
+                      <div className="name">{h.name}</div>
+                      <small>{h.listing_date ?? '—'}</small>
+                    </div>
+                    <div>
+                      <span className={`tag t-${m.cls}`}>{m.label}</span>
+                    </div>
+                    <div>
+                      {h.probability != null ? (
+                        <span className="mono">{pctOf(h.probability)}%</span>
+                      ) : (
+                        <span className="pending">n/a</span>
+                      )}
+                    </div>
+                    <div className={`actual ${pos ? 'pos' : 'neg'}`}>
+                      {pos ? '+' : ''}
+                      {(h.net_return * 100).toFixed(1)}%
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span className={`hitmark ${cm.c}`}>{cm.t}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="state">
+              <h3>No matching IPOs</h3>
+              <p>Nothing matches this filter and search.</p>
+            </div>
+          )}
+        </>
       )}
     </>
   )

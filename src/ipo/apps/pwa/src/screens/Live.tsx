@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBoard } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
+import { Loading } from '../components/Loading'
 import { getLastSeen, getPinned, seedLastSeen, togglePinned } from '../state/prefs'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
@@ -145,7 +146,7 @@ function Row({
 }
 
 export function Live({ onOpen }: { onOpen: (id: string) => void }) {
-  const { data, isLoading, isError } = useBoard()
+  const { data, isLoading, isError, refetch } = useBoard()
   const [sort, setSort] = useState<{ key: SortKey; dir: number }>({ key: 'verdict', dir: 1 })
   const [pinned, setPinned] = useState<Set<string>>(getPinned)
   const [attnDismissed, setAttnDismissed] = useState(false)
@@ -203,12 +204,15 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
     firstFlip.current = false
   }, [orderKey])
 
-  if (isLoading) return <div className="state">Loading verdicts…</div>
+  if (isLoading) return <Loading label="Loading verdicts…" />
   if (isError || !data)
     return (
       <div className="state">
         <h3>Couldn't load verdicts</h3>
         <p>The engine isn't responding. Check that it's running, then retry.</p>
+        <button className="btn" onClick={() => void refetch()}>
+          Retry
+        </button>
       </div>
     )
 

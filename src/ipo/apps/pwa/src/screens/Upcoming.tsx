@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { useBoard } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
-import { toast } from '../toast'
+import { Loading } from '../components/Loading'
 
 const midnight = (d: string) => new Date(d + 'T00:00:00')
 const today = () => {
@@ -53,35 +52,17 @@ function valuationLabel(pe: number | null, peer: number | null): string {
   return 'in line with peers'
 }
 
-function Bell() {
-  const [on, setOn] = useState(false)
-  return (
-    <button
-      className={on ? 'bell on' : 'bell'}
-      title="Notify when this opens / gets a verdict"
-      aria-pressed={on}
-      onClick={() =>
-        setOn((v) => {
-          toast(v ? 'Alert removed' : 'Alert set for this IPO')
-          return !v
-        })
-      }
-    >
-      <svg viewBox="0 0 24 24">
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
-      </svg>
-    </button>
-  )
-}
-
-export function Upcoming() {
-  const { data, isLoading, isError } = useBoard()
-  if (isLoading) return <div className="state">Loading calendar…</div>
+export function Upcoming({ onOpen }: { onOpen: (id: string) => void }) {
+  const { data, isLoading, isError, refetch } = useBoard()
+  if (isLoading) return <Loading label="Loading calendar…" />
   if (isError || !data)
     return (
       <div className="state">
         <h3>Couldn't load the calendar</h3>
         <p>The engine isn't responding.</p>
+        <button className="btn" onClick={() => void refetch()}>
+          Retry
+        </button>
       </div>
     )
 
@@ -104,14 +85,26 @@ export function Upcoming() {
         <div>Opens</div>
         <div>Structure preview</div>
         <div>Valuation</div>
-        <div className="r">Notify</div>
       </div>
       <div className="rows">
         {rows.map((row) => {
           const o = opensLabel(row)
           const a = anchorLabel(row)
           return (
-            <div className="row grid-up" key={row.ipo_id} style={{ cursor: 'default' }}>
+            <div
+              className="row grid-up"
+              key={row.ipo_id}
+              role="button"
+              tabIndex={0}
+              aria-label={`${row.name}, open detail`}
+              onClick={() => onOpen(row.ipo_id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onOpen(row.ipo_id)
+                }
+              }}
+            >
               <div className="co">
                 <div className="name">{row.name}</div>
                 <small>
@@ -127,9 +120,6 @@ export function Upcoming() {
               <div className="struct">{structureLabel(row.ofs_fraction)}</div>
               <div className="pending-sm" style={{ color: 'var(--tx2)', marginTop: 0 }}>
                 {valuationLabel(row.issue_pe, row.peer_median_pe)}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Bell />
               </div>
             </div>
           )

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useIpo, useTransitionsFor } from '../api/hooks'
 import type { IPODetail, IPOFeatures, SubscriptionPoint, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
+import { Loading } from '../components/Loading'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
 
@@ -167,17 +168,23 @@ function Contributions({ d }: { d: IPODetail }) {
 }
 
 export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
-  const { data: d, isLoading, isError } = useIpo(id)
+  const { data: d, isLoading, isError, refetch } = useIpo(id)
   const [copied, setCopied] = useState(false)
 
-  if (isLoading) return <div className="state">Loading verdict…</div>
+  if (isLoading) return <Loading label="Loading verdict…" />
   if (isError || !d)
     return (
       <div className="state">
         <h3>Couldn't load this IPO</h3>
-        <button className="btn" onClick={onBack}>
-          Back
-        </button>
+        <p>The engine isn't responding.</p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <button className="btn" onClick={() => void refetch()}>
+            Retry
+          </button>
+          <button className="btn" onClick={onBack}>
+            Back
+          </button>
+        </div>
       </div>
     )
 
@@ -296,17 +303,22 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               <span className="v">{x(r.retail_sub)}</span>
             </div>
             {d.retail_allotment_odds != null && (
-              <div className="r sub">
-                <span
-                  className="k gl"
-                  data-tip="Rough estimate of the chance a minimum-lot (1-lot) retail application is allotted ≈ min(1, 1 ÷ retail subscription). An approximation of the whole-lot allotment lottery — it tends to UNDER-state the real odds, since retail applicants average more than one lot. This is the chance of GETTING allotted, NOT the calibrated probability of a positive listing shown at the top."
-                >
-                  ↳ Est. allotment odds (1 lot)
-                </span>
-                <span className="v">
-                  ≈ {d.retail_allotment_odds >= 0.005 ? `${Math.round(d.retail_allotment_odds * 100)}%` : '<1%'}
-                </span>
-              </div>
+              <>
+                <div className="r sub">
+                  <span
+                    className="k gl"
+                    data-tip="Rough estimate of the chance a minimum-lot (1-lot) retail application is allotted ≈ min(1, 1 ÷ retail subscription). An approximation of the whole-lot allotment lottery — it tends to UNDER-state the real odds, since retail applicants average more than one lot. This is the chance of GETTING allotted, NOT the calibrated probability of a positive listing shown at the top."
+                  >
+                    ↳ Est. allotment odds (1 lot)
+                  </span>
+                  <span className="v">
+                    ≈ {d.retail_allotment_odds >= 0.005 ? `${Math.round(d.retail_allotment_odds * 100)}%` : '<1%'}
+                  </span>
+                </div>
+                <div className="alloc-note">
+                  chance of getting allotted — not the listing probability above
+                </div>
+              </>
             )}
             {r.overall_sub != null && (
               <div className="r">
