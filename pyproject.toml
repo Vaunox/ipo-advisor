@@ -89,6 +89,13 @@ disallow_untyped_defs = true
 init_typed = true
 warn_required_dynamic_aliases = true
 
+[[tool.mypy.overrides]]
+# tabpfn is a research-only optional dependency (the B7 bake-off in research/, quarantined and never
+# shipped). It is not a project dependency and ships no type stubs, so ignore its missing imports —
+# CI (which does not install it) stays green while the committed bake-off still type-checks.
+module = ["tabpfn.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

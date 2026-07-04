@@ -202,6 +202,15 @@ GMP failed the *hot* gate; the open question is whether it earns its weight **wh
 ## B7. Model-architecture bake-off (one-day experiment)
 **Keep the logistic core** — research is unambiguous that logistic is stable at your sample size and flexible ML overfits below ~10× the events-per-variable. The one credible challenger is **TabPFN v2**; run it through the same gate. **It must clear a higher bar than AUC/ECE:** adopting a black box forfeits the grounded reason (Rule 8), so it must win by enough to justify losing interpretability. Most likely (and fine) outcome: logistic stays, question closed with evidence.
 
+> **DONE (2026-07-04) — LOGISTIC STAYS, question closed with evidence.** TabPFN v2 (`ModelVersion.V2`,
+> ungated public `Prior-Labs/TabPFN-v2-clf` weights) vs the shipped fixed-weight-scorer→Platt core,
+> same walk-forward OOS gate on 358 IPOs (same 3 splits, same QIB/NII/retail features). AUC edge
+> within noise (**+0.004 / +0.009 / +0.018**, every 95% CI includes zero, none reaches the +0.03
+> decisive bar) and **ECE worse for TabPFN on all 3 splits** → not decisive. Interpretability +
+> operational cost (opaque ~29 MB/torch dependency, vendor telemetry, newer TabPFN line
+> license/account-gated) raise the bar further. **No `src/` change; scorer + calibrator untouched;**
+> quarantined in `research/`. Full result: `docs/B7_BAKEOFF.md`.
+
 ## B8. Regime-aware calibration — revisit when cold data accrues
 Currently annotation-only (didn't converge OOS on thin cold data). With enough cold history, re-face the same bar (OOS cold ECE within tolerance). A complementary honesty layer — **weighted conformal prediction** — gives distribution-free uncertainty bands that handle regime shift *without* requiring the per-regime calibrator to converge; worth evaluating as an add-on.
 
