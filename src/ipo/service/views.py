@@ -38,6 +38,12 @@ class IPODetail(BaseModel):
     features: IPOFeatures
     contributions: dict[str, float]
     retail_allotment_odds: float | None = None
+    # v2 B8 Idea 1: a distribution-free conformal uncertainty band ``[lo, hi]`` around
+    # ``verdict.probability`` — display-only honesty context (how much to trust the number in the
+    # current market), computed **downstream** and never a modification of the probability. Widens
+    # in unfamiliar/cold regimes, narrows when familiar. ``None`` when the calibrator abstains
+    # (no probability) or no conformal model is wired. Coverage-validated (docs/B8_CONFORMAL.md).
+    probability_band: tuple[float, float] | None = None
 
 
 class IPOListRow(BaseModel):

@@ -69,6 +69,10 @@ export interface IPODetail {
   // v2 A3 — separate downstream display estimate: approx P(1-lot retail allotment),
   // min(1, 1/retail_sub). Distinct from `verdict.probability`; show as an estimate. null = unknown.
   retail_allotment_odds: number | null
+  // v2 B8 Idea 1 — conformal uncertainty band [lo, hi] around verdict.probability. Display-only
+  // "realistic range" honesty context; never a second prediction. Widens in unfamiliar/cold
+  // markets, narrows when familiar. null when the calibrator abstains or no band model is wired.
+  probability_band: [number, number] | null
 }
 
 export interface IPOListRow {

@@ -240,6 +240,16 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
                   ? 'verdict set by kill-flag override'
                   : 'engine abstained — no number'}
             </div>
+            {showNumber && d.probability_band && (
+              <div
+                className="mono"
+                style={{ marginTop: 6, fontSize: 12, color: 'var(--tx3)', whiteSpace: 'nowrap' }}
+                data-tip="A distribution-free 'realistic range' for the probability (conformal prediction): it widens when the current market is unfamiliar/cold — where the model is less certain — and narrows when familiar. Honesty context around the number above, NOT a second prediction; validated to contain the actual outcome at its stated rate."
+              >
+                realistic range {Math.round(d.probability_band[0] * 100)}–
+                {Math.round(d.probability_band[1] * 100)}%
+              </div>
+            )}
           </div>
         </div>
 

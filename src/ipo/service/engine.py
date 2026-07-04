@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date, datetime
 
+from ipo.calibration.conformal import ConformalBands
 from ipo.calibration.label import is_positive, net_listing_return
 from ipo.calibration.regime import NiftyRegime, VixSeries
 from ipo.core.calendar import now_ist
@@ -50,6 +51,7 @@ class VerdictEngine:
         config: AppConfig,
         regime: NiftyRegime | None = None,
         vix: VixSeries | None = None,
+        conformal: ConformalBands | None = None,
         transitions: TransitionStore | None = None,
         clock: Callable[[], datetime] = now_ist,
     ) -> None:
@@ -65,6 +67,7 @@ class VerdictEngine:
         self._config = config
         self._regime = regime
         self._vix = vix
+        self._conformal = conformal
         self._transitions = transitions
         self._clock = clock
 
@@ -156,7 +159,23 @@ class VerdictEngine:
             # v2 A3: a separate downstream display estimate — computed here, never in the scoring
             # path above; does not and cannot affect ``verdict`` / ``probability``.
             retail_allotment_odds=retail_allotment_odds(record.retail_sub),
+            # v2 B8 Idea 1: conformal uncertainty band — also downstream of the final probability.
+            probability_band=self._probability_band(verdict, features),
         )
+
+    def _probability_band(
+        self, verdict: Verdict, features: IPOFeatures
+    ) -> tuple[float, float] | None:
+        """The conformal uncertainty band around the calibrated probability (v2 B8 Idea 1).
+
+        A read of the *already-final* ``verdict.probability`` and the point-in-time
+        ``market_regime`` — a display-only honesty companion to the cold flag that can never feed
+        back into the score. ``None`` when the calibrator abstained (no probability) or no
+        conformal model is wired.
+        """
+        if self._conformal is None or verdict.probability is None:
+            return None
+        return self._conformal.band(verdict.probability, features.market_regime)
 
     def verdicts(self, *, asof: datetime | None = None) -> list[Verdict]:
         """Compute verdicts for every stored IPO."""
