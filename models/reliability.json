@@ -2,46 +2,61 @@
   "version": "platt-1",
   "gate_passed": true,
   "source": "walk-forward out-of-sample",
-  "n": 233,
-  "base_rate": 0.6909871244635193,
-  "ece": 0.07272923952419429,
-  "brier": 0.16396909191835962,
-  "auc": 0.8115079365079365,
+  "n": 298,
+  "base_rate": 0.697986577181208,
+  "ece": 0.08134435367185353,
+  "brier": 0.1696519188932395,
+  "auc": 0.7967414529914529,
   "bins": [
     {
-      "mean_predicted": 0.37607309043405934,
-      "observed_rate": 0.4074074074074074,
-      "count": 27
+      "mean_predicted": 0.08040818133969829,
+      "observed_rate": 1.0,
+      "count": 1
     },
     {
-      "mean_predicted": 0.4478477791609032,
-      "observed_rate": 0.3684210526315789,
-      "count": 38
-    },
-    {
-      "mean_predicted": 0.5302748387691704,
-      "observed_rate": 0.4444444444444444,
+      "mean_predicted": 0.15828575519111743,
+      "observed_rate": 0.2222222222222222,
       "count": 9
     },
     {
-      "mean_predicted": 0.6590161298385089,
-      "observed_rate": 0.5714285714285714,
+      "mean_predicted": 0.2582913128688327,
+      "observed_rate": 0.5333333333333333,
+      "count": 15
+    },
+    {
+      "mean_predicted": 0.3403831344611965,
+      "observed_rate": 0.39622641509433965,
+      "count": 53
+    },
+    {
+      "mean_predicted": 0.43587362737673263,
+      "observed_rate": 0.3684210526315789,
+      "count": 19
+    },
+    {
+      "mean_predicted": 0.5794085902258416,
+      "observed_rate": 1.0,
+      "count": 4
+    },
+    {
+      "mean_predicted": 0.6511651836971416,
+      "observed_rate": 0.5,
+      "count": 12
+    },
+    {
+      "mean_predicted": 0.7304919583653738,
+      "observed_rate": 0.7142857142857143,
       "count": 14
     },
     {
-      "mean_predicted": 0.7419140065013381,
-      "observed_rate": 0.75,
-      "count": 16
+      "mean_predicted": 0.8621811212341479,
+      "observed_rate": 0.6060606060606061,
+      "count": 33
     },
     {
-      "mean_predicted": 0.8653039208305969,
-      "observed_rate": 0.7457627118644068,
-      "count": 59
-    },
-    {
-      "mean_predicted": 0.9157047992700417,
-      "observed_rate": 0.9714285714285714,
-      "count": 70
+      "mean_predicted": 0.9507497247122149,
+      "observed_rate": 0.9347826086956522,
+      "count": 138
     }
   ]
 }
