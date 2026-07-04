@@ -31,7 +31,7 @@ dev = [
     "pytest>=8.0",
     "types-PyYAML",
     "types-requests",
-    "httpx>=0.27",  # FastAPI TestClient (exercises the API over real HTTP in tests)
+    "httpx>=0.27,<1.0",  # FastAPI TestClient; cap <1.0 until the starlette/httpx2 cutover is handled
     "pre-commit>=3.6",
 ]
 packaging = [
@@ -93,3 +93,8 @@ warn_required_dynamic_aliases = true
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-ra -q"
+filterwarnings = [
+    # starlette 1.x nudges TestClient toward "httpx2"; our usage is fine on httpx 0.28.
+    # Benign forward-deprecation — silence it so the suite stays warning-clean (A4 housekeeping).
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]

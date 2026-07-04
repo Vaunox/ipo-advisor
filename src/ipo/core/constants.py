@@ -75,13 +75,26 @@ NSE_TRADING_HOLIDAYS: frozenset[date] = frozenset(
         date(2025, 10, 22),  # Diwali Balipratipada
         date(2025, 11, 5),  # Gurunanak Jayanti
         date(2025, 12, 25),  # Christmas
-        # 2026 (provisional — confirm against NSE's published 2026 calendar)
+        # 2026 — NSE 2026 trading-holiday circular (CMTR71775), cross-checked across
+        # Zerodha / ClearTax / Kotak Neo (unanimous on all 16 weekday dates).
+        date(2026, 1, 15),  # Municipal Election, Maharashtra
         date(2026, 1, 26),  # Republic Day
-        date(2026, 3, 17),  # Holi
+        date(2026, 3, 3),  # Holi
+        date(2026, 3, 26),  # Shri Ram Navami
+        date(2026, 3, 31),  # Shri Mahavir Jayanti
         date(2026, 4, 3),  # Good Friday
+        date(2026, 4, 14),  # Dr. Baba Saheb Ambedkar Jayanti
         date(2026, 5, 1),  # Maharashtra Day
-        date(2026, 8, 15),  # Independence Day
-        date(2026, 10, 2),  # Gandhi Jayanti
+        date(2026, 5, 28),  # Bakri Id
+        date(2026, 6, 26),  # Muharram
+        date(2026, 9, 14),  # Ganesh Chaturthi
+        date(2026, 10, 2),  # Mahatma Gandhi Jayanti
+        date(2026, 10, 20),  # Dussehra
+        date(2026, 11, 10),  # Diwali Balipratipada
+        date(2026, 11, 24),  # Gurunanak Jayanti
         date(2026, 12, 25),  # Christmas
+        # Independence Day (Aug 15) and Diwali Laxmi Pujan (Nov 8) fall on weekends in
+        # 2026; Muhurat trading on Nov 8 is a special session, not a holiday. Weekends
+        # are handled in core.calendar, so weekend-coincident holidays are omitted here.
     }
 )

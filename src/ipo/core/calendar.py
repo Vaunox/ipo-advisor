@@ -56,3 +56,24 @@ def trading_days_between(start: date, end: date) -> list[date]:
             days.append(cursor)
         cursor += timedelta(days=1)
     return days
+
+
+def latest_covered_year() -> int:
+    """Return the last calendar year the holiday set covers.
+
+    The holiday set MUST be reviewed each December when NSE publishes the next year's
+    calendar (see ``core.constants``). Exposing the horizon lets an operator check flag a
+    stale calendar before it silently treats an un-loaded holiday as a trading day.
+    """
+    return max(day.year for day in NSE_TRADING_HOLIDAYS)
+
+
+def review_due(today: date | None = None) -> bool:
+    """True when the holiday calendar should be extended with the next year's NSE circular.
+
+    Becomes due once the current date reaches the last covered year: by then NSE has
+    published (or is about to publish) the following year's holidays, and the tail of the
+    calendar is one bad assumption away from treating a real holiday as a trading day.
+    """
+    ref = today or now_ist().date()
+    return ref.year >= latest_covered_year()
