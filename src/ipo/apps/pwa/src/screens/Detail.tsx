@@ -186,8 +186,9 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   const isKill = v.kill_flags.length > 0
   const showNumber = v.probability != null && !isKill
   const pct = v.probability != null ? Math.round(v.probability * 100) : null
-  const cold = v.watch.find((w) => /cold market/i.test(w))
-  const watch = v.watch.filter((w) => !/cold market/i.test(w))
+  // Graded regime caveat (v2 B9): cold OR the milder soft tier — both render in the caveat box.
+  const regimeCaveat = v.watch.find((w) => /cold market|softening market/i.test(w))
+  const watch = v.watch.filter((w) => !/cold market|softening market/i.test(w))
   const fresh = r.ofs_fraction != null ? `${Math.round((1 - r.ofs_fraction) * 100)} / ${Math.round(r.ofs_fraction * 100)}` : '—'
   const band = `₹${r.price_band_low}–${r.price_band_high}`
 
@@ -375,12 +376,12 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
           </span>
         </div>
 
-        {cold && (
+        {regimeCaveat && (
           <div className="caveat">
             <IconAlert />
             <span>
-              <b>Cold market — probability less certain.</b> Annotation only; it does not change the
-              number above.
+              <b>{regimeCaveat.charAt(0).toUpperCase() + regimeCaveat.slice(1)}.</b> Annotation
+              only; it does not change the number above.
             </span>
           </div>
         )}

@@ -29,6 +29,9 @@ verdict_thresholds:
   # below this market_regime the verdict is FLAGGED (ranking reliable, probability less
   # certain) rather than the number being forced. See docs/REGIME_FIX.md.
   cold_regime_flag: -0.3
+  # Graded tiers (v2 B9, annotation-only): normal > soft; soft (soft>=regime>cold) = milder caveat;
+  # cold (<=cold) = strong caveat. Round-number a-priori boundary, untuned. Never moves the number.
+  soft_regime_flag: -0.15
 
 calibration:
   # Calibration is SACRED. These govern the Phase-4 reliability gate.

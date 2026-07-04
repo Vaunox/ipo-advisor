@@ -78,6 +78,10 @@ class VerdictThresholds(_Section):
     # Below this market_regime, flag the verdict "cold market — probability less certain"
     # (the regime stress-test landed on gate/flag, not forcing the cold probability).
     cold_regime_flag: float = Field(default=-0.3, ge=-1, le=1)
+    # Graded regime-flag tiers (v2 B9): normal (> soft) → no caveat, soft (cold < r ≤ soft) → a
+    # milder caveat, cold (≤ cold) → the strong caveat. Round-number a-priori boundary, NOT tuned
+    # to outcomes; annotation-only (weight 0) — only the caveat text changes, never the probability.
+    soft_regime_flag: float = Field(default=-0.15, ge=-1, le=1)
 
 
 class CalibrationConfig(_Section):

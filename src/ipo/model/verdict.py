@@ -17,7 +17,7 @@ otherwise the verdict carries ``probability=None`` and an uncalibrated banner
 
 from __future__ import annotations
 
-from ipo.core.config import AppConfig
+from ipo.core.config import AppConfig, VerdictThresholds
 from ipo.core.interfaces import Calibrator, ScoringModel
 from ipo.core.types import IPOFeatures, IPORecord, Verdict, VerdictType
 from ipo.model.killflags import kill_flags
@@ -39,6 +39,29 @@ def map_probability(probability: float, apply_cutoff: float, marginal_cutoff: fl
     if probability >= marginal_cutoff:
         return VerdictType.MARGINAL
     return VerdictType.SKIP
+
+
+# Graded cold-market caveats per regime tier (v2 B9). The 'cold' text is unchanged from the binary
+# flag (the UI keys on "cold market"); 'soft' is the milder middle tier. 'normal' → no caveat.
+_REGIME_CAVEAT: dict[str, str] = {
+    "soft": "softening market — ranking reliable, probability a touch less certain",
+    "cold": "cold market — ranking reliable, probability less certain",
+}
+
+
+def regime_tier(market_regime: float | None, thresholds: VerdictThresholds) -> str:
+    """Grade the point-in-time market_regime into ``'normal' | 'soft' | 'cold'`` (v2 B9).
+
+    Annotation-only — ``market_regime``'s scorer weight is 0, so the tier only selects a graded
+    cold-market caveat, never a score change. Boundaries are untuned round numbers
+    (``soft_regime_flag`` / ``cold_regime_flag``), chosen a-priori and NOT fit to listing outcomes.
+    ``None`` (no regime history) grades as ``'normal'`` — no caveat.
+    """
+    if market_regime is None or market_regime > thresholds.soft_regime_flag:
+        return "normal"
+    if market_regime <= thresholds.cold_regime_flag:
+        return "cold"
+    return "soft"
 
 
 def evaluate(
@@ -87,13 +110,12 @@ def evaluate(
         probability=probability,
     )
 
-    # Regime stress-test outcome: in a cold market the *ranking* is reliable but the
-    # *probability* does not calibrate out-of-sample, so flag rather than force it.
-    if (
-        features.market_regime is not None
-        and features.market_regime <= config.verdict_thresholds.cold_regime_flag
-    ):
-        watch.append("cold market — ranking reliable, probability less certain")
+    # Regime stress-test outcome: in an adverse market the *ranking* is reliable but the
+    # *probability* does not calibrate out-of-sample, so flag rather than force it. Graded into
+    # normal/soft/cold tiers (v2 B9) — annotation-only (weight 0); the number is never touched.
+    caveat = _REGIME_CAVEAT.get(regime_tier(features.market_regime, config.verdict_thresholds))
+    if caveat is not None:
+        watch.append(caveat)
 
     return Verdict(
         ipo_id=features.ipo_id,
