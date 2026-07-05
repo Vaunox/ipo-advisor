@@ -96,6 +96,13 @@ warn_required_dynamic_aliases = true
 module = ["tabpfn.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# pandas is a research-only dependency (the B1 trajectory probe in research/, quarantined and never
+# shipped — the engine uses pyarrow, not pandas). It is not a project dependency, so ignore its
+# missing stubs — CI (which does not install it) stays green while the committed probe type-checks.
+module = ["pandas.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
