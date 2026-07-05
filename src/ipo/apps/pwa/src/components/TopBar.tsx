@@ -6,7 +6,7 @@ import { Clock } from './Clock'
 import { ThemeToggle } from './ThemeToggle'
 
 // Always-visible data-state chip: shows when the app is refreshing, when it last successfully
-// refreshed ("Updated HH:MM" IST), and — when the engine is unreachable — that it's reconnecting.
+// refreshed ("Updated h:mm AM/PM" IST), and — when the engine is unreachable — that it's reconnecting.
 // So the user always knows what the app is doing with the live feed. Reads react-query state only.
 function SyncStatus() {
   const fetching = useIsFetching()
@@ -15,8 +15,8 @@ function SyncStatus() {
   const updated = board.dataUpdatedAt
     ? new Date(board.dataUpdatedAt).toLocaleTimeString('en-US', {
         timeZone: 'Asia/Kolkata',
-        hour12: false,
-        hour: '2-digit',
+        hour12: true,
+        hour: 'numeric',
         minute: '2-digit',
       })
     : null
