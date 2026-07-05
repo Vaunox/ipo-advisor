@@ -122,7 +122,7 @@ export function Settings() {
           <Switch on={notif.anyChange} onToggle={() => toggle('anyChange')} />
         </div>
         <div className="set-row">
-          <div className="k">Quiet hours (22:00–08:00 IST)</div>
+          <div className="k">Quiet hours (10 PM – 8 AM IST)</div>
           <Switch on={notif.quiet} onToggle={() => toggle('quiet')} />
         </div>
       </div>
