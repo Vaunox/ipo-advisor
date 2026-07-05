@@ -16,7 +16,8 @@ which runs, in order:
 1. `packaging/make_icon.py` → `src/ipo/apps/desktop/build/icon.ico` (branded diamond mark)
 2. `packaging/build_engine.py` → `packaging/dist/ipo-engine/` — PyInstaller freezes the FastAPI
    engine into `ipo-engine.exe`, bundling **config, models (calibrator + held-out reliability),
-   the Nifty regime series, and a curated demo store** (`_seed/`)
+   and the Nifty + India-VIX regime series** (live-only build — no demo store ships; the app fills
+   from live NSE ingestion)
 3. PWA `npm run build` → `src/ipo/apps/pwa/dist/`
 4. desktop `npm run dist` (electron-builder, NSIS) →
    `src/ipo/apps/desktop/release/IPO-Advisor-Setup-0.7.0.exe`
@@ -33,7 +34,8 @@ target machine.
   change (caught during S18 verification).
 - **Writable data** (record store + verdict-transition log) lives under the per-user app-data dir
   (`%APPDATA%/IPO Advisor/engine-data`); Program Files is read-only. On first launch the engine
-  copies the bundled demo store in (never overwriting existing user data).
+  provisions the store (versioned); the live-only build ships no demo data, so live NSE ingestion
+  fills it (never overwriting existing user data).
 
 ## What the shell does (Electron)
 
@@ -58,7 +60,7 @@ Automated here (reproducible):
 - ✅ Installer builds end-to-end (NSIS, 126 MB); the packaged tree contains `IPO Advisor.exe`,
   `resources/engine/ipo-engine.exe` (+ bundled config/models/_seed), `resources/pwa/`, and the icon.
 - ✅ The **shipped** engine binary (inside `win-unpacked`) serves the board + provisions.
-- ✅ Backend suite (211) green; PWA + desktop TypeScript compile.
+- ✅ Backend suite (269) green; PWA + desktop TypeScript compile.
 
 Needs a manual GUI run (not automatable in this environment):
 

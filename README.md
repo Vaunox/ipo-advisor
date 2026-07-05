@@ -1,6 +1,6 @@
 # IPO Listing-Gains Advisor — Build Handoff
 
-This folder is a **build handoff** for a coding agent (e.g. Claude Code). No source code is included yet — the agent builds it from these specs, phase by phase.
+This project is **built, shipped, and closed** — a private Windows app that serves genuine NSE-live IPO verdicts. The archival record of *why the model is shaped as it is* (every gate, CI, and rejected feature) lives in [`docs/PROJECT_LOG.md`](docs/PROJECT_LOG.md); the *how to operate/maintain it* procedures in [`operations/README.md`](operations/README.md). The specs below (blueprint + deep dives) remain the governing design; the folder was originally a build handoff for a coding agent (e.g. Claude Code).
 
 ## Contents
 - `MASTER_BLUEPRINT_IPO_Listing_Advisor_Handoff.md` — the spec to build from, top to bottom. Engineering ground rules, locked decisions, the seven-layer architecture, and a phase-gated build program (Phase 0 → the Windows `.exe` + Android APK).

@@ -1,8 +1,8 @@
 """Build the engine sidecar binary with PyInstaller (GATE 7, step 1).
 
-Ensures the curated demo store + clean transition log exist (so the bundled ``_seed`` is fresh),
-then freezes ``packaging/engine_entry.py`` via ``packaging/ipo-engine.spec`` into
-``packaging/dist/ipo-engine/``. electron-builder picks that folder up as an extraResource.
+Freezes ``packaging/engine_entry.py`` via ``packaging/ipo-engine.spec`` into
+``packaging/dist/ipo-engine/`` (live-only build — no demo store is bundled). electron-builder
+picks that folder up as an extraResource.
 
     python -m packaging.build_engine
 """

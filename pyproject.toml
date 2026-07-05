@@ -62,7 +62,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]            # tests need not be docstring-complete
 "scripts/*" = ["D"]
-"research/*" = ["D"]         # dead code, excluded from the build (see research/README.md)
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -76,7 +75,7 @@ python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
-files = ["src", "tests", "scripts", "research"]  # research/ is dev-checked but never built/shipped
+files = ["src", "tests", "scripts"]
 # Ignore JS/packaging build artifacts that live under src/ (electron-builder release/, the frozen
 # engine's bundled site-packages, node_modules) — they are not our source. mypy, unlike ruff/black,
 # does not honor .gitignore.
@@ -88,20 +87,6 @@ disallow_untyped_defs = true
 [tool.pydantic-mypy]
 init_typed = true
 warn_required_dynamic_aliases = true
-
-[[tool.mypy.overrides]]
-# tabpfn is a research-only optional dependency (the B7 bake-off in research/, quarantined and never
-# shipped). It is not a project dependency and ships no type stubs, so ignore its missing imports —
-# CI (which does not install it) stays green while the committed bake-off still type-checks.
-module = ["tabpfn.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-# pandas is a research-only dependency (the B1 trajectory probe in research/, quarantined and never
-# shipped — the engine uses pyarrow, not pandas). It is not a project dependency, so ignore its
-# missing stubs — CI (which does not install it) stays green while the committed probe type-checks.
-module = ["pandas.*"]
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

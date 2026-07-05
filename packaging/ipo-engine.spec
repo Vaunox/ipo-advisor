@@ -2,8 +2,9 @@
 #
 # Produces packaging/dist/ipo-engine/ipo-engine.exe + an _internal/ folder, which electron-builder
 # copies into the app's resources/engine/. The Electron shell spawns it with --port <free> and
-# --data-dir <userData>. Read-only artifacts (calibrator, held-out reliability report, Nifty
-# regime series) and the curated demo store (_seed) are bundled so the binary is self-contained.
+# --data-dir <userData>. Read-only artifacts (calibrator, held-out reliability report, Nifty +
+# India-VIX regime series) are bundled so the binary is self-contained. Live-only build: no demo
+# store is bundled; the app starts empty and fills from live NSE ingestion.
 #
 # Build:  pyinstaller packaging/ipo-engine.spec --noconfirm   (see packaging/build_engine.py)
 
@@ -64,7 +65,28 @@ a = Analysis(  # noqa: F821
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "PIL", "pytest"],
+    excludes=[
+        "tkinter",
+        "matplotlib",
+        "PIL",
+        "pytest",
+        # Research-only ML deps that linger in the dev venv (TabPFN/B7 -> torch; B1 probe -> pandas;
+        # HF dataset pulls -> huggingface_hub/hf_xet). The shipped engine NEVER imports them
+        # (proven: nothing under src/ipo imports torch/pandas/scipy/etc.), but PyInstaller would
+        # otherwise greedily collect them from site-packages and bloat the bundle by ~500 MB. Keep
+        # the frozen sidecar lean — these belong to the removed research/, not the product.
+        "torch",
+        "pandas",
+        "scipy",
+        "tabpfn",
+        "transformers",
+        "huggingface_hub",
+        "hf_xet",
+        "sympy",
+        "networkx",
+        "mpmath",
+        "sklearn",
+    ],
     noarchive=False,
 )
 pyz = PYZ(a.pure)  # noqa: F821
