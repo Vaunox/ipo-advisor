@@ -1,20 +1,57 @@
 import { useIsFetching } from '@tanstack/react-query'
+import { useBoard, useHealth } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { AlertCenter } from './AlertCenter'
 import { Clock } from './Clock'
 import { ThemeToggle } from './ThemeToggle'
 
-// A quiet always-present "live" dot that pulses while any query is in flight — so a background
-// refresh (react-query refetches on its interval) is visible instead of numbers silently changing.
-function SyncIndicator() {
+// Always-visible data-state chip: shows when the app is refreshing, when it last successfully
+// refreshed ("Updated HH:MM" IST), and — when the engine is unreachable — that it's reconnecting.
+// So the user always knows what the app is doing with the live feed. Reads react-query state only.
+function SyncStatus() {
   const fetching = useIsFetching()
+  const health = useHealth()
+  const board = useBoard()
+  const updated = board.dataUpdatedAt
+    ? new Date(board.dataUpdatedAt).toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null
+
+  let state: 'err' | 'busy' | 'ok'
+  let text: string
+  if (health.isError) {
+    state = 'err'
+    text = 'Reconnecting…'
+  } else if (fetching > 0) {
+    state = 'busy'
+    text = 'Refreshing…'
+  } else {
+    state = 'ok'
+    text = updated ? `Updated ${updated} IST` : 'Live'
+  }
+
   return (
-    <span
-      className={fetching ? 'sync on' : 'sync'}
-      title={fetching ? 'Refreshing data…' : 'Live · up to date'}
+    <div
+      className={`syncstat ${state}`}
       role="status"
-      aria-label={fetching ? 'Refreshing data' : 'Data up to date'}
-    />
+      aria-live="polite"
+      title={
+        state === 'err'
+          ? "Couldn't reach the engine — retrying automatically"
+          : state === 'busy'
+            ? 'Refreshing from the live feed…'
+            : updated
+              ? `Last refreshed ${updated} IST`
+              : 'Live'
+      }
+    >
+      <span className={state === 'err' ? 'sync err' : state === 'busy' ? 'sync on' : 'sync'} />
+      <span className="syncstat-t">{text}</span>
+    </div>
   )
 }
 
@@ -42,7 +79,7 @@ export function TopBar({
         <button className="kbtn" onClick={onSearch}>
           Search <kbd>Ctrl K</kbd>
         </button>
-        <SyncIndicator />
+        <SyncStatus />
         <Clock />
         <ThemeToggle />
       </div>

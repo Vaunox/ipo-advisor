@@ -41,7 +41,11 @@ export function Sidebar({
             onClick={() => onNavigate(n.id)}
           >
             {n.icon} {n.label}
-            {counts[n.id] != null && <span className="count">{counts[n.id]}</span>}
+            {/* Live/Upcoming counts are bounded, current-state signals worth showing. History is a
+                cumulative archive total — not actionable and only grows uglier — so no badge there. */}
+            {n.id !== 'history' && counts[n.id] != null && (
+              <span className="count">{counts[n.id]}</span>
+            )}
           </button>
         ))}
       </nav>

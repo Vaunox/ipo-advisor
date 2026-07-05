@@ -227,6 +227,16 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
   const cls = (key: SortKey) => (sort.key === key ? 'sorted' : '')
 
   const closing = data.filter((r) => statusLabel(r).closesToday)
+  // Nearest not-yet-open IPO on the calendar (data already on the board) — powers the empty-state hint.
+  const nextUp = data
+    .filter((r) => r.listing_date == null && midnight(r.open_date) > today())
+    .sort((a, b) => +midnight(a.open_date) - +midnight(b.open_date))[0]
+  const fmtOpen = (iso: string) =>
+    new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
 
   return (
     <>
@@ -279,11 +289,19 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
       ) : (
         <div className="state">
           <h3>No IPOs open right now</h3>
-          <p>
-            No mainboard book is currently open. Live verdicts appear here the moment an issue opens
-            and its subscription data lands — check Upcoming for what's next, or History for past
-            calls.
-          </p>
+          {nextUp ? (
+            <p>
+              No mainboard book is currently open. <b>Next up — {nextUp.name}</b>, opens{' '}
+              {fmtOpen(nextUp.open_date)}. See <b>Upcoming</b> for the full calendar, or{' '}
+              <b>History</b> for past calls.
+            </p>
+          ) : (
+            <p>
+              No mainboard book is currently open, and none are on the calendar yet. Live verdicts
+              appear here the moment an issue opens and its subscription lands. See <b>History</b>{' '}
+              for past calls.
+            </p>
+          )}
         </div>
       )}
     </>

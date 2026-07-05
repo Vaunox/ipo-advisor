@@ -14,6 +14,14 @@ const Search = () => (
 
 const pctOf = (frac: number): number => Math.round(frac * 100)
 
+// Reliability buckets are fixed deciles server-side (np.linspace(0,1,11)); empty ones are dropped.
+// Label each by its clean decile RANGE for at-a-glance reading, derived from the bin's own mean
+// (which always lies inside its decile). Presentation/labeling only — the mean, observed rate, n,
+// and ECE are unchanged; the precise average is shown in the hover tooltip.
+const bandLo = (mean: number): number => Math.min(0.9, Math.floor(mean * 10) / 10)
+const bandLabel = (mean: number): string =>
+  `${Math.round(bandLo(mean) * 100)}–${Math.round((bandLo(mean) + 0.1) * 100)}%`
+
 function callMark(h: HistoryRow): { t: string; c: string } {
   if (h.verdict === 'APPLY')
     return h.listed_positive ? { t: '✓ HIT', c: 'hit' } : { t: '✗ MISS', c: 'miss' }
@@ -118,7 +126,9 @@ function ReliabilityDiagram({ cal }: { cal: CalibrationView }) {
               cx={X(b.mean_predicted)}
               cy={Y(b.observed_rate)}
               r={3.5 + (b.count / maxN) * 6}
-            />
+            >
+              <title>{`${bandLabel(b.mean_predicted)} predicted · avg ${pctOf(b.mean_predicted)}% · observed ${pctOf(b.observed_rate)}% · n${b.count}`}</title>
+            </circle>
           ))}
           {ticks.map((t) => (
             <text key={`x${t}`} className="rd-tick" x={X(t)} y={P + S + 13} textAnchor="middle">
@@ -143,7 +153,12 @@ function ReliabilityDiagram({ cal }: { cal: CalibrationView }) {
           <div className="rd-buckets">
             {cal.bins.map((b, i) => (
               <div className="rd-brow" key={i}>
-                <span className="bp">{pctOf(b.mean_predicted)}% pred</span>
+                <span
+                  className="bp gl"
+                  data-tip={`${bandLabel(b.mean_predicted)} predicted · avg prediction ${pctOf(b.mean_predicted)}% · observed ${pctOf(b.observed_rate)}% · n${b.count}`}
+                >
+                  {bandLabel(b.mean_predicted)}
+                </span>
                 <span className="bar">
                   <i style={{ width: `${pctOf(b.observed_rate)}%` }} />
                 </span>

@@ -129,6 +129,39 @@ function contribLabel(key: string, f: IPOFeatures): string {
   }
 }
 
+const _SUB_KEYS = new Set(['qib_sub', 'nii_sub', 'retail_sub'])
+
+// Plain-language headline for the verdict, composed from the SAME signed contributions the engine
+// produced (already shown as the bars below). Presentation only — it verbalizes the dominant driver,
+// derives no new number, and the exact engine reason string stays verbatim beneath it.
+function plainLead(d: IPODetail): string | null {
+  const entries = Object.entries(d.contributions).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+  if (!entries.length) return null
+  const [key, val] = entries[0]
+  const pos = val >= 0
+  const phrases: Record<string, [string, string]> = {
+    qib_sub: ['Strong institutional demand', 'Soft institutional demand'],
+    nii_sub: ['Strong high-net-worth (NII) demand', 'Weak high-net-worth (NII) demand'],
+    retail_sub: ['Strong retail demand', 'Thin retail demand'],
+    anchor_quality: ['High-quality anchor book', 'Weak anchor backing'],
+    relative_valuation: ['Attractively valued vs peers', 'Richly valued vs peers'],
+    ofs_fraction: ['Mostly fresh-capital raise', 'Heavy offer-for-sale'],
+    market_regime: ['Supportive market backdrop', 'Cold market backdrop'],
+  }
+  const pair = phrases[key]
+  if (!pair) return null
+  let tail = contribLabel(key, d.features)
+  if (_SUB_KEYS.has(key)) {
+    // Whole-× to match the engine's grounded-reason line (which rounds), not the 2-decimal
+    // subscription-card value — so the headline and the reason beneath it never disagree.
+    const v =
+      key === 'qib_sub' ? d.features.qib_sub : key === 'nii_sub' ? d.features.nii_sub : d.features.retail_sub
+    const name = key === 'qib_sub' ? 'QIB' : key === 'nii_sub' ? 'NII' : 'Retail'
+    if (v != null) tail = `${name} ${Math.round(v)}× ${v >= 1 ? 'oversubscribed' : 'undersubscribed'}`
+  }
+  return `${pos ? pair[0] : pair[1]} — ${tail}`
+}
+
 function whatIf(verdict: VerdictType, isKill: boolean): string {
   if (verdict === 'APPLY')
     return 'Holds as APPLY while the QIB book stays strong and no kill-flag fires. Softens to MARGINAL if institutional demand faded or the valuation re-rated rich.'
@@ -198,6 +231,12 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   const watch = v.watch.filter((w) => !/cold market|softening market/i.test(w))
   const fresh = r.ofs_fraction != null ? `${Math.round((1 - r.ofs_fraction) * 100)} / ${Math.round(r.ofs_fraction * 100)}` : '—'
   const band = `₹${r.price_band_low}–${r.price_band_high}`
+  const lead = plainLead(d)
+  // Allotment odds are a conservative FLOOR (retail applicants average >1 lot, so real odds are
+  // usually higher) — framed as "at least ~X%", visually distinct from the calibrated probability.
+  const allot = d.retail_allotment_odds
+  const allotFloor =
+    allot == null ? null : allot >= 0.995 ? '~100%' : allot >= 0.01 ? `~${Math.round(allot * 100)}%` : '<1%'
 
   const copy = () => {
     const txt = `${r.name} — ${v.verdict}${showNumber ? ` (${pct}% calibrated)` : ''}. ${v.reason}. Advisory only, not financial advice.`
@@ -252,21 +291,25 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
 
         {showNumber && (
           <div className="card meterbar">
-            <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--tx3)', whiteSpace: 'nowrap' }}>
+            <div className="mono" style={{ fontSize: 11, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--tx2)', whiteSpace: 'nowrap' }}>
               Calibrated P(positive listing)
             </div>
             <div className="bigmeter">
               <i style={{ width: `${pct}%` }} />
             </div>
-            <div className="mono" style={{ color: 'var(--tx3)', fontSize: 12, whiteSpace: 'nowrap' }}>
+            <div className="mono" style={{ color: 'var(--tx2)', fontSize: 12.5, whiteSpace: 'nowrap' }}>
               {pct} / 100
             </div>
           </div>
         )}
 
         <div className="card">
-          <h3 className="sec">Grounded reason</h3>
-          <p className="reason-body">{v.reason}</p>
+          <h3 className="sec">Why this verdict</h3>
+          {lead && <p className="reason-lead">{lead}</p>}
+          <p className="reason-body">
+            <span className="reason-src">grounded reason</span>
+            {v.reason}
+          </p>
           <h3 className="sec" style={{ marginTop: 22 }}>
             What drove this
           </h3>
@@ -302,23 +345,18 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               <span className="k gl" data-tip="Retail Individual Investors — bids up to ₹2 lakh. A retail-led book is a weaker signal than a QIB-led one.">Retail</span>
               <span className="v">{x(r.retail_sub)}</span>
             </div>
-            {d.retail_allotment_odds != null && (
-              <>
-                <div className="r sub">
+            {allotFloor != null && (
+              <div className="alloc">
+                <div className="alloc-head">
                   <span
-                    className="k gl"
-                    data-tip="Rough estimate of the chance a minimum-lot (1-lot) retail application is allotted ≈ min(1, 1 ÷ retail subscription). An approximation of the whole-lot allotment lottery — it tends to UNDER-state the real odds, since retail applicants average more than one lot. This is the chance of GETTING allotted, NOT the calibrated probability of a positive listing shown at the top."
+                    className="alloc-lab gl"
+                    data-tip="Estimated chance a 1-lot retail application receives an allotment ≈ min(1, 1 ÷ retail subscription). A conservative FLOOR: it under-states the real odds because retail applicants average more than one lot. This is the chance of GETTING SHARES — a different thing from the calibrated probability of a positive listing shown at the top."
                   >
-                    ↳ Est. allotment odds (1 lot)
+                    Retail allotment odds · est. floor
                   </span>
-                  <span className="v">
-                    ≈ {d.retail_allotment_odds >= 0.005 ? `${Math.round(d.retail_allotment_odds * 100)}%` : '<1%'}
-                  </span>
+                  <span className="alloc-val mono">≥ {allotFloor}</span>
                 </div>
-                <div className="alloc-note">
-                  chance of getting allotted — not the listing probability above
-                </div>
-              </>
+              </div>
             )}
             {r.overall_sub != null && (
               <div className="r">
