@@ -78,21 +78,28 @@ export function App() {
   const engineDown = health.isError
   useCrossingNotifications() // native OS toast on a new APPLY crossing (desktop shell only)
 
-  // Nav count chips: the size of each section, derived from the board (the same partitions the
-  // Upcoming / History screens render) — no extra fetch, no fabricated numbers.
+  // Nav count chips: the size of each section, derived from the board with the SAME partitions the
+  // Live / Upcoming / History screens render (no extra fetch, no fabricated numbers). `live` must
+  // match the Live screen (open now or closes today) — NOT the raw record count, which also holds
+  // closed/listed rows the Live screen filters out.
   const counts = useMemo(() => {
     const rows = board.data ?? []
     const t = new Date()
     t.setHours(0, 0, 0, 0)
     const midnight = (d: string) => +new Date(`${d}T00:00:00`)
+    let live = 0
     let upcoming = 0
     let history = 0
     for (const r of rows) {
       const listed = r.listing_date != null && midnight(r.listing_date) <= +t
-      if (listed) history += 1
-      else if (midnight(r.close_date) >= +t) upcoming += 1
+      if (listed || midnight(r.close_date) < +t) {
+        history += 1 // listed, or the book has closed → History's domain (outcome or awaiting)
+      } else {
+        upcoming += 1 // not listed and book not yet closed → on the calendar
+        if (midnight(r.open_date) <= +t) live += 1 // …and already open → live now
+      }
     }
-    return { live: rows.length, upcoming, history }
+    return { live, upcoming, history }
   }, [board.data])
 
   const navigate = (v: View) => {
