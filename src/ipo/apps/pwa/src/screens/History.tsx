@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useCalibration, useHistory } from '../api/hooks'
-import type { CalibrationView, HistoryRow, VerdictType } from '../api/types'
+import { useBoard, useCalibration, useHistory } from '../api/hooks'
+import type { CalibrationView, HistoryRow, IPOListRow, VerdictType } from '../api/types'
 import { Loading } from '../components/Loading'
 import { getCosts } from '../state/prefs'
 import { VMETA } from '../verdict'
@@ -182,6 +182,69 @@ function ReliabilityDiagram({ cal }: { cal: CalibrationView }) {
   )
 }
 
+const awMidnight = (d: string): number => +new Date(`${d}T00:00:00`)
+const awToday = (): number => {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return +d
+}
+
+// Once a book closes the IPO leaves Live, but its net-of-cost outcome can't be shown until it lists
+// and the listing price backfills. This surfaces those in-between IPOs so a closed / just-listed
+// call never silently vanishes between Live and the outcome table below.
+function AwaitingList({ rows, onOpen }: { rows: IPOListRow[]; onOpen: (id: string) => void }) {
+  if (!rows.length) return null
+  const status = (r: IPOListRow): string =>
+    r.listing_date != null && awMidnight(r.listing_date) <= awToday()
+      ? 'listed · outcome pending'
+      : 'book closed · awaiting listing'
+  return (
+    <div className="card">
+      <h3 className="sec">Awaiting listing outcome ({rows.length})</h3>
+      <div className="rows">
+        {rows.map((r) => {
+          const m = VMETA[r.verdict]
+          return (
+            <div
+              className="row grid-hist"
+              key={r.ipo_id}
+              role="button"
+              tabIndex={0}
+              aria-label={`${r.name}, open detail`}
+              onClick={() => onOpen(r.ipo_id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onOpen(r.ipo_id)
+                }
+              }}
+            >
+              <div className="co">
+                <div className="name">{r.name}</div>
+                <small>{status(r)}</small>
+              </div>
+              <div>
+                <span className={`tag t-${m.cls}`}>{m.label}</span>
+              </div>
+              <div>
+                {r.probability != null ? (
+                  <span className="mono">{pctOf(r.probability)}%</span>
+                ) : (
+                  <span className="pending">n/a</span>
+                )}
+              </div>
+              <div className="pending">—</div>
+              <div style={{ textAlign: 'right' }}>
+                <span className="hitmark neutral">pending</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 type SortKey = 'company' | 'verdict' | 'prob' | 'actual' | 'date'
 
 function csvCell(v: string): string {
@@ -191,6 +254,7 @@ function csvCell(v: string): string {
 export function History({ onOpen }: { onOpen: (id: string) => void }) {
   const { data: history, isLoading, isError, refetch } = useHistory(getCosts())
   const cal = useCalibration()
+  const board = useBoard()
   const [filter, setFilter] = useState<'all' | VerdictType>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: number }>({ key: 'date', dir: -1 })
@@ -222,6 +286,19 @@ export function History({ onOpen }: { onOpen: (id: string) => void }) {
     })
     return r
   }, [history, filter, query, sort])
+
+  // Closed/listed IPOs that don't yet have a net-of-cost outcome row (price still backfilling, or
+  // just closed and not listed) — surfaced so they don't vanish between Live and the outcome table.
+  const awaiting = useMemo(() => {
+    const brows = board.data ?? []
+    const done = new Set((history ?? []).map((h) => h.ipo_id))
+    const t = awToday()
+    return brows.filter((r) => {
+      if (done.has(r.ipo_id)) return false
+      const listed = r.listing_date != null && awMidnight(r.listing_date) <= t
+      return listed || awMidnight(r.close_date) < t
+    })
+  }, [board.data, history])
 
   if (isLoading) return <Loading label="Loading history…" />
   if (isError || !history)
@@ -270,11 +347,14 @@ export function History({ onOpen }: { onOpen: (id: string) => void }) {
     <>
       {!noHistory && <Scorecard history={history} cal={cal.data} />}
       {cal.data && <ReliabilityDiagram cal={cal.data} />}
+      <AwaitingList rows={awaiting} onOpen={onOpen} />
       {noHistory ? (
-        <div className="state">
-          <h3>No listed IPOs yet</h3>
-          <p>Past calls and their actual net-of-cost outcomes appear here once an IPO lists.</p>
-        </div>
+        awaiting.length ? null : (
+          <div className="state">
+            <h3>No listed IPOs yet</h3>
+            <p>Past calls and their actual net-of-cost outcomes appear here once an IPO lists.</p>
+          </div>
+        )
       ) : (
         <>
           <div className="hist-tools">
