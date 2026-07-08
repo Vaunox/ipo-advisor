@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useIpo, useTransitionsFor } from '../api/hooks'
-import type { IPODetail, IPOFeatures, SubscriptionPoint, VerdictType } from '../api/types'
+import type { IPODetail, IPOFeatures, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { Loading } from '../components/Loading'
 import { toast } from '../toast'
@@ -58,52 +58,6 @@ const Check = () => (
 // the way the exchanges do: 2 decimals, trailing zeros trimmed — 3.48×, 19.22×, 242×.
 const fmtMult = (v: number): string => v.toFixed(2).replace(/\.?0+$/, '')
 const x = (v: number | null): string => (v != null ? `${fmtMult(v)}×` : '—')
-
-const fmtDay = (iso: string): string =>
-  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-
-// Demand-progression sparkline: how the overall subscription built through the bidding
-// window. Display-only — it ends at the same finals shown above, never a second number.
-function DemandSpark({ points }: { points: SubscriptionPoint[] }) {
-  const series = points.map((p) => p.overall ?? p.nii ?? 0)
-  if (series.length < 2) return null
-  const max = Math.max(...series, 1)
-  const W = 280
-  const H = 54
-  const pad = 5
-  const stepX = (W - pad * 2) / (series.length - 1)
-  const yOf = (v: number) => H - pad - (v / max) * (H - pad * 2)
-  const coords = series.map((v, i) => `${pad + i * stepX},${yOf(v)}`)
-  const line = `M${coords.join(' L')}`
-  const lastX = pad + (series.length - 1) * stepX
-  const area = `M${pad},${H - pad} L${coords.join(' L')} L${lastX},${H - pad} Z`
-  const last = series[series.length - 1]
-  return (
-    <div className="sub-spark">
-      <div className="ss-head">
-        <span>Demand progression · overall</span>
-        <span className="ss-final mono">{fmtMult(last)}× final</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="ss-svg">
-        <path d={area} className="ss-area" />
-        <path d={line} className="ss-line" />
-        {series.map((v, i) => (
-          <circle
-            key={i}
-            cx={pad + i * stepX}
-            cy={yOf(v)}
-            r={i === series.length - 1 ? 2.8 : 1.7}
-            className="ss-dot"
-          />
-        ))}
-      </svg>
-      <div className="ss-axis mono">
-        <span>{fmtDay(points[0].asof)}</span>
-        <span>{fmtDay(points[points.length - 1].asof)}</span>
-      </div>
-    </div>
-  )
-}
 
 // Readable label for each contribution key, enriched with the feature value where available.
 function contribLabel(key: string, f: IPOFeatures): string {
@@ -365,9 +319,6 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               </div>
             )}
           </div>
-          {r.subscription_progression && r.subscription_progression.length >= 2 && (
-            <DemandSpark points={r.subscription_progression} />
-          )}
           <h3 className="sec" style={{ marginTop: 18 }}>
             Issue structure
           </h3>

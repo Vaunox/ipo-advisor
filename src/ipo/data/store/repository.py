@@ -28,8 +28,6 @@ _LABELS_FILE = "listing_labels.parquet"
 def _record_to_row(record: IPORecord) -> dict[str, Any]:
     row = record.model_dump(mode="json")
     row["anchor_book"] = json.dumps(row["anchor_book"]) if row["anchor_book"] is not None else None
-    prog = row["subscription_progression"]
-    row["subscription_progression"] = json.dumps(prog) if prog is not None else None
     row["source_hashes"] = json.dumps(row["source_hashes"])
     return row
 
@@ -38,8 +36,7 @@ def _row_to_record(row: dict[str, Any]) -> IPORecord:
     data = dict(row)
     anchor = data.get("anchor_book")
     data["anchor_book"] = json.loads(anchor) if anchor else None
-    prog = data.get("subscription_progression")
-    data["subscription_progression"] = json.loads(prog) if prog else None
+    data.pop("subscription_progression", None)  # legacy column (feature removed) — drop if present
     hashes = data.get("source_hashes")
     data["source_hashes"] = json.loads(hashes) if hashes else {}
     return IPORecord.model_validate(data)

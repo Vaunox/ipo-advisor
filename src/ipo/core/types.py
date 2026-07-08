@@ -55,22 +55,6 @@ class AnchorAllotment(_Frozen):
     lock_in_days: int = Field(ge=0)
 
 
-class SubscriptionPoint(_Frozen):
-    """One running-subscription reading taken during the bidding window (Deep Dive #1).
-
-    The exchange republishes cumulative demand several times a day; each point is the
-    subscription multiple as of ``asof``. This is display-only context for the
-    demand-progression view — it is never read by a feature, and every ``asof`` is at
-    or before the subscription close, so the as-of clock stays honest (Rule 2).
-    """
-
-    asof: datetime
-    qib: float | None = Field(default=None, ge=0)
-    nii: float | None = Field(default=None, ge=0)
-    retail: float | None = Field(default=None, ge=0)
-    overall: float | None = Field(default=None, ge=0)
-
-
 class RawResponse(_Frozen):
     """An immutably-cached raw source response (Deep Dive #1, Module 3).
 
@@ -120,10 +104,6 @@ class IPORecord(_Frozen):
     nii_small_sub: float | None = Field(default=None, ge=0)
     nii_big_sub: float | None = Field(default=None, ge=0)
     overall_sub: float | None = Field(default=None, ge=0)
-
-    # Running cumulative-demand readings through the bidding window (for the
-    # demand-progression sparkline). As-of/pre-close only; display-only, never a feature.
-    subscription_progression: tuple[SubscriptionPoint, ...] | None = None
 
     # Valuation / structure.
     issue_pe: float | None = None
