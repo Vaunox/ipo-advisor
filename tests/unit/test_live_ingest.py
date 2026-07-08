@@ -26,16 +26,21 @@ class _StubClient:
         subs: dict[str, NseSubscription] | None = None,
         past: list[NsePastIssue] | None = None,
         prices: dict[str, tuple[float, float] | None] | None = None,
+        upcoming: list[NseCurrentIssue] | None = None,
     ) -> None:
         self._issues = issues
         self._subs = subs or {}
         self._past = past
         self._prices = prices or {}
+        self._upcoming = upcoming or []
 
     def current_issues(self) -> list[NseCurrentIssue]:
         if self._issues is None:
             raise SourceError("nse unreachable")
         return self._issues
+
+    def upcoming_issues(self) -> list[NseCurrentIssue]:
+        return self._upcoming
 
     def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
         return self._subs.get(symbol, NseSubscription(qib=None, nii=None, retail=None, total=None))
@@ -86,8 +91,9 @@ def _client(
     subs: dict[str, NseSubscription] | None = None,
     past: list[NsePastIssue] | None = None,
     prices: dict[str, tuple[float, float] | None] | None = None,
+    upcoming: list[NseCurrentIssue] | None = None,
 ) -> NseClient:
-    return cast(NseClient, _StubClient(issues, subs, past, prices))
+    return cast(NseClient, _StubClient(issues, subs, past, prices, upcoming))
 
 
 _KNACK = NseCurrentIssue(
@@ -136,6 +142,40 @@ def test_build_live_records_skips_incomplete() -> None:
         close_date=date(2026, 7, 3),
     )
     assert build_live_records(_client([incomplete])) == []
+
+
+_FORTHCOMING = NseCurrentIssue(
+    symbol="FUTUREMB",
+    company="Future Mainboard Ltd",
+    segment="mainboard",
+    price_band_low=100.0,
+    price_band_high=110.0,
+    open_date=date(2026, 7, 20),
+    close_date=date(2026, 7, 24),
+)
+
+
+def test_build_live_records_merges_forthcoming_from_upcoming() -> None:
+    # a forthcoming issue (all-upcoming-issues) with a band joins the current-issue set
+    recs = build_live_records(_client([_KNACK], upcoming=[_FORTHCOMING]))
+    assert sorted(r.ipo_id for r in recs) == ["futuremb", "knack"]
+
+
+def test_build_live_records_current_wins_over_upcoming_duplicate() -> None:
+    stub_dupe = NseCurrentIssue(
+        symbol="KNACK",
+        company="Knack (forthcoming stub name)",
+        segment="mainboard",
+        price_band_low=161.0,
+        price_band_high=170.0,
+        open_date=date(2026, 7, 1),
+        close_date=date(2026, 7, 3),
+    )
+    subs = {"KNACK": NseSubscription(qib=3.48, nii=19.22, retail=4.23, total=7.21)}
+    recs = build_live_records(_client([_KNACK], subs, upcoming=[stub_dupe]))
+    assert [r.ipo_id for r in recs] == ["knack"]  # deduped
+    assert recs[0].name == "Knack Packaging Limited"  # current-issue entry won
+    assert recs[0].qib_sub == 3.48  # …and carries its subscription
 
 
 def test_refresh_upserts_and_counts() -> None:

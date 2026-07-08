@@ -19,6 +19,7 @@ from ipo.data.sources.nse import (
     parse_listing_prices,
     parse_past_issues,
     parse_subscription,
+    parse_upcoming_issues,
 )
 
 _FIX = Path(__file__).resolve().parents[1] / "fixtures"
@@ -110,6 +111,29 @@ def test_parse_current_issues_fixture() -> None:
 def test_parse_current_issues_bad_shape_raises() -> None:
     with pytest.raises(SourceError):
         parse_current_issues(_raw('{"not": "a list"}'))
+
+
+def test_parse_upcoming_issues_fixture() -> None:
+    raw = _raw((_FIX / "nse_upcoming_sample.json").read_text(encoding="utf-8"))
+    issues = parse_upcoming_issues(raw)
+    by_symbol = {i.symbol: i for i in issues}
+    assert set(by_symbol) == {"FUTUREMB", "NOBANDSME"}  # empty-symbol row skipped, not fatal
+    fut = by_symbol["FUTUREMB"]
+    assert fut.segment == "mainboard"
+    assert (fut.price_band_low, fut.price_band_high) == (100.0, 110.0)
+    assert fut.open_date == date(2026, 7, 20)
+    # a forthcoming row without a band parses but yields None -> skipped downstream (as designed)
+    assert by_symbol["NOBANDSME"].price_band_high is None
+
+
+def test_parse_upcoming_issues_handles_dict_wrapper() -> None:
+    issues = parse_upcoming_issues(_raw('{"data": [{"symbol": "ABC", "series": "EQ"}]}'))
+    assert [i.symbol for i in issues] == ["ABC"]
+
+
+def test_parse_upcoming_issues_bad_shape_raises() -> None:
+    with pytest.raises(SourceError):
+        parse_upcoming_issues(_raw('"not a list"'))
 
 
 def test_parse_subscription_captures_snii_bnii() -> None:

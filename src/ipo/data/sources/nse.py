@@ -36,6 +36,7 @@ NSE_BASE = "https://www.nseindia.com"
 NSE_HOMEPAGE = f"{NSE_BASE}/market-data/all-upcoming-issues-ipo"
 PAST_ISSUES_URL = f"{NSE_BASE}/api/public-past-issues?index=equities"
 CURRENT_ISSUES_URL = f"{NSE_BASE}/api/ipo-current-issue"
+UPCOMING_ISSUES_URL = f"{NSE_BASE}/api/all-upcoming-issues?category=ipo"
 SUBSCRIPTION_URL = f"{NSE_BASE}/api/ipo-active-category"
 BHAVCOPY_OLD = "https://archives.nseindia.com/content/historical/EQUITIES/{y}/{mon}/cm{d:02d}{mon}{y}bhav.csv.zip"
 BHAVCOPY_UDIFF = (
@@ -218,6 +219,44 @@ def parse_current_issues(raw: RawResponse) -> list[NseCurrentIssue]:
     return issues
 
 
+def parse_upcoming_issues(raw: RawResponse) -> list[NseCurrentIssue]:
+    """Parse ``all-upcoming-issues`` (forthcoming IPOs) into typed rows (tolerant of the feed).
+
+    Mirrors the ``ipo-current-issue`` item schema (symbol / companyName / series / dates + band).
+    Forthcoming rows can arrive before a symbol or price band is finalized: those are skipped
+    (missing symbol) or returned with band ``None`` (skipped downstream — an ``IPORecord`` needs a
+    band, exactly as for current issues). A dict-wrapped payload (``{"data": [...]}``) is unwrapped.
+    """
+    try:
+        data = json.loads(raw.content)
+    except json.JSONDecodeError as exc:
+        raise SourceError("nse: upcoming-issues is not valid JSON") from exc
+    rows = data.get("data") if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        raise SourceError("nse: upcoming-issues JSON is not a list (source drift?)")
+
+    issues: list[NseCurrentIssue] = []
+    for row in rows:
+        symbol = str(row.get("symbol", "")).strip()
+        if not symbol:
+            continue  # forthcoming rows may predate a finalized symbol — skip, don't fail the feed
+        low, high = _parse_band(
+            row.get("priceRange", "") or row.get("issuePrice", ""), row.get("issuePrice", "")
+        )
+        issues.append(
+            NseCurrentIssue(
+                symbol=symbol,
+                company=str(row.get("companyName", "")).strip(),
+                segment=_segment_of_series(str(row.get("series", ""))),
+                price_band_low=low,
+                price_band_high=high,
+                open_date=_parse_nse_date(row.get("issueStartDate", "")),
+                close_date=_parse_nse_date(row.get("issueEndDate", "")),
+            )
+        )
+    return issues
+
+
 def parse_listing_prices(raw_csv: str, symbol: str) -> tuple[float, float] | None:
     """Extract (open, close) for ``symbol`` from a bhavcopy CSV (old or UDiFF format).
 
@@ -308,6 +347,25 @@ class NseClient:
             return parse_current_issues(resp)
         return parse_current_issues(
             self._get_json("nse_current", CURRENT_ISSUES_URL, referer=NSE_HOMEPAGE)
+        )
+
+    def upcoming_issues(self, *, force: bool = True) -> list[NseCurrentIssue]:
+        """Fetch + parse NSE's forthcoming IPOs (``all-upcoming-issues``), before they go active.
+
+        Widens live ingestion beyond ``ipo-current-issue`` (active/just-closed) so a mainboard IPO
+        reaches the Upcoming calendar as soon as NSE publishes it with a price band — earlier than
+        waiting for it to open. Rows without a band yet are skipped downstream, as always.
+        """
+        if force:
+            self._ensure_cookies()
+            resp = self._client.fetch(
+                "nse_upcoming",
+                UPCOMING_ISSUES_URL,
+                headers={"Accept": "application/json", "Referer": NSE_HOMEPAGE},
+            )
+            return parse_upcoming_issues(resp)
+        return parse_upcoming_issues(
+            self._get_json("nse_upcoming", UPCOMING_ISSUES_URL, referer=NSE_HOMEPAGE)
         )
 
     def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:

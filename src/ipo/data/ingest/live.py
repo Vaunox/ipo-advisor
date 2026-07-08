@@ -25,7 +25,7 @@ from ipo.core.interfaces import Repository
 from ipo.core.logging import get_logger
 from ipo.core.types import IPORecord, Segment
 from ipo.data.sources.base import SourceError
-from ipo.data.sources.nse import NseClient, NseSubscription
+from ipo.data.sources.nse import NseClient, NseCurrentIssue, NseSubscription
 
 _log = get_logger("ipo.data.ingest.live")
 
@@ -33,14 +33,28 @@ _log = get_logger("ipo.data.ingest.live")
 def build_live_records(
     client: NseClient, *, clock: Callable[[], datetime] = now_ist
 ) -> list[IPORecord]:
-    """Fetch current mainboard issues + their subscription and build ``IPORecord``s (pure-ish).
+    """Fetch current + forthcoming mainboard issues + subscription and build ``IPORecord``s.
 
-    Raises ``SourceError`` if the current-issues fetch itself fails (the caller decides what to do);
-    a per-issue subscription or validation failure is skipped, not fatal. SME issues are excluded.
+    Merges NSE's ``ipo-current-issue`` (active / just-closed) with ``all-upcoming-issues``
+    (forthcoming) so an IPO reaches the Upcoming calendar as soon as NSE lists it with a price band
+    — not only once it opens. For a symbol in both feeds the current-issue entry wins (fresher,
+    subscription-eligible). Raises ``SourceError`` only if the current-issues fetch itself fails; a
+    forthcoming-feed failure degrades to current-only; a per-issue subscription or validation
+    failure is skipped. SME issues are excluded.
     """
     issues = client.current_issues()
+    try:
+        upcoming = client.upcoming_issues()
+    except SourceError:
+        upcoming = []  # forthcoming feed is best-effort; current issues still ingest
+
+    # Dedupe by symbol; the current-issue entry (iterated last) wins over the forthcoming one.
+    merged: dict[str, NseCurrentIssue] = {}
+    for issue in (*upcoming, *issues):
+        merged[issue.symbol.upper()] = issue
+
     records: list[IPORecord] = []
-    for issue in issues:
+    for issue in merged.values():
         if issue.segment != SEGMENT_MAINBOARD:
             continue  # SME excluded (Locked decision)
         if issue.price_band_high is None or issue.open_date is None or issue.close_date is None:
