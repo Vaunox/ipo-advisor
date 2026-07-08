@@ -1,7 +1,7 @@
 {
   "name": "ipo-advisor-desktop",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Electron shell for IPO Advisor — spawns the Python FastAPI engine as a sidecar, health-gates it, and hosts the PWA as a native Windows app.",
   "main": "dist/main.js",
   "scripts": {
