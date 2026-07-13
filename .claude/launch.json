@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "src/ipo/apps/pwa", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8778", "--directory", "website"],
+      "port": 8778
     }
   ]
 }
