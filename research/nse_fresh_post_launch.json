@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "LASERPOWER",
+    "fresh_nse": 38.93991399350439,
+    "upstox": "38.73",
+    "pct_diff": -0.5390715386259191
+  },
+  {
+    "symbol": "KUSUMGAR",
+    "fresh_nse": 128.84594728644532,
+    "upstox": "128.5",
+    "pct_diff": -0.2684968318609406
+  },
+  {
+    "symbol": "KNACK",
+    "fresh_nse": 83.33033853901637,
+    "upstox": "82.98",
+    "pct_diff": -0.4204213557254778
+  },
+  {
+    "symbol": "AASTHA",
+    "fresh_nse": 4.641708823529412,
+    "upstox": "6.8",
+    "pct_diff": 46.4977718018402
+  },
+  {
+    "symbol": "CSM",
+    "fresh_nse": 1.359113026103956,
+    "upstox": "1.34",
+    "pct_diff": -1.4062867279511972
+  },
+  {
+    "symbol": "RAMBHAJO",
+    "fresh_nse": 212.62539830296086,
+    "upstox": "211.4",
+    "pct_diff": -0.5763179341420149
+  },
+  {
+    "symbol": "CORDELIA",
+    "fresh_nse": 1.6693736430462303,
+    "upstox": "1.45",
+    "pct_diff": -13.141075034940824
+  },
+  {
+    "symbol": "HEXAGON",
+    "fresh_nse": 53.68082258834456,
+    "upstox": "52.91",
+    "pct_diff": -1.4359366179160036
+  }
+]

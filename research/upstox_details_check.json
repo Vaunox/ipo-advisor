@@ -1,0 +1,137 @@
+[
+  {
+    "symbol": "BHARATCOAL",
+    "name": "Bharat Coking Coal Limited (BCCL) IPO",
+    "id": "bharat-coking-coal-limited-bccl-ipo",
+    "kind": "suspect",
+    "list_total": "98.51",
+    "details_total": "98.51",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "CMRGREEN",
+    "name": "CMR Green Technologies IPO",
+    "id": "cmr-green-technologies-limited-ipo",
+    "kind": "control",
+    "list_total": "126.73",
+    "details_total": "126.73",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "CORONA",
+    "name": "Corona Remedies IPO",
+    "id": "corona-remedies-limited-ipo",
+    "kind": "suspect",
+    "list_total": "35.0",
+    "details_total": "35.0",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "DAMCAPITAL",
+    "name": "DAM Capital Advisors IPO",
+    "id": "dam-capital-advisors-ipo",
+    "kind": "suspect",
+    "list_total": "32.98",
+    "details_total": "32.98",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "EIEL",
+    "name": "Enviro Infra Engineers IPO",
+    "id": "enviro-infra-engineers-ipo",
+    "kind": "suspect",
+    "list_total": "52.04",
+    "details_total": "52.04",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "KUSUMGAR",
+    "name": "Kusumgar IPO",
+    "id": "kusumgar-limited-ipo",
+    "kind": "control",
+    "list_total": "128.5",
+    "details_total": "128.5",
+    "detail_status": "closed"
+  },
+  {
+    "symbol": "LENSKART",
+    "name": "Lenskart Solutions IPO",
+    "id": "lenskart-solutions-limited-ipo",
+    "kind": "control",
+    "list_total": "28.21",
+    "details_total": "28.21",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "MEESHO",
+    "name": "Meesho IPO",
+    "id": "meesho-limited-ipo",
+    "kind": "suspect",
+    "list_total": "23.33",
+    "details_total": "23.33",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "RUBICON",
+    "name": "Rubicon Research IPO",
+    "id": "rubicon-research-limited-ipo",
+    "kind": "control",
+    "list_total": "103.62",
+    "details_total": "103.62",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "SANATHAN",
+    "name": "Sanathan Textiles IPO",
+    "id": "sanathan-textiles-ipo",
+    "kind": "suspect",
+    "list_total": "13.04",
+    "details_total": "13.04",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "SENORES",
+    "name": "Senores Pharmaceuticals IPO",
+    "id": "senores-ipo",
+    "kind": "suspect",
+    "list_total": "50.78",
+    "details_total": "50.78",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "SWIGGY",
+    "name": "Swiggy Limited",
+    "id": "swiggy-ipo",
+    "kind": "suspect",
+    "list_total": "1.5145264993714966",
+    "details_total": "1.5145264993714966",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "TRANSRAILL",
+    "name": "Transrail Lighting IPO",
+    "id": "transrail-lighting-ipo",
+    "kind": "suspect",
+    "list_total": "33.43",
+    "details_total": "33.43",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "TURTLEMINT",
+    "name": "Turtlemint Fintech Solutions IPO",
+    "id": "turtlemint-fintech-solutions-limited-ipo",
+    "kind": "control",
+    "list_total": "1.19",
+    "details_total": "1.19",
+    "detail_status": "listed"
+  },
+  {
+    "symbol": "VMM",
+    "name": "Vishal Mega Mart IPO",
+    "id": "vishal-mega-mart-ipo",
+    "kind": "suspect",
+    "list_total": "2.83",
+    "details_total": "2.83",
+    "detail_status": "listed"
+  }
+]

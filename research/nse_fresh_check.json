@@ -1,0 +1,86 @@
+[
+  {
+    "symbol": "MEESHO",
+    "fresh_nse": 79.03440882734158,
+    "our_csv": "79.03440882734158",
+    "upstox": "23.33"
+  },
+  {
+    "symbol": "BHARATCOAL",
+    "fresh_nse": 146.86863248368263,
+    "our_csv": "146.86863248368263",
+    "upstox": "98.51"
+  },
+  {
+    "symbol": "CORONA",
+    "fresh_nse": 137.0423471121958,
+    "our_csv": "137.0423471121958",
+    "upstox": "35.0"
+  },
+  {
+    "symbol": "SWIGGY",
+    "fresh_nse": 3.593211287138544,
+    "our_csv": "3.593211287138544",
+    "upstox": "1.5145264993714966"
+  },
+  {
+    "symbol": "VMM",
+    "fresh_nse": 27.277612666232194,
+    "our_csv": "27.277612666232194",
+    "upstox": "2.83"
+  },
+  {
+    "symbol": "SANATHAN",
+    "fresh_nse": 35.11655658938679,
+    "our_csv": "35.11655658938679",
+    "upstox": "13.04"
+  },
+  {
+    "symbol": "DAMCAPITAL",
+    "fresh_nse": 82.08201562998086,
+    "our_csv": "82.08201562998086",
+    "upstox": "32.98"
+  },
+  {
+    "symbol": "TRANSRAILL",
+    "fresh_nse": 80.7976789395104,
+    "our_csv": "80.7976789395104",
+    "upstox": "33.43"
+  },
+  {
+    "symbol": "EIEL",
+    "fresh_nse": 89.89982986724515,
+    "our_csv": "89.89982986724515",
+    "upstox": "52.04"
+  },
+  {
+    "symbol": "SENORES",
+    "fresh_nse": 93.68793584669422,
+    "our_csv": "93.68793584669422",
+    "upstox": "50.78"
+  },
+  {
+    "symbol": "CMRGREEN",
+    "fresh_nse": 127.04189754091425,
+    "our_csv": "127.04189754091425",
+    "upstox": "126.73"
+  },
+  {
+    "symbol": "TURTLEMINT",
+    "fresh_nse": 1.2019892603090925,
+    "our_csv": "1.2019892603090925",
+    "upstox": "1.19"
+  },
+  {
+    "symbol": "RUBICON",
+    "fresh_nse": 103.89614157308696,
+    "our_csv": "103.89614157308696",
+    "upstox": "103.62"
+  },
+  {
+    "symbol": "LENSKART",
+    "fresh_nse": 28.25591679343014,
+    "our_csv": "28.25591679343014",
+    "upstox": "28.21"
+  }
+]

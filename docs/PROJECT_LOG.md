@@ -31,6 +31,7 @@ the deep dives (`docs/deep_dives/`, `docs/v2/deep_dives/`), and the operator reb
    - [4.6 T+3 settlement cross-break stability](#46-t3-stability)
    - [4.7 v2 gates & probes — B1 / B2 / B3 / B6 / B7 / B8](#47-v2-gates)
    - [4.8 Shipped v2 features — A3 / B2-VIX / B9](#48-shipped-v2-features)
+   - [4.9 Total-only / QIB-only — the category-split substitutability probe](#49-total-only)
 5. [Shipped-app wiring — what's live](#5-shipped-app-wiring)
 
 ---
@@ -134,6 +135,7 @@ candidate is a logged negative — that is the discipline working, not a failure
 | 2026-07-05 | **B1 — subscription-trajectory cheap probe** (does the buildup SHAPE add signal?) | B (probe) | **PROBE-INCONCLUSIVE** — free-data route closed with evidence; NOT a permanent closure | HF/Chittorgarh finals faithful (98%) but day-wise truncates at day 2 (reaches verified final on 0.8%) → endpoint-reliable, path-useless. Salvage (N=120): NO PULSE, lift ≈0 all splits. A real B1 gate needs forward collection. §4.7. |
 | 2026-06-30 | **GMP** — as-of-close level + slope | B (gate) | **NOT EARNED (provisional, hot-market only)** | AUC lift CI includes zero every split; keep/cut flips. Leaky +0.133 collapsed to ~0 on clean PIT. Revisit with cold-market PIT GMP from the recorder. §4.3. |
 | 2026-07-03 | **OFS / relative valuation / anchor** (enhancement) | B (gate) | **CUT / NOT EARNED / NOT TESTED** | All QIB-redundant. **OFS kill-flag is backwards**; **valuation lift was an outlier artifact**. §4.4. |
+| 2026-07-13→14 | **Total-only / QIB-only — category-split substitutability** (reduced-feature model) | B (gate) | **VALIDATED, HELD — sourcing decision pending** *(branch `total-only-gate`)* | Total-only statistically indistinguishable from shipped (AUC/ECE parity, passes reliability gate); survives regime+T+3 stress with one bounded caveat (cold ECE softer, known failure class); Upstox tested and conclusively closed as a source (endpoint-wide staleness, no in-API fix); NSE/BSE-direct licensing recommended — would unlock the full model, not just total-only. §4.9. |
 
 ---
 
@@ -660,6 +662,63 @@ probability (weight 0). Byte-equality proven (`test_regime_tiers_wiring`: same v
 | normal | 239 | none |
 | **soft** | **13** | "softening market — … a touch less certain" (**new**) |
 | cold | 59 | "cold market — … less certain" (unchanged) |
+
+<a name="49-total-only"></a>
+### 4.9 Total-only / QIB-only — the category-split substitutability probe
+
+*Off-main branch `total-only-gate` (2026-07-13→14), consolidated here as a closed finding — model and
+data untouched, calibrator byte-identical throughout. Full backing: `research/TOTAL_ONLY_GATE.md`,
+`research/CHECK1_FIELD_VERIFICATION.md`, `research/CHECK2_REGIME_T3_STABILITY.md`,
+`research/CHECK3_DEPLOYABILITY_VERDICT.md`.*
+
+The shipped model's QIB/NII/Retail split is not licensable from most real public feeds (brokers
+typically expose only a single Total oversubscription multiple). Does a model built on **Total-only**
+(no split at all) come close to the shipped model, survive the same stress tests, and does a real
+source exist that measures it correctly? QIB-only runs as the intermediate rung (QIB dominates the
+full model's contribution), so any dropoff shows in steps: full → QIB-only → Total-only.
+
+**Gate parity** (same 358-IPO set, same walk-forward, calibrator refit per arm — GMP-parity
+discipline):
+
+| arm | OOS N | AUC | ECE | APPLY@0.65 precision |
+|---|---|---|---|---|
+| full (shipped) | 298 | 0.797 | 0.081 | 84.8% [79.0%, 89.2%] |
+| qib_only | 298 | 0.805 | 0.084 | 85.3% [79.6%, 89.7%] |
+| total_only | 298 | 0.805 | 0.079 | 85.1% [79.2%, 89.5%] |
+
+Per-split AUC-lift 95% CIs include zero on every split for both reduced arms (max Δ +0.007); **all
+three arms pass the identical six-check reliability gate**. Mechanism: total is a 0.93-Spearman
+rank-copy of QIB, and the total-only score tracks the *full model's* ranking at 0.979 — tighter than
+QIB-only (0.929) — because total saturates less against the winsorization cap (3 vs 19 of 358 IPOs).
+
+**Regime + T+3 stress-test** (identical shipped functions; the full-model control reproduced the
+§4.5/§4.6 numbers exactly, validating the harness before trusting the new ones): total-only's ranking
+edge holds or improves in every regime (AUC 0.81/0.81/0.77 vs full's 0.80/0.80/0.76 for All/Hot/Cold),
+and cold APPLY precision is statistically unchanged (83% vs 83%, overlapping CIs). **The one real
+finding:** cold-regime ECE is softer — 0.133 vs full's already-marginal 0.102 — the same "cold markets
+calibrate worse" failure class the shipped model already manages via its weight-0 regime flag, not a
+new one, at a somewhat larger magnitude. T+3 cross-break shift (−0.062 vs full's −0.060) matches
+full's for the identical already-documented composition reason (not a settlement effect).
+
+**Sourcing** — Upstox (Analytics-Token developer API) tested as the concrete licensed-feed candidate
+and **conclusively closed**: its `total_subscription` matches our NSE-sourced definition when the
+value is final (118 IPOs matched, recent-window median gap 0.57%), but 30% of matches disagree by
+>10% (stale pre-close snapshots), the details endpoint (`/v2/ipos/{id}`) serves the byte-identical
+stale value as the list endpoint (no in-API fix), and the failure persists even for IPOs closing after
+the API's own 2026-05-23 launch (2/10 tested, one in a new too-high direction) — ruling out both an
+adjustment factor and a "wait for fresher data" fix. Our own backfill was independently confirmed
+clean (14/14 exact match against a live cache-bypassed NSE re-fetch). Upstox's **consumer website**
+(not the API) does show the full day-wise QIB/NII/Retail split, confirming the split's authoritative
+home is **NSE/BSE** — reframing the recommendation: NSE/BSE-direct licensing would unlock the *full*
+model, not just total-only.
+
+**Verdict: VALIDATED, HELD — not shipped, sourcing decision pending.** Total-only clears every bar
+the shipped model clears (gate parity, reliability gate, regime and T+3 robustness) with one bounded,
+already-understood caveat (softer cold-market calibration, manageable with the existing
+flag-don't-force mechanism applied a notch more conservatively). What remains unresolved is sourcing,
+not modeling: Upstox is closed on data-quality grounds; NSE/BSE-direct licensing is the standing
+recommendation, carried into the legal/vendor conversation. No further work without an explicit
+decision to reopen it.
 
 ---
 
