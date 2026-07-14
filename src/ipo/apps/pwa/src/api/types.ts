@@ -166,6 +166,11 @@ export interface IpoContextView {
   // INDICATIVE planning figure (≈ N shares · approx ₹…), never as an exact reported value.
   lot_size: number | null
   lot_state: RegistrarState
+  // v3 V3-11 — plain display reference metadata (no source named, honest degradation via *_state).
+  isin: string | null
+  isin_state: RegistrarState
+  industry: string | null
+  industry_state: RegistrarState
   registrar: RegistrarInfo | null
   registrar_state: RegistrarState
 }

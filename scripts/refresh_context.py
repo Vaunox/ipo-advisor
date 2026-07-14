@@ -92,7 +92,7 @@ def _get(path: str, token: str) -> requests.Response:
     )
 
 
-def _rows(payload: object) -> list[dict]:
+def _rows(payload: object) -> list[dict[str, object]]:
     """Pull the IPO list out of whatever envelope the API returns (defensive)."""
     if isinstance(payload, dict):
         data = payload.get("data")
@@ -131,7 +131,7 @@ def _list_ids(token: str) -> dict[str, object]:
     return ids
 
 
-def _context(token: str, ipo_id: object) -> dict:
+def _context(token: str, ipo_id: object) -> dict[str, object]:
     """GET /v2/ipos/{id} and pull the per-IPO context fields (registrar + rhp_url)."""
     resp = _get(f"/v2/ipos/{ipo_id}", token)
     if resp.status_code != 200:
@@ -140,7 +140,7 @@ def _context(token: str, ipo_id: object) -> dict:
     obj = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else None)
     if not isinstance(obj, dict):
         return {}
-    entry: dict = {}
+    entry: dict[str, object] = {}
     ri = obj.get("registrar_info")
     if isinstance(ri, dict):
         reg = {k: ri.get(k) for k in _REGISTRAR_FIELDS if ri.get(k) not in (None, "")}
@@ -156,6 +156,10 @@ def _context(token: str, ipo_id: object) -> dict:
         entry["lot_size"] = lot
     elif isinstance(lot, str) and lot.strip().isdigit() and int(lot) > 0:
         entry["lot_size"] = int(lot)
+    for key in ("isin", "industry"):  # V3-11 reference fields — plain display metadata
+        val = obj.get(key)
+        if isinstance(val, str) and val.strip():
+            entry[key] = val.strip()
     return entry
 
 
@@ -172,7 +176,7 @@ def main() -> None:
 
     token = _load_token()
     ids = _list_ids(token)
-    ipos: dict[str, dict] = {}
+    ipos: dict[str, dict[str, object]] = {}
     for sym, ipo_id in sorted(ids.items()):
         entry = _context(token, ipo_id)
         time.sleep(_DETAIL_PAUSE_S)
@@ -191,7 +195,8 @@ def main() -> None:
     print(f"\nWrote {len(ipos)} IPO context entries to {out_path} (token-free).")
     print(f"  with registrar: {n_reg}   with rhp_url: {n_rhp}   with lot_size: {n_lot}")
     for sym in list(ipos)[:8]:
-        r = ipos[sym].get("registrar") or {}
+        raw = ipos[sym].get("registrar")
+        r = raw if isinstance(raw, dict) else {}
         reg = str(r.get("name") or r.get("short") or "-")[:28]
         has_rhp = "Y" if ipos[sym].get("rhp_url") else "-"
         print(f"  {sym:<12} registrar={reg:<28} rhp={has_rhp}")

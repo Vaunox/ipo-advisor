@@ -58,6 +58,8 @@ class IpoContext(BaseModel):
     registrar: RegistrarInfo | None = None
     rhp_url: str | None = None
     lot_size: int | None = None
+    isin: str | None = None
+    industry: str | None = None
 
 
 class _ContextCacheFile(BaseModel):
@@ -206,6 +208,8 @@ def build_ipo_context(
     reg = ctx.registrar if ctx else None
     rhp_url = ctx.rhp_url if ctx else None
     lot_size = ctx.lot_size if ctx else None
+    isin = ctx.isin if ctx else None
+    industry = ctx.industry if ctx else None
 
     def _state(present: bool) -> str:
         return field_state(
@@ -224,6 +228,10 @@ def build_ipo_context(
         rhp_state=_state(rhp_url is not None),
         lot_size=lot_size,
         lot_state=_state(lot_size is not None),
+        isin=isin,
+        isin_state=_state(isin is not None),
+        industry=industry,
+        industry_state=_state(industry is not None),
         registrar=reg,
         registrar_state=_state(reg is not None),
     )

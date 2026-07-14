@@ -72,6 +72,46 @@ function lotIndicative(ctx: IpoContextView | undefined, bandHigh: number): strin
   return `≈ ${ctx.lot_size} shares · approx ₹${amount}`
 }
 
+// v3 V3-11 — honest degradation for a plain reference field (isin / industry): the value if present,
+// else why it's absent (stale cache vs genuinely not available), never a bare blank that lies.
+function refField(value: string | null, state: IpoContextView['isin_state']): string {
+  if (state === 'stale') return 'unknown — data stale'
+  if (state === 'unpublished' || value == null) return 'not available'
+  return value
+}
+
+// v3 V3-11 — ISIN + industry: plain display metadata from the per-IPO Upstox context cache (never a
+// model input, no source named). Only rendered once a context cache exists; each field degrades
+// honestly via its own state. Grouped as one small card next to the filed documents.
+function ContextRef({ ctx }: { ctx: IpoContextView | undefined }) {
+  if (!ctx || !ctx.available) return null // no cache loaded → nothing to show (not an empty scaffold)
+  return (
+    <div className="card">
+      <h3 className="sec">Reference</h3>
+      <div className="kv">
+        <div className="r">
+          <span
+            className="k gl"
+            data-tip="International Securities Identification Number — the security's unique code, used when checking allotment or holdings. Reference only."
+          >
+            ISIN
+          </span>
+          <span className="v mono">{refField(ctx.isin, ctx.isin_state)}</span>
+        </div>
+        <div className="r">
+          <span
+            className="k gl"
+            data-tip="The company's industry/sector classification. Context only — it is not a model input."
+          >
+            Industry
+          </span>
+          <span className="v">{refField(ctx.industry, ctx.industry_state)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // v3 V3-5 — the filed RHP link. Display/routing only (from the per-IPO Upstox context cache, never a
 // model input). Labelled the *Red Herring Prospectus* explicitly — the final offer document, never a
 // generic "prospectus" and never the draft (DRHP was dropped as unusable). Opens the official SEBI
@@ -332,6 +372,8 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
         <VerdictHistory id={id} />
 
         <RhpLink ctx={ctx} />
+
+        <ContextRef ctx={ctx} />
 
         <div className="card">
           <h3 className="sec">{f.book_closed ? 'Subscription (final)' : 'Subscription (live)'}</h3>

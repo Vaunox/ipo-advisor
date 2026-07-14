@@ -206,6 +206,10 @@ def create_app(
                 rhp_state="not_loaded",
                 lot_size=None,
                 lot_state="not_loaded",
+                isin=None,
+                isin_state="not_loaded",
+                industry=None,
+                industry_state="not_loaded",
                 registrar=None,
                 registrar_state="not_loaded",
             )

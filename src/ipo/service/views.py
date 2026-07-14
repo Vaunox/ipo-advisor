@@ -180,8 +180,10 @@ class AllotmentRow(BaseModel):
 class IpoContextView(BaseModel):
     """One IPO's display-only Upstox context for the detail page (v3 V3-5+) — never a model input.
 
-    Carries the RHP link (V3-5), the bid ``lot_size`` (V3-8), and the registrar (shared with the
-    Allotment tab); extend with isin / … as V3-11/10 land. ``lot_size`` is Upstox's — NSE gives it
+    Carries the RHP link (V3-5), the bid ``lot_size`` (V3-8), the ``isin`` + ``industry`` reference
+    fields (V3-11), and the registrar (shared with the Allotment tab); extend as V3-10 lands.
+    ``isin``/``industry`` are plain display metadata (no source named, honest degradation via their
+    ``*_state``). ``lot_size`` is Upstox's — NSE gives it
     on 0% of IPOs, so it is the sole source and the UI shows it as an INDICATIVE planning figure
     (``≈ N shares · approx ₹…``), never an exact reported value (a possibly-imprecise number must
     not wear an authoritative face; the app places no bids, so the broker enforces the true lot at
@@ -201,6 +203,10 @@ class IpoContextView(BaseModel):
     rhp_state: str
     lot_size: int | None
     lot_state: str
+    isin: str | None
+    isin_state: str
+    industry: str | None
+    industry_state: str
     registrar: RegistrarInfo | None
     registrar_state: str
 
