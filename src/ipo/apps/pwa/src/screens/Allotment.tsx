@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAllotment } from '../api/hooks'
 import type { AllotmentRow, RegistrarInfo } from '../api/types'
 import { Loading } from '../components/Loading'
+import { isAllowedExternalUrl, openExternalUrl } from '../external'
 
 // v3 V3-6 — the Allotment tab. Routing convenience only: for each IPO past its close, show the
 // registrar and DEEP-LINK OUT to the registrar's own allotment-check page. We never collect a PAN
@@ -19,45 +20,6 @@ const fmtWhen = (iso: string): string =>
     minute: '2-digit',
     hour12: true,
   })
-
-interface DesktopBridge {
-  openExternal?: (url: string) => Promise<boolean>
-}
-
-// Open the registrar's page in the user's real browser. Desktop routes through the shell (which
-// RE-VALIDATES the host allowlist — the authoritative gate); browser/dev falls back to a new tab.
-// Only ever called for a URL that already passed isRegistrarUrl below.
-function openRegistrar(url: string): void {
-  const api = (window as unknown as { ipoDesktop?: DesktopBridge }).ipoDesktop
-  if (api?.openExternal) void api.openExternal(url)
-  else window.open(url, '_blank', 'noopener,noreferrer')
-}
-
-// Mirrors the authoritative allowlist in apps/desktop/src/registrar.ts — used ONLY to decide
-// button-vs-inert rendering; the main process re-validates on open, so drift is cosmetic, not a
-// security hole. A URL from the registrar cache that isn't a pinned registrar host is shown as inert
-// copyable text, never a working "open" (we don't route a PAN-primed user to a page we can't vouch for).
-const REGISTRAR_HOSTS = [
-  'mpms.mufg.com',
-  'linkintime.co.in',
-  'kfintech.com',
-  'bigshareonline.com',
-  'maashitla.com',
-  'skylinerta.com',
-  'cameoindia.com',
-  'purvashare.com',
-]
-function isRegistrarUrl(url: string | null): url is string {
-  if (!url) return false
-  try {
-    const u = new URL(url)
-    if (u.protocol !== 'https:') return false
-    const h = u.hostname.toLowerCase()
-    return REGISTRAR_HOSTS.some((d) => h === d || h.endsWith('.' + d))
-  } catch {
-    return false
-  }
-}
 
 function ContactBlock({ r }: { r: RegistrarInfo }) {
   const lines: [string, string][] = []
@@ -116,8 +78,8 @@ function AllotmentCard({ row, refreshedAt }: { row: AllotmentRow; refreshedAt: s
 
       {reg && (
         <div className="al-actions">
-          {isRegistrarUrl(reg.website) ? (
-            <button className="btn al-check" onClick={() => openRegistrar(reg.website as string)}>
+          {isAllowedExternalUrl(reg.website) ? (
+            <button className="btn al-check" onClick={() => openExternalUrl(reg.website as string)}>
               Check allotment ↗
             </button>
           ) : reg.website ? (

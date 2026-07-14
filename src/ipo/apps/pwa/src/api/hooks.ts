@@ -9,6 +9,7 @@ import type {
   HistoryRow,
   IPODetail,
   IPOListRow,
+  IpoContextView,
   StatusView,
   Verdict,
   VerdictTransition,
@@ -61,6 +62,14 @@ export const useCalibration = () =>
 // when no cache is loaded (the tab says so). Never a scoring input.
 export const useAllotment = () =>
   useQuery({ queryKey: ['allotment'], queryFn: () => apiGet<AllotmentView>('/allotment') })
+
+// One IPO's display-only Upstox context (v3 V3-5: the RHP link). Read-only; never a scoring input.
+export const useIpoContext = (id: string | null) =>
+  useQuery({
+    queryKey: ['context', id],
+    queryFn: () => apiGet<IpoContextView>(`/context/${id}`),
+    enabled: !!id,
+  })
 
 export const useTransitions = () =>
   useQuery({

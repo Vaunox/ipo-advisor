@@ -32,13 +32,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ipo.core.types import Verdict
 from ipo.data.ingest.state import IngestStateStore
-from ipo.service.allotment_context import AllotmentStore, build_allotment_view
 from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
+from ipo.service.ipo_context import ContextStore, build_allotment_view, build_ipo_context
 from ipo.service.views import (
     AllotmentView,
     CalibrationView,
     HistoryRow,
+    IpoContextView,
     IPODetail,
     IPOListRow,
     StatusView,
@@ -51,7 +52,7 @@ def create_app(
     *,
     calibration_report_path: Path | None = None,
     ingest_state: IngestStateStore | None = None,
-    allotment_store: AllotmentStore | None = None,
+    context_store: ContextStore | None = None,
 ) -> FastAPI:
     """Build the read-only advisory API over a composed ``VerdictEngine``.
 
@@ -63,9 +64,10 @@ def create_app(
     when absent (no live feed wired) ``/status`` reports ``live_ingest=false`` with null
     timestamps — it never invents a freshness it cannot prove.
 
-    ``allotment_store`` (v3 V3-6) is the display-only registrar cache the ``/allotment`` tab reads;
-    when absent (no cache loaded yet) ``/allotment`` reports ``available=false`` honestly. It is a
-    read of a store entirely separate from ``IPORecord`` — registrar data never reaches the model.
+    ``context_store`` (v3 V3-5/V3-6) is the display-only per-IPO Upstox context cache the
+    ``/allotment`` tab and ``/context/{id}`` read (registrar, RHP link, …). When absent both report
+    ``available=false`` honestly. It is a read of a store entirely separate from ``IPORecord`` —
+    context data never reaches the model.
     """
     app = FastAPI(title="IPO Listing-Gains Advisor", version="0.1.0")
 
@@ -179,9 +181,33 @@ def create_app(
         ``available=false`` when no cache is loaded; per-IPO ``registrar=null`` when not yet
         published. Never handles a PAN — the tab links out to the registrar's own site.
         """
-        if allotment_store is None:
+        if context_store is None:
             return AllotmentView(available=False, refreshed_at=None, rows=[])
-        return build_allotment_view(engine.list_records(), allotment_store)
+        return build_allotment_view(engine.list_records(), context_store)
+
+    @app.get("/context/{ipo_id}", response_model=IpoContextView)
+    def ipo_context(ipo_id: str) -> IpoContextView:
+        """One IPO's display-only Upstox context — the RHP link (+ its freshness state) (v3 V3-5).
+
+        Read-only: joins the record with the per-IPO context cache. The RHP is the Red Herring
+        Prospectus specifically (labelled as such in the UI). Degrades honestly — ``rhp_state``
+        distinguishes "not filed yet" from "cache is stale". Context data comes from a store apart
+        from the scoring path; it is never a model input. 404 if the IPO is unknown.
+        """
+        record = engine.get_record(ipo_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"unknown ipo_id: {ipo_id}")
+        if context_store is None:
+            return IpoContextView(
+                ipo_id=ipo_id,
+                available=False,
+                refreshed_at=None,
+                rhp_url=None,
+                rhp_state="not_loaded",
+                registrar=None,
+                registrar_state="not_loaded",
+            )
+        return build_ipo_context(record, context_store)
 
     @app.get("/calibration", response_model=CalibrationView)
     def calibration() -> CalibrationView:
