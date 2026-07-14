@@ -35,19 +35,31 @@ Every rule from v1/v2 still applies. The three that v3 work is most likely to br
 
 ## The architecture (decided)
 
-- **The VM is a pure data layer.** It scrapes NSE and durably archives **input** (raw scraped data) and **output** (verdicts/history). Nothing else runs on it.
+- **The VM is a pure data layer — the WHOLE data plane, not just NSE.** It runs **every fetcher the app depends on** — NSE ingestion **and** the Upstox per-IPO context refresh (`refresh_context.py`: registrar, RHP, lot size, isin, industry) — durably archives **input** (raw scraped data) and **output** (verdicts/history), and **serves every store the app reads through ONE read-only API**. Nothing else runs on it.
+- **One transport for all stores (decided): a read API, not file-sync.** The app reads each store over the same read-only HTTP mechanism. Adding a future store must never mean adding a second transport.
 - **The model, calibrator, scoring, UI, builds, and the recalibration ritual all stay in the user's local app.** The VM is never capable of running the model. This division is deliberate and load-bearing — it keeps the VM's resource envelope trivial and keeps the model where it has always been.
 - **VM is PRIMARY.** The app fetches from the VM first.
-- **Local scraping (the current pipeline) is the FALLBACK.** It is never removed. If the VM is unreachable, the app scrapes NSE directly, exactly as it does today.
+- **Local scraping (the current pipeline) is the FALLBACK.** It is never removed. If the VM is unreachable, the app scrapes/refreshes directly, exactly as it does today. This holds for **every** store the VM serves, not only NSE.
+- **The Upstox token lives on the VM** (as an env var there), so `refresh_context.py` runs on the VM. The token is **never** in the packaged app and **never** committed. (`refresh_context.py` was built VM-runnable from day one — pure Python, env token, `--data-dir`, no desktop assumptions — so it adopts as-is, no rewrite.)
 - **Spec:** Oracle Always Free, 1 vCPU / 1 GB, Mumbai region.
 
-## V3-1. VM setup and NSE ingestion
+## V3-1. VM setup and the data plane — NSE ingestion + Upstox context + read API
 
-Move (or replicate) the existing NSE ingestion to run on the VM, carrying the **identical discipline** the local `nse.py` already has: cookie/UA handshake, schema-validate, **fail loud** on drift. This is more important on the VM than locally, because nobody is watching it in real time.
+**Scope (operator-corrected): V3-1 is the full data plane, not just NSE.** The VM runs every fetcher and serves every store the app reads. Three parts:
+
+**(a) NSE ingestion.** Move (or replicate) the existing NSE ingestion to run on the VM, carrying the **identical discipline** the local `nse.py` already has: cookie/UA handshake, schema-validate, **fail loud** on drift. This is more important on the VM than locally, because nobody is watching it in real time.
 
 **Verified fact (operator-tested):** NSE does **not** block the VM's Mumbai-region datacenter IP — no proxy or rotation needed. This is the condition that makes VM-primary viable. **It is not a permanent guarantee.** NSE may tighten blocking at any time. The monitoring in V3-3 exists precisely so that if this changes, you find out in hours, not months.
 
-**GATE V3-1:** the VM fetches NSE data on schedule, schema-validation raises on unexpected shape, and a fetch failure is loud (not a silent empty write).
+**(b) Upstox per-IPO context refresh.** The VM also runs `scripts/refresh_context.py` on a cadence (the display-only registrar / RHP / lot size / isin / industry cache). It was **deliberately built VM-runnable** (pure Python, env `UPSTOX_TOKEN`, `--data-dir`, no desktop assumptions) — **adopt it as-is, no rewrite.** The token is an env var on the VM only.
+
+**(c) The read API — one read-only mechanism for every store.** The app fetches both stores (NSE records/history + the Upstox context) from the VM over a small HTTP API, on the following non-negotiable requirements:
+
+- **Read-only, structurally.** GET only, no mutation route — the same guarantee the engine's local API already holds. The app reads from the VM; it can **never** make the VM act. Do **not** reintroduce the mutation surface that was deliberately refused when Option 1 (shell-owned stdin trigger) was chosen for BUG 1's refresh.
+- **Degrade honestly and visibly.** VM request timeout **10s**, **2 retries**, then fall back to local scraping/refresh **and show the fallback indicator** ("running on local data — VM unreachable"). Never a silent degrade. Reuse the freshness/state pattern from BUG 1 (`ingest_state` / `GET /status`) and V3-6 (`field_state`) rather than inventing a second one.
+- **Freshness travels with the data.** Each store carries its **own** last-successful-refresh timestamp in its payload, so the staleness-honesty rule is **identical** whether the data came from the VM or the local fallback — one staleness rule, evaluated the same way on both paths, not two.
+
+**GATE V3-1:** the VM fetches NSE **and** refreshes the Upstox context on schedule; schema-validation raises on unexpected shape; a fetch failure is loud (not a silent empty write); the app reads **both** stores from the VM's read-only API; the API exposes **no** mutation route; each store's payload carries its own freshness timestamp.
 
 ## V3-2. Durable archive (input + output)
 
