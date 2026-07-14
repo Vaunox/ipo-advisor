@@ -71,3 +71,80 @@ def test_environ_takes_precedence_over_file(tmp_path: Path) -> None:
 def test_missing_secret_returns_default() -> None:
     provider = SecretProvider(environ={})
     assert provider.get("ABSENT", default="fallback") == "fallback"
+
+
+# --- Secrets redaction (structural, at the sink — v3 A/B) ----------------------------------------
+
+# A realistic (fake) JWT, the shape an Upstox access token takes.
+_FAKE_JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+
+
+def _record(msg: str, **extra: object) -> logging.LogRecord:
+    record = logging.LogRecord("ipo.test", logging.INFO, __file__, 1, msg, (), None)
+    for key, value in extra.items():
+        setattr(record, key, value)
+    return record
+
+
+def test_redaction_drops_secret_keyed_values() -> None:
+    """A value under a known secret key is dropped whole, regardless of its content."""
+    line = JsonFormatter().format(_record("auth ok", token=_FAKE_JWT, api_key="sk-live-1234"))
+    payload = json.loads(line)
+    assert payload["token"] == "[REDACTED]"
+    assert payload["api_key"] == "[REDACTED]"
+    assert _FAKE_JWT not in line
+
+
+def test_redaction_pattern_scrub_catches_secret_under_innocuous_key() -> None:
+    """The realistic careless call: the raw token logged under a harmless-looking key.
+
+    The denylist wouldn't catch `detail`; the pattern scrub must — the raw token must not survive
+    anywhere in the serialized line.
+    """
+    line = JsonFormatter().format(_record("context refreshed", detail=f"used {_FAKE_JWT} to fetch"))
+    payload = json.loads(line)
+    assert _FAKE_JWT not in line
+    assert "[REDACTED]" in payload["detail"]
+
+
+def test_redaction_scrubs_pan_and_message_text() -> None:
+    """A PAN-shaped value is scrubbed even when it appears in the free-text message."""
+    line = JsonFormatter().format(_record("applicant ABCDE1234F verified"))
+    payload = json.loads(line)
+    assert "ABCDE1234F" not in line
+    assert "[REDACTED]" in payload["message"]
+
+
+def test_redaction_recurses_into_nested_extras() -> None:
+    """A secret nested inside a dict extra is still scrubbed (recursive, not just top-level)."""
+    line = JsonFormatter().format(_record("ok", registrar={"name": "KFin", "pan": "ABCDE1234F"}))
+    assert "ABCDE1234F" not in line
+    assert "[REDACTED]" in line
+
+
+def test_every_configured_handler_uses_a_redacting_formatter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Structural guarantee: configure_logging wires a redacting formatter onto EVERY sink.
+
+    Redaction can't be bypassed by a new log call because it lives in the formatter each handler
+    runs — and both the stderr and the rotating-file handler get one.
+    """
+    import ipo.core.logging as logging_module
+
+    root = logging.getLogger()
+    saved = root.handlers[:]
+    monkeypatch.setattr(logging_module, "_CONFIGURED", False)
+    try:
+        configure_logging("INFO", file_path=tmp_path / "logs" / "engine.log")
+        handlers = root.handlers
+        assert len(handlers) == 2  # stderr + rotating file
+        for handler in handlers:
+            assert isinstance(
+                handler.formatter,
+                (JsonFormatter, logging_module._RedactingTextFormatter),
+            )
+    finally:
+        for handler in root.handlers:
+            handler.close()
+        root.handlers = saved
