@@ -9,6 +9,9 @@ missing per-IPO entry degrades to ``registrar=None``. Offline + deterministic.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from datetime import date, datetime
 from pathlib import Path
 
@@ -116,6 +119,50 @@ def test_join_attaches_registrar_or_none(tmp_path: Path) -> None:
     assert view.available is True
 
 
+def _store_refreshed(tmp_path: Path, refreshed_at: str, registrars: dict) -> AllotmentStore:
+    path = tmp_path / "registrar_info.json"
+    path.write_text(
+        json.dumps({"refreshed_at": refreshed_at, "registrars": registrars}), encoding="utf-8"
+    )
+    return AllotmentStore(path)
+
+
+# --- registrar_state: distinguish "not yet published" from "cache is stale" (v3 V3-6) ----------
+
+
+def test_state_present(tmp_path: Path) -> None:
+    store = _store_with(tmp_path, {"HASREG": {"name": "KFin"}})
+    view = build_allotment_view([_rec("hasreg", close=date(2026, 7, 11))], store, clock=_CLOCK)
+    assert view.rows[0].registrar_state == "present"
+
+
+def test_state_unpublished_when_cache_is_current(tmp_path: Path) -> None:
+    # cache refreshed 2026-07-14 (≥ open 2026-06-01, and recent), no entry → genuinely not published
+    store = _store_with(tmp_path, {})  # refreshed_at 2026-07-14T09:00
+    view = build_allotment_view([_rec("noreg", close=date(2026, 7, 11))], store, clock=_CLOCK)
+    assert view.rows[0].registrar_state == "unpublished"
+
+
+def test_state_stale_when_cache_predates_the_ipo(tmp_path: Path) -> None:
+    # refreshed 2026-05-01 — BEFORE this IPO opened (2026-06-01) → we never looked → stale
+    store = _store_refreshed(tmp_path, "2026-05-01T09:00:00+05:30", {})
+    view = build_allotment_view([_rec("noreg", close=date(2026, 7, 11))], store, clock=_CLOCK)
+    assert view.rows[0].registrar_state == "stale"
+
+
+def test_state_stale_when_cache_past_threshold(tmp_path: Path) -> None:
+    # refreshed 2026-06-15 (≥ open) but 29 days before "today" (> 14-day threshold) → stale
+    store = _store_refreshed(tmp_path, "2026-06-15T09:00:00+05:30", {})
+    view = build_allotment_view([_rec("noreg", close=date(2026, 7, 11))], store, clock=_CLOCK)
+    assert view.rows[0].registrar_state == "stale"
+
+
+def test_state_not_loaded_when_no_cache(tmp_path: Path) -> None:
+    store = AllotmentStore(tmp_path / "missing.json")
+    view = build_allotment_view([_rec("x", close=date(2026, 7, 11))], store, clock=_CLOCK)
+    assert view.rows[0].registrar_state == "not_loaded"
+
+
 def test_view_available_false_when_no_cache(tmp_path: Path) -> None:
     store = AllotmentStore(tmp_path / "missing.json")  # never loaded
     view = build_allotment_view([_rec("x", close=date(2026, 7, 11))], store, clock=_CLOCK)
@@ -127,15 +174,17 @@ def test_view_available_false_when_no_cache(tmp_path: Path) -> None:
 # --- structural boundary (v3 V3-6) — a permanent regression guard ------------------------------
 
 
-def test_scoring_path_cannot_reach_registrar_data() -> None:
-    """The model must be *physically* unable to see registrar data — proven, not promised.
+_SCORING_PKGS = ("features", "model", "calibration", "core")
 
-    No file under features/ model/ calibration/ core/ may reference the V3-6 allotment context or
-    its registrar types. This is the same class of guarantee as the GET-only API surface; if it ever
-    breaks, a registrar field could leak into a feature vector and this test fails loudly.
+
+def test_scoring_path_has_no_direct_registrar_reference() -> None:
+    """Fast, readable direct check: no scoring-path FILE names the V3-6 allotment/registrar symbols.
+
+    Complements the transitive check below — this catches an obvious direct import at a glance; the
+    transitive one catches the sneakier case (a shared util imported by the scoring path that itself
+    imports the allotment context).
     """
     root = Path(__file__).resolve().parents[2] / "src" / "ipo"
-    scoring_path = ("features", "model", "calibration", "core")
     forbidden = (
         "allotment_context",
         "AllotmentStore",
@@ -144,11 +193,46 @@ def test_scoring_path_cannot_reach_registrar_data() -> None:
         "RegistrarInfo",
         "build_allotment_view",
     )
-    offenders: list[str] = []
-    for pkg in scoring_path:
-        for py in (root / pkg).rglob("*.py"):
-            text = py.read_text(encoding="utf-8")
-            for sym in forbidden:
-                if sym in text:
-                    offenders.append(f"{py.relative_to(root)} references {sym}")
+    offenders = [
+        f"{py.relative_to(root)} references {sym}"
+        for pkg in _SCORING_PKGS
+        for py in (root / pkg).rglob("*.py")
+        for sym in forbidden
+        if sym in py.read_text(encoding="utf-8")
+    ]
     assert not offenders, "registrar data must not reach the scoring path: " + "; ".join(offenders)
+
+
+def test_scoring_path_cannot_transitively_reach_registrar_data() -> None:
+    """The model must be *physically* unable to see registrar data — via the real import graph.
+
+    A fresh interpreter imports EVERY module under features/ model/ calibration/ core/ (their whole
+    transitive import closure) and asserts ``ipo.service.allotment_context`` never lands in
+    ``sys.modules``. So even an indirect path — a scoring module importing an out-of-scope util that
+    imports the allotment context — fails this test. Same class of structural guarantee as the
+    GET-only API surface: if it ever breaks, a registrar value could reach a feature vector.
+
+    Run in a subprocess because the pytest process itself has already imported the allotment context
+    (via the API tests), so this process's ``sys.modules`` cannot answer the question.
+    """
+    src = Path(__file__).resolve().parents[2] / "src"
+    probe = (
+        "import importlib, pkgutil, sys\n"
+        "import ipo.features, ipo.model, ipo.calibration, ipo.core\n"
+        "for pkg in (ipo.features, ipo.model, ipo.calibration, ipo.core):\n"
+        "    for m in pkgutil.walk_packages(pkg.__path__, pkg.__name__ + '.'):\n"
+        "        try:\n"
+        "            importlib.import_module(m.name)\n"
+        "        except Exception:\n"
+        "            pass\n"
+        "print('LEAK' if 'ipo.service.allotment_context' in sys.modules else 'CLEAN')\n"
+    )
+    env = {**os.environ, "PYTHONPATH": str(src) + os.pathsep + os.environ.get("PYTHONPATH", "")}
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, env=env, timeout=120
+    )
+    assert result.returncode == 0, f"probe failed: {result.stderr}"
+    assert result.stdout.strip().splitlines()[-1] == "CLEAN", (
+        "the scoring path transitively imports ipo.service.allotment_context — registrar data can "
+        f"reach the model: {result.stdout} {result.stderr}"
+    )

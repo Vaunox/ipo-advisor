@@ -25,14 +25,39 @@ interface DesktopBridge {
 }
 
 // Open the registrar's page in the user's real browser. Desktop routes through the shell (which
-// re-validates https); browser/dev falls back to a new tab. Only ever called with an https URL.
+// RE-VALIDATES the host allowlist — the authoritative gate); browser/dev falls back to a new tab.
+// Only ever called for a URL that already passed isRegistrarUrl below.
 function openRegistrar(url: string): void {
   const api = (window as unknown as { ipoDesktop?: DesktopBridge }).ipoDesktop
   if (api?.openExternal) void api.openExternal(url)
   else window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-const isHttps = (url: string | null): url is string => !!url && /^https:\/\//i.test(url)
+// Mirrors the authoritative allowlist in apps/desktop/src/registrar.ts — used ONLY to decide
+// button-vs-inert rendering; the main process re-validates on open, so drift is cosmetic, not a
+// security hole. A URL from the registrar cache that isn't a pinned registrar host is shown as inert
+// copyable text, never a working "open" (we don't route a PAN-primed user to a page we can't vouch for).
+const REGISTRAR_HOSTS = [
+  'mpms.mufg.com',
+  'linkintime.co.in',
+  'kfintech.com',
+  'bigshareonline.com',
+  'maashitla.com',
+  'skylinerta.com',
+  'cameoindia.com',
+  'purvashare.com',
+]
+function isRegistrarUrl(url: string | null): url is string {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'https:') return false
+    const h = u.hostname.toLowerCase()
+    return REGISTRAR_HOSTS.some((d) => h === d || h.endsWith('.' + d))
+  } catch {
+    return false
+  }
+}
 
 function ContactBlock({ r }: { r: RegistrarInfo }) {
   const lines: [string, string][] = []
@@ -52,7 +77,7 @@ function ContactBlock({ r }: { r: RegistrarInfo }) {
   )
 }
 
-function AllotmentCard({ row }: { row: AllotmentRow }) {
+function AllotmentCard({ row, refreshedAt }: { row: AllotmentRow; refreshedAt: string | null }) {
   const [showContact, setShowContact] = useState(false)
   const reg = row.registrar
   const listed = row.stage === 'listed'
@@ -77,30 +102,42 @@ function AllotmentCard({ row }: { row: AllotmentRow }) {
           <span className="al-reg-label">Registrar</span>
           <span className="al-reg-name">{reg.name ?? reg.short ?? 'Registrar'}</span>
         </div>
+      ) : row.registrar_state === 'stale' ? (
+        <div className="al-reg al-reg-stale">
+          Registrar unknown — the cache is stale (last refreshed{' '}
+          {refreshedAt ? fmtWhen(refreshedAt) : '—'}). Run the refresh to check; it isn't shown as
+          "unavailable" because we haven't looked.
+        </div>
+      ) : row.registrar_state === 'unpublished' ? (
+        <div className="al-reg al-reg-missing">Registrar not yet published for this IPO.</div>
       ) : (
-        <div className="al-reg al-reg-missing">Registrar not yet available for this IPO.</div>
+        <div className="al-reg al-reg-missing">Registrar details not loaded.</div>
       )}
 
-      <div className="al-actions">
-        {reg && isHttps(reg.website) ? (
-          <button className="btn al-check" onClick={() => openRegistrar(reg.website as string)}>
-            Check allotment ↗
-          </button>
-        ) : (
-          <span className="al-nolink">
-            {reg ? 'Registrar site unavailable' : 'Link appears once the registrar is published'}
-          </span>
-        )}
-        {hasContact && (
-          <button
-            className="btn ghost"
-            aria-expanded={showContact}
-            onClick={() => setShowContact((s) => !s)}
-          >
-            Contact {showContact ? '▲' : '▾'}
-          </button>
-        )}
-      </div>
+      {reg && (
+        <div className="al-actions">
+          {isRegistrarUrl(reg.website) ? (
+            <button className="btn al-check" onClick={() => openRegistrar(reg.website as string)}>
+              Check allotment ↗
+            </button>
+          ) : reg.website ? (
+            <span className="al-nolink" title="Not a recognized registrar host — open it manually">
+              Unrecognized link · <span className="mono al-url">{reg.website}</span>
+            </span>
+          ) : (
+            <span className="al-nolink">Registrar site unavailable</span>
+          )}
+          {hasContact && (
+            <button
+              className="btn ghost"
+              aria-expanded={showContact}
+              onClick={() => setShowContact((s) => !s)}
+            >
+              Contact {showContact ? '▲' : '▾'}
+            </button>
+          )}
+        </div>
+      )}
       {showContact && reg && <ContactBlock r={reg} />}
     </div>
   )
@@ -149,7 +186,7 @@ export function Allotment({ onOpen: _onOpen }: { onOpen: (id: string) => void })
       )}
       <div className="al-grid">
         {data.rows.map((row) => (
-          <AllotmentCard key={row.ipo_id} row={row} />
+          <AllotmentCard key={row.ipo_id} row={row} refreshedAt={data.refreshed_at} />
         ))}
       </div>
     </>

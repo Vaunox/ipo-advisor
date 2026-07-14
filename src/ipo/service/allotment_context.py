@@ -41,6 +41,11 @@ _log = get_logger("ipo.service.allotment_context")
 # same instinct as the alert-retention window).
 _LISTED_VISIBLE_DAYS = 7
 
+# Beyond this age a cache is "stale": an absent registrar is treated as unproven ("we haven't
+# looked") rather than "not published". Registrar assignment is fixed at RHP filing, so a cache this
+# old has likely missed newer IPOs — the honest read is "unknown", not "absent".
+_CACHE_STALE_DAYS = 14
+
 
 class _CacheFile(BaseModel):
     """On-disk shape written by scripts/refresh_allotment.py (token-free)."""
@@ -104,6 +109,32 @@ def _stage(record: IPORecord, today: date) -> str | None:
     return "awaiting allotment"
 
 
+def _registrar_state(
+    reg: RegistrarInfo | None,
+    *,
+    available: bool,
+    refreshed_at: datetime | None,
+    open_date: date,
+    today: date,
+) -> str:
+    """Why a registrar is (un)available — so an absence never lies about its cause (v3 V3-6).
+
+    See ``AllotmentRow.registrar_state``: distinguishing "not yet published" from "cache is stale"
+    is the honest-degradation rule taken one level deeper — the app reasons about freshness instead
+    of leaving the user to compare a timestamp against the IPO's dates.
+    """
+    if reg is not None:
+        return "present"
+    if not available:
+        return "not_loaded"
+    if refreshed_at is None:
+        return "stale"
+    refreshed = refreshed_at.date()
+    if refreshed < open_date or (today - refreshed).days > _CACHE_STALE_DAYS:
+        return "stale"  # refreshed before this IPO existed, or too old to trust the absence
+    return "unpublished"  # looked at/after it opened, recently, found nothing → not published yet
+
+
 def build_allotment_view(
     records: Iterable[IPORecord],
     store: AllotmentStore,
@@ -121,6 +152,7 @@ def build_allotment_view(
         stage = _stage(record, today)
         if stage is None:
             continue
+        reg = store.get(record.ipo_id)
         rows.append(
             AllotmentRow(
                 ipo_id=record.ipo_id,
@@ -128,7 +160,14 @@ def build_allotment_view(
                 stage=stage,
                 close_date=record.close_date,
                 listing_date=record.listing_date,
-                registrar=store.get(record.ipo_id),
+                registrar=reg,
+                registrar_state=_registrar_state(
+                    reg,
+                    available=store.available,
+                    refreshed_at=store.refreshed_at,
+                    open_date=record.open_date,
+                    today=today,
+                ),
             )
         )
     rows.sort(key=lambda r: r.close_date, reverse=True)

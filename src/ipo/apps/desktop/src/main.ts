@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { type ChildProcess } from 'node:child_process'
 import path from 'node:path'
+import { isAllowedRegistrarUrl } from './registrar'
 import {
   findRepoRoot,
   freePort,
@@ -237,16 +238,13 @@ ipcMain.handle('engine:restart', (): Promise<boolean> => restartEngine())
 // Returns whether the request was delivered; the engine debounces and does the polite fetch.
 ipcMain.handle('engine:refresh', (): boolean => triggerEngineRefresh(child))
 
-// v3 V3-6: open a registrar's allotment-check page in the user's real browser. Only https URLs are
-// opened (the renderer passes URLs that came from the trusted registrar cache); anything else is
-// refused. Nothing is navigated inside the app — the user's PAN is entered on the registrar's site.
+// v3 V3-6: open a registrar's allotment-check page in the user's real browser. The URL comes from
+// the registrar cache (a data-plane value), so an https check is not enough — it must be a PINNED
+// registrar host (isAllowedRegistrarUrl). An unknown/poisoned host is refused here, structurally, so
+// the app can never open an attacker-chosen page the user is primed to type their PAN into. Nothing
+// is navigated inside the app.
 ipcMain.handle('shell:openExternal', (_e, url: unknown): boolean => {
-  if (typeof url !== 'string') return false
-  try {
-    if (new URL(url).protocol !== 'https:') return false
-  } catch {
-    return false
-  }
+  if (typeof url !== 'string' || !isAllowedRegistrarUrl(url)) return false
   void shell.openExternal(url)
   return true
 })

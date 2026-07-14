@@ -132,6 +132,10 @@ export interface RegistrarInfo {
   contact_name: string | null
 }
 
+// registrar_state (v3 V3-6): 'present' | 'unpublished' (cache current, not published yet) |
+// 'stale' (cache predates this IPO / too old — absence unproven) | 'not_loaded' (no cache at all).
+export type RegistrarState = 'present' | 'unpublished' | 'stale' | 'not_loaded'
+
 export interface AllotmentRow {
   ipo_id: string
   name: string
@@ -139,6 +143,7 @@ export interface AllotmentRow {
   close_date: string
   listing_date: string | null
   registrar: RegistrarInfo | null
+  registrar_state: RegistrarState
 }
 
 export interface AllotmentView {

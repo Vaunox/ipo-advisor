@@ -155,8 +155,17 @@ class AllotmentRow(BaseModel):
     """One IPO at/past the allotment stage: its lifecycle stage + its registrar (v3 V3-6).
 
     Display/routing only. ``stage`` is derived from the record's dates (book closed → awaiting
-    allotment/listing; listed → listed). ``registrar`` is ``None`` when the cache has no entry for
-    this IPO yet — the tab shows "registrar not yet available" rather than inventing one.
+    allotment/listing; listed → listed).
+
+    ``registrar_state`` makes the app do the reasoning the freshness line otherwise offloads to the
+    user, so an absent registrar never lies about *why* it's absent:
+      * ``present`` — ``registrar`` is populated.
+      * ``unpublished`` — the cache is current (refreshed at/after this IPO opened) and still has no
+        entry → the registrar genuinely isn't published yet.
+      * ``stale`` — the cache predates this IPO's open date (we never looked) or is past the stale
+        threshold → the absence is unproven; the UI says "stale — last refreshed {date}", not
+        "not yet available".
+      * ``not_loaded`` — no cache at all (the whole view is ``available=false``).
     """
 
     ipo_id: str
@@ -165,6 +174,7 @@ class AllotmentRow(BaseModel):
     close_date: date
     listing_date: date | None
     registrar: RegistrarInfo | None
+    registrar_state: str
 
 
 class AllotmentView(BaseModel):
