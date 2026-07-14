@@ -151,6 +151,11 @@ def _context(token: str, ipo_id: object) -> dict:
     rhp = obj.get("rhp_url")  # Red Herring Prospectus (final offer doc); DRHP dropped (unusable)
     if rhp:
         entry["rhp_url"] = rhp
+    lot = obj.get("lot_size")  # bid lot — NSE gives it on 0% of IPOs, so Upstox is the sole source
+    if isinstance(lot, int) and lot > 0:
+        entry["lot_size"] = lot
+    elif isinstance(lot, str) and lot.strip().isdigit() and int(lot) > 0:
+        entry["lot_size"] = int(lot)
     return entry
 
 
@@ -182,8 +187,9 @@ def main() -> None:
 
     n_reg = sum(1 for e in ipos.values() if e.get("registrar"))
     n_rhp = sum(1 for e in ipos.values() if e.get("rhp_url"))
+    n_lot = sum(1 for e in ipos.values() if e.get("lot_size"))
     print(f"\nWrote {len(ipos)} IPO context entries to {out_path} (token-free).")
-    print(f"  with registrar: {n_reg}   with rhp_url: {n_rhp}")
+    print(f"  with registrar: {n_reg}   with rhp_url: {n_rhp}   with lot_size: {n_lot}")
     for sym in list(ipos)[:8]:
         r = ipos[sym].get("registrar") or {}
         reg = str(r.get("name") or r.get("short") or "-")[:28]

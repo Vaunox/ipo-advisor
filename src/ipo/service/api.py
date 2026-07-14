@@ -204,6 +204,8 @@ def create_app(
                 refreshed_at=None,
                 rhp_url=None,
                 rhp_state="not_loaded",
+                lot_size=None,
+                lot_state="not_loaded",
                 registrar=None,
                 registrar_state="not_loaded",
             )

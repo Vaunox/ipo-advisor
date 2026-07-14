@@ -162,6 +162,10 @@ export interface IpoContextView {
   refreshed_at: string | null
   rhp_url: string | null
   rhp_state: RegistrarState
+  // v3 V3-8 — the bid lot. NSE provides it on 0% of IPOs, so this is the sole source; shown as an
+  // INDICATIVE planning figure (≈ N shares · approx ₹…), never as an exact reported value.
+  lot_size: number | null
+  lot_state: RegistrarState
   registrar: RegistrarInfo | null
   registrar_state: RegistrarState
 }
