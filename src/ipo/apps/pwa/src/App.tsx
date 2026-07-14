@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useBoard, useCalibration, useHealth } from './api/hooks'
+import { useAllotment, useBoard, useCalibration, useHealth } from './api/hooks'
 import { CommandPalette } from './components/CommandPalette'
 import { IconAlert } from './components/Icons'
 import { Sidebar } from './components/Sidebar'
@@ -7,6 +7,7 @@ import { TopBar } from './components/TopBar'
 import type { View } from './nav'
 import { useCrossingNotifications } from './notifications'
 import { recalibrationCount } from './recalib'
+import { Allotment } from './screens/Allotment'
 import { Detail } from './screens/Detail'
 import { History } from './screens/History'
 import { Live } from './screens/Live'
@@ -18,6 +19,7 @@ import { Toaster } from './components/Toaster'
 const TITLES: Record<View, [string, string]> = {
   live: ['Live signals', 'mainboard · updated live · IST'],
   upcoming: ['Upcoming IPOs', 'mainboard calendar · anchor days flagged'],
+  allotment: ['Allotment', 'check allotment on the registrar’s own site · no PAN stored here'],
   history: ['History & accountability', 'did the verdicts hold up?'],
   settings: ['Settings', 'operational — model internals are not editable'],
 }
@@ -74,6 +76,7 @@ export function App() {
   const health = useHealth()
   const board = useBoard()
   const calibration = useCalibration()
+  const allotment = useAllotment()
   const engineUp = health.isSuccess && health.data?.status === 'ok'
   const engineDown = health.isError
   useCrossingNotifications() // native OS toast on a new APPLY crossing (desktop shell only)
@@ -125,6 +128,7 @@ export function App() {
         window.clearTimeout(gTimer)
         if (e.key === 'l') navigate('live')
         else if (e.key === 'u') navigate('upcoming')
+        else if (e.key === 'a') navigate('allotment')
         else if (e.key === 'h') navigate('history')
         else if (e.key === 's') navigate('settings')
         return
@@ -156,7 +160,7 @@ export function App() {
       <Sidebar
         view={view}
         onNavigate={navigate}
-        counts={counts}
+        counts={{ ...counts, allotment: allotment.data?.rows.length ?? 0 }}
         engineUp={engineUp}
         gatePassed={calibration.data?.gate_passed ?? true}
         recalibrations={recalibrationCount()}
@@ -181,6 +185,8 @@ export function App() {
             <History onOpen={setDetailId} />
           ) : view === 'upcoming' ? (
             <Upcoming onOpen={setDetailId} />
+          ) : view === 'allotment' ? (
+            <Allotment onOpen={setDetailId} />
           ) : (
             <Settings />
           )}

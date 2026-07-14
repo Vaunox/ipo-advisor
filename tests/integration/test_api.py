@@ -244,6 +244,42 @@ def test_status_reports_last_successful_ingest(tmp_path: Path) -> None:
     assert body["last_attempt_ok"] is False  # → UI shows stale + retrying, not "fresh"
 
 
+def test_allotment_without_store_is_honestly_unavailable() -> None:
+    """No registrar cache wired → /allotment reports available=false (v3 V3-6), never blanks."""
+    client, _ = _client(load_calibrator(_CAL))  # no allotment_store passed
+    body = client.get("/allotment").json()
+    assert body["available"] is False
+    assert body["rows"] == []
+
+
+def test_allotment_serves_registrar_join(tmp_path: Path) -> None:
+    """/allotment joins in-scope IPOs with the registrar cache; missing entry → registrar null."""
+    from ipo.service.allotment_context import AllotmentStore
+
+    path = tmp_path / "registrar_info.json"
+    path.write_text(
+        '{"refreshed_at": "2026-07-14T09:00:00+05:30", '
+        '"registrars": {"ABC": {"name": "KFin Technologies", "website": "https://kfintech.com/"}}}',
+        encoding="utf-8",
+    )
+    config = load_config(env="dev", environ={})
+    records = load_records_from_csv(_CSV)
+    engine = VerdictEngine(
+        repository=_ListRepo(records),
+        calibrator=load_calibrator(_CAL),
+        scorer=WeightedScorer(config.feature_weights, config.features),
+        config=config,
+        regime=NiftyRegime(_NIFTY),
+    )
+    client = TestClient(create_app(engine, allotment_store=AllotmentStore(path)))
+    body = client.get("/allotment").json()
+    assert body["available"] is True
+    # rows are display-only; each carries a registrar object or null, and an ipo_id/name/stage.
+    for row in body["rows"]:
+        assert {"ipo_id", "name", "stage", "registrar"} <= set(row)
+        assert row["registrar"] is None or "website" in row["registrar"]
+
+
 def test_gate_survives_serialization() -> None:
     records = load_records_from_csv(_CSV)
     rec = next(r for r in records if r.qib_sub is not None and r.listing_open is not None)

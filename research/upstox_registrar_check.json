@@ -1,0 +1,675 @@
+{
+  "summary": {
+    "sampled": 22,
+    "by_status": {
+      "closed": 2,
+      "listed": 20
+    },
+    "detail_key_union": [
+      "bidding_end_date",
+      "bidding_start_date",
+      "cut_off_price",
+      "daily_end_time",
+      "daily_start_time",
+      "drhp_url",
+      "face_value",
+      "id",
+      "industry",
+      "isin",
+      "issue_size",
+      "issue_type",
+      "listing_exchange",
+      "listing_price",
+      "lot_size",
+      "maximum_price",
+      "minimum_price",
+      "minimum_quantity",
+      "name",
+      "registrar_info",
+      "rhp_url",
+      "status",
+      "symbol",
+      "tick_size",
+      "timeline",
+      "total_subscription"
+    ],
+    "registrar_coverage": {
+      "name": "22/22",
+      "registrar": "22/22",
+      "website": "22/22",
+      "email": "22/22",
+      "contact_number": "22/22",
+      "contact_name": "22/22",
+      "phone": "0/22"
+    },
+    "adjacent_coverage": {
+      "rhp_url": "22/22",
+      "drhp_url": "0/22",
+      "lot_size": "22/22",
+      "isin": "22/22",
+      "industry": "20/22",
+      "cut_off_price": "22/22",
+      "status": "22/22"
+    }
+  },
+  "full_detail_samples": [
+    {
+      "id": "laser-power-and-infra-limited-ipo",
+      "symbol": "LASERPOWER",
+      "name": "Laser Power & Infra IPO",
+      "status": "closed",
+      "isin": "INE17IR01028",
+      "issue_type": "regular",
+      "issue_size": 742.0,
+      "industry": "Cable",
+      "minimum_price": 203.0,
+      "maximum_price": 214.0,
+      "bidding_start_date": "2026-07-09",
+      "bidding_end_date": "2026-07-13",
+      "daily_start_time": "10:00:00",
+      "daily_end_time": "17:00:00",
+      "face_value": 5.0,
+      "tick_size": null,
+      "lot_size": 70,
+      "minimum_quantity": 70,
+      "cut_off_price": 214.0,
+      "listing_price": null,
+      "listing_exchange": "BSE,NSE",
+      "rhp_url": "https://laserpowerinfra.com/wp-content/uploads/2026/07/Red-Herring-Prospectus.pdf",
+      "drhp_url": null,
+      "timeline": {
+        "pre_apply_start_date": "2026-07-08",
+        "application_start_date": "2026-07-09",
+        "application_end_date": "2026-07-13",
+        "allotment_start_date": "2026-07-14",
+        "allotment_date": "2026-07-15",
+        "refund_initiation_date": "2026-07-15",
+        "listing_date": "2026-07-16",
+        "mandate_end_date": "2026-08-24"
+      },
+      "registrar_info": {
+        "name": "MUFG Intime India Private Limited",
+        "email": "laserpower.ipo@in.mpms.mufg.com",
+        "contact_name": "Shanti Gopalkrishnan",
+        "contact_number": "+91 81 0811 4949",
+        "website": "https://in.mpms.mufg.com/",
+        "registrar": "MUFG"
+      },
+      "total_subscription": "38.73"
+    },
+    {
+      "id": "kusumgar-limited-ipo",
+      "symbol": "KUSUMGAR",
+      "name": "Kusumgar IPO",
+      "status": "closed",
+      "isin": "INE0ISX01025",
+      "issue_type": "regular",
+      "issue_size": 650.0,
+      "industry": "Textile",
+      "minimum_price": 398.0,
+      "maximum_price": 419.0,
+      "bidding_start_date": "2026-07-08",
+      "bidding_end_date": "2026-07-10",
+      "daily_start_time": "10:00:00",
+      "daily_end_time": "17:00:00",
+      "face_value": 1.0,
+      "tick_size": null,
+      "lot_size": 35,
+      "minimum_quantity": 35,
+      "cut_off_price": 419.0,
+      "listing_price": null,
+      "listing_exchange": "BSE,NSE",
+      "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jul-2026/kusumgar-limited-rhp_102510.html",
+      "drhp_url": null,
+      "timeline": {
+        "pre_apply_start_date": "2026-07-07",
+        "application_start_date": "2026-07-08",
+        "application_end_date": "2026-07-10",
+        "allotment_start_date": "2026-07-13",
+        "allotment_date": "2026-07-14",
+        "refund_initiation_date": "2026-07-14",
+        "listing_date": "2026-07-15",
+        "mandate_end_date": "2026-08-21"
+      },
+      "registrar_info": {
+        "name": "Bigshare Services Private Limited ",
+        "email": "ipo@bigshareonline.com",
+        "contact_name": "Babu Rapheal C.",
+        "contact_number": " +91 22 6263 8200",
+        "website": "https://www.bigshareonline.com/",
+        "registrar": "BIGSHARE"
+      },
+      "total_subscription": "128.5"
+    }
+  ],
+  "per_ipo": [
+    {
+      "symbol": "LASERPOWER",
+      "name": "Laser Power & Infra IPO",
+      "status": "closed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "MUFG Intime India Private Limited",
+        "registrar": "MUFG",
+        "website": "https://in.mpms.mufg.com/",
+        "email": "laserpower.ipo@in.mpms.mufg.com",
+        "contact_number": "+91 81 0811 4949",
+        "contact_name": "Shanti Gopalkrishnan",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://laserpowerinfra.com/wp-content/uploads/2026/07/Red-Herring-Prospectus.pdf",
+        "drhp_url": null,
+        "lot_size": 70,
+        "isin": "INE17IR01028",
+        "industry": "Cable",
+        "cut_off_price": 214.0,
+        "status": "closed"
+      }
+    },
+    {
+      "symbol": "KUSUMGAR",
+      "name": "Kusumgar IPO",
+      "status": "closed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "Bigshare Services Private Limited ",
+        "registrar": "BIGSHARE",
+        "website": "https://www.bigshareonline.com/",
+        "email": "ipo@bigshareonline.com",
+        "contact_number": " +91 22 6263 8200",
+        "contact_name": "Babu Rapheal C.",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jul-2026/kusumgar-limited-rhp_102510.html",
+        "drhp_url": null,
+        "lot_size": 35,
+        "isin": "INE0ISX01025",
+        "industry": "Textile",
+        "cut_off_price": 419.0,
+        "status": "closed"
+      }
+    },
+    {
+      "symbol": "KNACK",
+      "name": "Knack Packaging Limited",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "MUFG Intime India Private Limited",
+        "registrar": "MUFG",
+        "website": "https://in.mpms.mufg.com/",
+        "email": "knackpackaging.ipo@in.mpms.mufg.com",
+        "contact_number": "+91 810 811 4949",
+        "contact_name": "Shanti Gopalkrishnan",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://knackpackaging.com/INV/KnackPackagingLimited-RHP.pdf",
+        "drhp_url": null,
+        "lot_size": 88,
+        "isin": "INE17QZ01016",
+        "industry": "Packaging",
+        "cut_off_price": 170.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "AASTHA",
+      "name": "Aastha Spintex IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "Bigshare Services Private Limited",
+        "registrar": "BIGSHARE",
+        "website": "https://www.bigshareonline.com/",
+        "email": "ipo@bigshareonline.com",
+        "contact_number": "+91 226 263 8200",
+        "contact_name": "Vinayak Morbale",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://aasthaspintex.com/pdf/RHP/RHP_Aastha.pdf",
+        "drhp_url": null,
+        "lot_size": 110,
+        "isin": "INE2FMX01012",
+        "industry": "Textile",
+        "cut_off_price": 136.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "CSM",
+      "name": "CSM Technologies IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited",
+        "registrar": "K FINTECH",
+        "website": "https://www.kfintech.com/",
+        "email": "csmtechnologies.ipo@kfintech.com",
+        "contact_number": "+91 040-67162222",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jun-2026/csm-technologies-limited-rhp_102194.html",
+        "drhp_url": null,
+        "lot_size": 132,
+        "isin": "INE0ZK601013",
+        "industry": "IT - Software",
+        "cut_off_price": 113.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "RAMBHAJO",
+      "name": "Advit Jewels IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "Bigshare Services Private Limited ",
+        "registrar": "BIGSHARE",
+        "website": "https://www.bigshareonline.com/",
+        "email": "ipo@bigshareonline.com",
+        "contact_number": "+91 22-62638200 ",
+        "contact_name": "Mr. Babu Rapheal C ",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jun-2026/advit-jewels-limited-rhp_102061.html",
+        "drhp_url": null,
+        "lot_size": 100,
+        "isin": "INE1SJO01012",
+        "industry": "Diamond & Jewellery",
+        "cut_off_price": 138.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "CORDELIA",
+      "name": "Waterways Leisure Tourism Limited",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "MUFG Intime India Private Limited ",
+        "registrar": "MUFG",
+        "website": "https://in.mpms.mufg.com/",
+        "email": "waterwaysleisure.ipo@in.mpms.mufg.com",
+        "contact_number": "+91 81081 14949",
+        "contact_name": "Shanti Gopalkrishnan",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jun-2026/waterways-leisure-tourism-limited-rhp_102226.html",
+        "drhp_url": null,
+        "lot_size": 18,
+        "isin": "INE0LZF01013",
+        "industry": "Travel Services",
+        "cut_off_price": 808.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "TURTLEMINT",
+      "name": "Turtlemint Fintech Solutions IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited",
+        "registrar": "K FINTECH",
+        "website": "https://www.kfintech.com/",
+        "email": "turtlemint.ipo@kfintech.com",
+        "contact_number": "+ 91 40 6716 2222",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://cdn.turtlemint.com/wp-content/uploads/20260615160850/IFA2047-RHP_June-15-2026.pdf",
+        "drhp_url": null,
+        "lot_size": 98,
+        "isin": "INE0OC301013",
+        "industry": "Finance - Investment",
+        "cut_off_price": 152.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "HEXAGON",
+      "name": "Hexagon Nutrition IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited",
+        "registrar": "K FINTECH",
+        "website": "https://www.kfintech.com/",
+        "email": "hexagon.ipo@kfintech.com",
+        "contact_number": " +91 40 6716 2222",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://hexagonnutrition.com/wp-content/uploads/2026/05/RHP-documents.pdf",
+        "drhp_url": null,
+        "lot_size": 333,
+        "isin": "INE0JUI01012",
+        "industry": "Consumer Food",
+        "cut_off_price": 45.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "CMRGREEN",
+      "name": "CMR Green Technologies IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited",
+        "registrar": "K Fintech",
+        "website": "https://www.kfintech.com/",
+        "email": "cmr.ipo@kfintech.com",
+        "contact_number": "+91 40 6716 2222",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://assets.upstox.com/ipo/documents/rhp/cmr-green-technologies-rhp.pdf",
+        "drhp_url": null,
+        "lot_size": 78,
+        "isin": "INE00WV01027",
+        "industry": "Metal - Non Ferrous",
+        "cut_off_price": 192.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "BAGMANE",
+      "name": "Bagmane Prime Office REIT IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited",
+        "registrar": "K FINTECH",
+        "website": "https://www.kfintech.com/",
+        "email": "bagmane.reit@kfintech.com",
+        "contact_number": "+91 40 6716 2222/1800 309 4001",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.axiscapital.co.in/contents/5716-1777312447.pdf",
+        "drhp_url": null,
+        "lot_size": 150,
+        "isin": "INE2OVN25015",
+        "industry": "Construction - Real Estate",
+        "cut_off_price": 100.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "KISSHT",
+      "name": "OnEMI Technology Solutions IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited",
+        "registrar": "K Fintech",
+        "website": "https://www.kfintech.com/",
+        "email": "kissht.ipo@kfintech.com",
+        "contact_number": "+91 40 6716 2222",
+        "contact_name": "https://www.nuvama.com/wp-content/uploads/2026/04/Project-NorthStar-RHP-Filing-version.pdf",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.nuvama.com/wp-content/uploads/2026/04/Project-NorthStar-RHP-Filing-version.pdf",
+        "drhp_url": null,
+        "lot_size": 87,
+        "isin": "INE12F801023",
+        "industry": "Finance - NBFC",
+        "cut_off_price": 171.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "OMPOWER",
+      "name": "Om Power Transmission IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "MUFG INTIME INDIA PRIVATE LIMITED",
+        "registrar": "MUFG",
+        "website": "https://in.mpms.mufg.com/",
+        "email": "ompower.ipo@in.mpms.mufg.com",
+        "contact_number": "+91 8108114949",
+        "contact_name": "Shanti Gopalkrishnan",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://assets.upstox.com/ipo/documents/rhp/rhp_optl.pdf",
+        "drhp_url": null,
+        "lot_size": 85,
+        "isin": "INE25E901019",
+        "industry": "Engineering - Construction",
+        "cut_off_price": 175.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "AMIRCHAND",
+      "name": "Amir Chand Jagdish Kumar (Exports) IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited",
+        "registrar": "K FINTECH",
+        "website": "https://www.kfintech.com/",
+        "email": "acjkel.ipo@kfintech.com",
+        "contact_number": "+91 40 6716 2222",
+        "contact_name": "M. Murali Krishna ",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://assets.upstox.com/ipo/documents/rhp/RHP_Amir Chand Jagdish Kumar (Exports) Limited.pdf",
+        "drhp_url": null,
+        "lot_size": 70,
+        "isin": "INE05TO01019",
+        "industry": "Consumer Food",
+        "cut_off_price": 212.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "POWERICA",
+      "name": "Powerica IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "MUFG Intime India Private Limited ",
+        "registrar": "MUFG",
+        "website": "https://in.mpms.mufg.com/",
+        "email": "powerica.ipo@in.mpms.mufg.com",
+        "contact_number": "+91 810 811 4949",
+        "contact_name": "Shanti Gopalkrishnan",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/mar-2026/powerica-limited-rhp_100434.html",
+        "drhp_url": null,
+        "lot_size": 37,
+        "isin": "INE921L01032",
+        "industry": "Power Generation/Distribution",
+        "cut_off_price": 395.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "SAIPARENT",
+      "name": "Sai Parenteral's IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "Bigshare Services Private Limited",
+        "registrar": "BIGSHARE",
+        "website": "https://www.bigshareonline.com/",
+        "email": "ipo@bigshareonline.com",
+        "contact_number": "+91 22 6263 8200",
+        "contact_name": "Babu Rapheal ",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/mar-2026/sai-parenteral-s-limited-rhp_100427.html",
+        "drhp_url": null,
+        "lot_size": 38,
+        "isin": "INE0H9F01037",
+        "industry": "Pharmaceuticals & Drugs",
+        "cut_off_price": 392.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "CMPDI",
+      "name": "Central Mine Planning & Design Institute IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "K Fintech Technologies Limited",
+        "registrar": " K Fintech",
+        "website": "https://www.kfintech.com/",
+        "email": "centralmine.ipo@kfintech.com",
+        "contact_number": "+91 4067162222",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/mar-2026/central-mine-planning-and-design-institute-limited-rhp_100326.html",
+        "drhp_url": null,
+        "lot_size": 80,
+        "isin": "INE05HV01027",
+        "industry": "Mining & Minerals",
+        "cut_off_price": 172.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "GSPCROP",
+      "name": "GSP Crop Science IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "MUFG Intime India Private Limited ",
+        "registrar": "MUFG",
+        "website": "https://in.mpms.mufg.com/",
+        "email": "gspcrop.ipo@in.mpms.mufg.com",
+        "contact_number": "+91 810 811 4949",
+        "contact_name": "Shanti Gopalkrishnan",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/mar-2026/gsp-crop-science-limited-rhp_100229.html",
+        "drhp_url": null,
+        "lot_size": 46,
+        "isin": "INE713R01022",
+        "industry": "Pesticides & Agrochemicals",
+        "cut_off_price": 320.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "INNOVISION",
+      "name": "Innovision IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFIN TECHNOLOGIES LIMITED",
+        "registrar": "K FINTECH",
+        "website": "https://www.kfintech.com/",
+        "email": "innovision.ipo@kfintech.com",
+        "contact_number": "+91 40 6716 222",
+        "contact_name": "M Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/mar-2026/innovision-limited-rhp_100105.html",
+        "drhp_url": null,
+        "lot_size": 27,
+        "isin": "INE0ADB01012",
+        "industry": null,
+        "cut_off_price": 519.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "RIIT",
+      "name": "Raajmarg Infra Investment Trust",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFIN TECHNOLOGIES LIMITED",
+        "registrar": "K Fintech",
+        "website": "https://www.kfintech.com/",
+        "email": "riimpl.invit@kfintech.com",
+        "contact_number": " +91 1800 309 4001 / +91 40 6716 2222",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/invit-public-issues/feb-2026/raajmarg-infra-investment-trust_100062.html",
+        "drhp_url": null,
+        "lot_size": 150,
+        "isin": "INE2PB023011",
+        "industry": null,
+        "cut_off_price": 100.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "RSL",
+      "name": "Rajputana Stainless IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "KFin Technologies Limited ",
+        "registrar": "K FINTECH ",
+        "website": "https://www.kfintech.com/",
+        "email": "rsl.ipo@kfintech.com",
+        "contact_number": "+91 40 6716 2222 / 1800 309 4001",
+        "contact_name": "M. Murali Krishna",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sebi.gov.in/filings/public-issues/mar-2026/rajputana-stainless-limited-rhp_100081.html",
+        "drhp_url": null,
+        "lot_size": 110,
+        "isin": "INE313L01016",
+        "industry": "Steel & Iron Products",
+        "cut_off_price": 122.0,
+        "status": "listed"
+      }
+    },
+    {
+      "symbol": "SEDEMAC",
+      "name": "SEDEMAC Mechatronics IPO",
+      "status": "listed",
+      "registrar": {
+        "has_registrar_info_object": true,
+        "name": "MUFG Intime India Private Limited",
+        "registrar": "MUFG",
+        "website": "https://in.mpms.mufg.com/",
+        "email": "sedemac.ipo@in.mpms.mufg.com",
+        "contact_number": "+91 810 811 4949",
+        "contact_name": "Shanti Gopalkrishnan ",
+        "phone": null
+      },
+      "adjacent": {
+        "rhp_url": "https://www.sedemac.com/static/media/SEDEMACMECHATRONICSLIMITEDRHP.86f5227defffbdeb10ea.pdf",
+        "drhp_url": null,
+        "lot_size": 11,
+        "isin": "INE00XB01019",
+        "industry": "Electric Equipment",
+        "cut_off_price": 1352.0,
+        "status": "listed"
+      }
+    }
+  ]
+}

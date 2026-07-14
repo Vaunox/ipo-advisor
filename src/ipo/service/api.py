@@ -32,9 +32,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ipo.core.types import Verdict
 from ipo.data.ingest.state import IngestStateStore
+from ipo.service.allotment_context import AllotmentStore, build_allotment_view
 from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
 from ipo.service.views import (
+    AllotmentView,
     CalibrationView,
     HistoryRow,
     IPODetail,
@@ -49,6 +51,7 @@ def create_app(
     *,
     calibration_report_path: Path | None = None,
     ingest_state: IngestStateStore | None = None,
+    allotment_store: AllotmentStore | None = None,
 ) -> FastAPI:
     """Build the read-only advisory API over a composed ``VerdictEngine``.
 
@@ -59,6 +62,10 @@ def create_app(
     ``ingest_state`` (v3 BUG 1 / Defect 2) is the live-ingest freshness store ``/status`` serves;
     when absent (no live feed wired) ``/status`` reports ``live_ingest=false`` with null
     timestamps — it never invents a freshness it cannot prove.
+
+    ``allotment_store`` (v3 V3-6) is the display-only registrar cache the ``/allotment`` tab reads;
+    when absent (no cache loaded yet) ``/allotment`` reports ``available=false`` honestly. It is a
+    read of a store entirely separate from ``IPORecord`` — registrar data never reaches the model.
     """
     app = FastAPI(title="IPO Listing-Gains Advisor", version="0.1.0")
 
@@ -161,6 +168,20 @@ def create_app(
         if engine.get_record(ipo_id) is None:
             raise HTTPException(status_code=404, detail=f"unknown ipo_id: {ipo_id}")
         return engine.transitions(ipo_id)
+
+    @app.get("/allotment", response_model=AllotmentView)
+    def allotment() -> AllotmentView:
+        """IPOs at/past the allotment stage joined with the registrar cache (v3 V3-6, display-only).
+
+        Read-only routing convenience: registrar name + a deep-link to the registrar's own
+        allotment-check portal + a public grievance contact. The registrar data comes from a store
+        entirely separate from the scoring path — it is never a model input. Degrades honestly:
+        ``available=false`` when no cache is loaded; per-IPO ``registrar=null`` when not yet
+        published. Never handles a PAN — the tab links out to the registrar's own site.
+        """
+        if allotment_store is None:
+            return AllotmentView(available=False, refreshed_at=None, rows=[])
+        return build_allotment_view(engine.list_records(), allotment_store)
 
     @app.get("/calibration", response_model=CalibrationView)
     def calibration() -> CalibrationView:

@@ -133,6 +133,65 @@ class CalibrationView(BaseModel):
     bins: list[ReliabilityBinView]
 
 
+class RegistrarInfo(BaseModel):
+    """One IPO's registrar contact block (v3 V3-6) — public, mandated-disclosure business contact.
+
+    Display/routing only — NEVER a model input (it is not an ``IPORecord`` field and the feature
+    builder never sees it). ``website`` is the registrar's own allotment-check portal we deep-link
+    out to (the user enters their PAN there, not in this app). ``contact_*`` is the registrar's
+    public grievance channel. Every field is nullable — a not-yet-published registrar degrades to
+    ``None``, never a fabricated value.
+    """
+
+    name: str | None = None
+    short: str | None = None  # the registrar short code (e.g. "MUFG", "KFIN")
+    website: str | None = None
+    email: str | None = None
+    contact_number: str | None = None
+    contact_name: str | None = None
+
+
+class AllotmentRow(BaseModel):
+    """One IPO at/past the allotment stage: its lifecycle stage + its registrar (v3 V3-6).
+
+    Display/routing only. ``stage`` is derived from the record's dates (book closed → awaiting
+    allotment/listing; listed → listed).
+
+    ``registrar_state`` makes the app do the reasoning the freshness line otherwise offloads to the
+    user, so an absent registrar never lies about *why* it's absent:
+      * ``present`` — ``registrar`` is populated.
+      * ``unpublished`` — the cache is current (refreshed at/after this IPO opened) and still has no
+        entry → the registrar genuinely isn't published yet.
+      * ``stale`` — the cache predates this IPO's open date (we never looked) or is past the stale
+        threshold → the absence is unproven; the UI says "stale — last refreshed {date}", not
+        "not yet available".
+      * ``not_loaded`` — no cache at all (the whole view is ``available=false``).
+    """
+
+    ipo_id: str
+    name: str
+    stage: str
+    close_date: date
+    listing_date: date | None
+    registrar: RegistrarInfo | None
+    registrar_state: str
+
+
+class AllotmentView(BaseModel):
+    """The Allotment tab payload (v3 V3-6) — read-only join of IPOs past close × registrar cache.
+
+    ``available`` is False when no registrar cache has been loaded yet (fresh install, or the
+    operator/VM has not run the refresh) — the tab says so honestly instead of showing blanks.
+    ``refreshed_at`` is when the cache was last written by the refresh job. The registrar data
+    reaches this view through a store that is entirely separate from ``IPORecord`` and the scoring
+    path — it cannot become a feature (proven by the import-graph check).
+    """
+
+    available: bool
+    refreshed_at: datetime | None
+    rows: list[AllotmentRow]
+
+
 class StatusView(BaseModel):
     """Live-ingest freshness (v3 BUG 1 / Defect 2) — the honest "how fresh is this?" for the UI.
 

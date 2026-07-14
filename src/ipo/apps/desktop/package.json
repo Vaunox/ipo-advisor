@@ -9,7 +9,7 @@
     "dev": "tsc -p tsconfig.json && electron .",
     "start": "electron .",
     "selftest": "tsc -p tsconfig.json && node dist/sidecar.js",
-    "test": "tsc -p tsconfig.json && node --test dist/settings.test.js",
+    "test": "tsc -p tsconfig.json && node --test dist/settings.test.js dist/registrar.test.js",
     "dist": "tsc -p tsconfig.json && electron-builder --win --publish never"
   },
   "devDependencies": {

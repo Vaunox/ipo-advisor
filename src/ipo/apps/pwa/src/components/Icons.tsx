@@ -17,6 +17,15 @@ export const IconHistory = () => (
     <circle cx="12" cy="12" r="9" />
   </svg>
 )
+
+// Allotment: a document with a check — "did I get allotted?"
+export const IconAllotment = () => (
+  <svg viewBox="0 0 24 24">
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5" />
+    <path d="M9 14l2 2 4-4" />
+  </svg>
+)
 export const IconSettings = () => (
   <svg viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="3" />

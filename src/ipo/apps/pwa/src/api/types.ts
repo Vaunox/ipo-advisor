@@ -119,6 +119,39 @@ export interface CalibrationView {
   bins: ReliabilityBin[]
 }
 
+// Allotment tab (v3 V3-6) — display/routing only, NEVER a model input. `registrar` is null when
+// the cache has no entry for that IPO yet ("not yet available"); `available` is false when no cache
+// has been loaded at all. `website` is the registrar's own allotment-check portal we deep-link out
+// to — the user enters their PAN there, never in this app.
+export interface RegistrarInfo {
+  name: string | null
+  short: string | null
+  website: string | null
+  email: string | null
+  contact_number: string | null
+  contact_name: string | null
+}
+
+// registrar_state (v3 V3-6): 'present' | 'unpublished' (cache current, not published yet) |
+// 'stale' (cache predates this IPO / too old — absence unproven) | 'not_loaded' (no cache at all).
+export type RegistrarState = 'present' | 'unpublished' | 'stale' | 'not_loaded'
+
+export interface AllotmentRow {
+  ipo_id: string
+  name: string
+  stage: string
+  close_date: string
+  listing_date: string | null
+  registrar: RegistrarInfo | null
+  registrar_state: RegistrarState
+}
+
+export interface AllotmentView {
+  available: boolean
+  refreshed_at: string | null
+  rows: AllotmentRow[]
+}
+
 // Live-ingest freshness (v3 BUG 1 / Defect 2). `last_successful_ingest` is the ONLY value the UI
 // may show as "Updated" — the last confirmed-good NSE pull, never a local API-read timestamp.
 // `last_attempt_ok === false` means the store is still served but the feed is failing (stale +
