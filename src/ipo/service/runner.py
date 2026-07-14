@@ -27,7 +27,7 @@ from ipo.calibration.regime import NiftyRegime, VixSeries
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, load_config
 from ipo.core.interfaces import Calibrator, Notifier, Repository
-from ipo.core.logging import get_logger
+from ipo.core.logging import configure_logging, get_logger
 from ipo.data.ingest.state import IngestStateStore
 from ipo.data.store.repository import ParquetRepository
 from ipo.model.scorer import WeightedScorer
@@ -259,6 +259,15 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     config = load_config(config_dir=res / "config")
     data_dir = Path(args.data_dir) if args.data_dir else Path(config.storage.data_dir)
     _provision_data_dir(data_dir, res, manage=frozen)
+    # Turn the structured logger ON in the live engine (v3 A) — it exists but was only wired in the
+    # batch scripts, so INFO was dropped and WARN escaped as unstructured lastResort text. Full
+    # detail goes to a size-capped rotating file in the data dir (durable + greppable, esp. once the
+    # VM lands); stderr stays at WARN so the desktop shell's console isn't flooded.
+    configure_logging(
+        config.logging.level,
+        json_output=config.logging.json_output,
+        file_path=data_dir / "logs" / "engine.log",
+    )
     repository = ParquetRepository(data_dir)
     log = get_logger("ipo.service.runner")
     # One shared freshness store: the refresh path writes it, /status reads it (v3 BUG 1/Defect 2).
