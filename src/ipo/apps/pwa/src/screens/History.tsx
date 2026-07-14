@@ -3,7 +3,7 @@ import { useBoard, useCalibration, useHistory } from '../api/hooks'
 import type { CalibrationView, HistoryRow, IPOListRow, VerdictType } from '../api/types'
 import { Loading } from '../components/Loading'
 import { getCosts } from '../state/prefs'
-import { isListed, midnight, today } from '../status'
+import { awaitingLabel, isListed, midnight, today } from '../status'
 import { VMETA } from '../verdict'
 
 const Search = () => (
@@ -188,14 +188,17 @@ function ReliabilityDiagram({ cal }: { cal: CalibrationView }) {
 // call never silently vanishes between Live and the outcome table below.
 function AwaitingList({ rows, onOpen }: { rows: IPOListRow[]; onOpen: (id: string) => void }) {
   if (!rows.length) return null
-  const status = (r: IPOListRow): string =>
-    isListed(r) ? 'listed · outcome pending' : 'book closed · awaiting listing'
+  const overdue = rows.filter((r) => r.listing_overdue).length
   return (
     <div className="card">
-      <h3 className="sec">Awaiting listing outcome ({rows.length})</h3>
+      <h3 className="sec">
+        Awaiting listing outcome ({rows.length})
+        {overdue > 0 && <span className="strand-tag"> · {overdue} overdue</span>}
+      </h3>
       <div className="rows">
         {rows.map((r) => {
           const m = VMETA[r.verdict]
+          const al = awaitingLabel(r)
           return (
             <div
               className="row grid-hist"
@@ -213,7 +216,7 @@ function AwaitingList({ rows, onOpen }: { rows: IPOListRow[]; onOpen: (id: strin
             >
               <div className="co">
                 <div className="name">{r.name}</div>
-                <small>{status(r)}</small>
+                <small className={al.overdue ? 'strand' : undefined}>{al.text}</small>
               </div>
               <div>
                 <span className={`tag t-${m.cls}`}>{m.label}</span>
@@ -227,7 +230,9 @@ function AwaitingList({ rows, onOpen }: { rows: IPOListRow[]; onOpen: (id: strin
               </div>
               <div className="pending">—</div>
               <div style={{ textAlign: 'right' }}>
-                <span className="hitmark neutral">pending</span>
+                <span className={`hitmark ${al.overdue ? 'strand' : 'neutral'}`}>
+                  {al.overdue ? 'overdue' : 'pending'}
+                </span>
               </div>
             </div>
           )

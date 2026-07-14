@@ -18,6 +18,7 @@ from datetime import date
 from pathlib import Path
 
 from ipo.core.calendar import latest_covered_year, now_ist, review_due
+from ipo.data.store.repository import ParquetRepository
 from ipo.service.heartbeat import (
     FeedHealth,
     any_missing,
@@ -25,6 +26,7 @@ from ipo.service.heartbeat import (
     calendar_health,
     stale_feeds,
 )
+from ipo.service.lifecycle import overdue_listings
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -98,19 +100,50 @@ def _collect(today: date) -> list[FeedHealth]:
     ]
 
 
+def _overdue_strands(data_dir: Path, today: date) -> list[tuple[str, str]]:
+    """Stranded listings in the live record store (v3 finding-④), or [] if no store is present.
+
+    A silent resolution failure (``resolve_listings`` never matched the symbol, or a stamped row's
+    price never backfilled) leaves an IPO wearing "awaiting listing" forever. Surfaced here so a
+    strand shows up in the ritual the operator already runs, not weeks later by noticing a badge.
+    """
+    if not (data_dir / "ipo_records.parquet").is_file():
+        return []  # fresh install / no live store to audit — not an error
+    return overdue_listings(ParquetRepository(data_dir).list_all(), today)
+
+
 def main() -> None:
-    """Collect feed health and print the heartbeat; exit non-zero if a feed is missing."""
-    argparse.ArgumentParser(description="Report data-source freshness (heartbeat).").parse_args()
+    """Collect feed health + stranded listings; print the heartbeat; exit non-zero on either."""
+    parser = argparse.ArgumentParser(description="Report data-source freshness (heartbeat).")
+    parser.add_argument(
+        "--data-dir",
+        default=str(_REPO_ROOT / "data_store"),
+        help="live record store to audit for stranded listings (default: the dev data_store; "
+        "point at the packaged app's engine-data dir to check the real store)",
+    )
+    args = parser.parse_args()
     today = now_ist().date()
     feeds = _collect(today)
+    strands = _overdue_strands(Path(args.data_dir), today)
 
     lines = [f"data-source heartbeat @ {today.isoformat()}", ""]
     lines += [f"  [{f.status:<7}] {f.name} - {f.detail}" for f in feeds]
+    if strands:
+        lines.append(f"  [OVERDUE] Listing resolution - {len(strands)} stranded (silent failure):")
+        lines += [f"            - {ipo_id} ({state})" for ipo_id, state in strands]
+    else:
+        lines.append("  [OK     ] Listing resolution - no stranded listings")
+
     stale = stale_feeds(feeds)
     missing = any_missing(feeds)
     lines.append("")
     if missing:
         lines.append("result: ERROR - a required artifact is MISSING")
+    elif strands:
+        lines.append(
+            f"result: ATTENTION - {len(strands)} listing(s) OVERDUE - the resolution path may have "
+            "silently failed; inspect the IPO(s) above (symbol mismatch or missing listing price)"
+        )
     elif stale:
         lines.append(
             f"result: WARN - {len(stale)} feed(s) stale "
@@ -120,7 +153,7 @@ def main() -> None:
         lines.append("result: OK - all feeds fresh")
 
     print("\n".join(lines))  # noqa: T201
-    if missing:
+    if missing or strands:
         raise SystemExit(1)
 
 

@@ -78,6 +78,9 @@ export interface IPOListRow {
   reason: string
   watch: string[]
   kill_flags: string[]
+  // v3 finding-④: the Live→History resolution is OVERDUE — a silent strand (book closed but never
+  // stamped listed past the expected day + buffer, or stamped but its price never backfilled).
+  listing_overdue: boolean
 }
 
 export interface HistoryRow {

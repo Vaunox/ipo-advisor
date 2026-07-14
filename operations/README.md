@@ -26,7 +26,7 @@ None of these change the model. Run them after a batch of new listings, or on a 
 
 | Check | Command | When | Reads OK as… | Concerning result |
 |---|---|---|---|---|
-| **Data-source heartbeat** | `python scripts/run_heartbeat.py` | Monthly, and before any recalibration | `OK` (all fresh) or `WARN` (expected stale feeds — see §4) | **`ERROR — a required artifact is MISSING`** (exit 1): `models/calibrator.json` / `reliability.json` / a `data/backfill/*.csv` is gone. Restore it. |
+| **Data-source heartbeat** | `python scripts/run_heartbeat.py --data-dir <app data dir>` | Monthly, and before any recalibration | `OK` (all fresh) or `WARN` (expected stale feeds — see §4) | **`ERROR — a required artifact is MISSING`** (exit 1): `models/calibrator.json` / `reliability.json` / a `data/backfill/*.csv` is gone. Restore it. · **`ATTENTION — N listing(s) OVERDUE`** (exit 1, v3 finding-④): a book-closed IPO the Live→History resolution never completed — the symbol never matched in NSE past-issues, or its listing price never backfilled — so it is silently stranded under an "awaiting listing" label. Inspect the named IPO(s); see §5. `--data-dir` defaults to `data_store` (dev) — point it at the installed app's per-user `engine-data` dir to audit the real store. |
 | **Verdict-accuracy / drift monitor** | `python scripts/run_accuracy_monitor.py` | Quarterly, or after ~20+ new listings | `OK - no drift` | **`DRIFT ALERT`** (exit 1): recent-window APPLY-precision Wilson-CI sits **entirely below** the OOS baseline, or recent ECE exceeds tolerance. → investigate, then recalibrate (§2). `INCONCLUSIVE` = recent window below `--min-window`, not judged. |
 | **T+3 settlement stability** | `python scripts/run_t3_stability.py` | Yearly, or after a settlement-rule change | `STABLE` (ECE shift ≤ 0.030, CIs overlap) | `DIFFERENCE` — but read the cause. Expected to read `DIFFERENCE` on the full 358 set purely from cold-era composition in the pre-cutover bucket (see [PROJECT_LOG §4.6](../docs/PROJECT_LOG.md#46-t3-stability)); a *settlement-driven* difference (matched composition) is the real signal → recalibrate on post-cutover data. **Regenerates `docs/T3_STABILITY.md`.** |
 | **Recalibration-reproduces (dry run)** | `python scripts/run_recalibration_check.py` | Before trusting any re-fit; part of the recalibration ritual | **`REPRODUCES` (max delta 0.0)** — the fit is deterministic | **`MISMATCH`** (exit 1): the shipped calibrator is stale vs current data/code. → run the recalibration ritual (§2). **Writes nothing** — safe to run anytime. |
@@ -163,13 +163,32 @@ The app now tells the honest truth about how current its data is, and lets you f
 None of this touches the model: `/status`, the freshness store, and the refresh trigger are all
 outside the scoring path (verdicts/probabilities are byte-identical — proven per branch).
 
+### Stranded listings — the overdue detector (v3 finding-④)
+
+An IPO leaves Live and enters History once the engine stamps its `listing_date` (+ the listing-day
+price) — `resolve_listings` does this by matching the closed issue against NSE's past-issues feed.
+That match can **fail silently**: if NSE's symbol never matches the one we hold, the listing is never
+stamped; if the bhavcopy price never backfills, the row is stamped but never priced. Either way the
+IPO would otherwise sit forever under an "awaiting listing" label with nothing flagging it.
+
+The app now **names the strand instead of hiding it.** Past the expected listing day + a
+holiday-aware trading-day grace buffer, History's "Awaiting listing outcome" section shows the IPO as
+**"listing overdue — resolution may have failed"** (or "…outcome overdue — price never recorded")
+with an overdue count and a red badge, and the **heartbeat** (§1) prints an `[OVERDUE]` block and
+exits non-zero — so a strand surfaces in the monthly ritual, not weeks later by noticing a badge.
+**When it fires:** look the IPO up on NSE. If it *has* listed, the symbol we hold most likely differs
+from NSE's past-issues symbol (fix the record / ingest mapping); if it genuinely hasn't listed yet,
+the buffer clears it automatically once it does. The check is our-dates-only (no second data source),
+so it stays truthful even when the Upstox context cache is stale or offline.
+
 ### The per-IPO Upstox context cache (v3 V3-5/V3-6+)
 
 The **one** display-only Upstox cache feeds every per-IPO context field the app shows: the
 Allotment tab's **registrar** (V3-6, deep-links to the registrar's own allotment-check site — the
 app never handles a PAN), the detail page's **RHP link** (V3-5) and **bid lot** (V3-8, shown as an
 *indicative* "≈ N shares · approx ₹…" — NSE provides lot_size on 0% of IPOs, so Upstox is the sole
-source and it's never presented as an exact reported figure), and later isin / anchor (V3-11/10).
+source and it's never presented as an exact reported figure), the detail page's **ISIN + industry**
+reference fields (V3-11, plain display metadata, no source named), and later the anchor list (V3-10).
 One cache, one refresh, one staleness rule. It is **not** fetched by the app — it's an
 occasional, token-free cache you refresh:
 
@@ -211,9 +230,18 @@ python scripts/refresh_context.py --data-dir <the app's data dir>
 | `scripts/run_recalibration_check.py` | Dry-run: does a re-fit reproduce the shipped calibrator? | nothing (read-only) |
 | `scripts/run_accuracy_monitor.py` | Drift monitor: recent window vs OOS baseline | nothing (prints; exit 1 on alert) |
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
-| `scripts/run_heartbeat.py` | Data-source freshness heartbeat | nothing (prints; exit 1 if missing) |
-| `scripts/refresh_context.py` | v3 V3-5/6/8 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + …; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
+| `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) | nothing (prints; exit 1 if a feed is missing **or** a listing is overdue) |
+| `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in
 [`docs/PROJECT_LOG.md`](../docs/PROJECT_LOG.md).*
+
+### Dev/CI note — the mypy version pin
+
+The CI type-check gate runs `mypy` (bare, over `src` / `tests` / `scripts`). The dev dependency is
+pinned **`mypy>=1.9,<2`**. Reason: mypy 2.x tightened its bare-generic checks, and while the pin was
+unbounded a routine `pip install -e ".[dev]"` pulled 2.x and **silently reddened the gate on `main`
+with no code change** — a dependency that can break your own gate is itself the silent-failure class
+this project keeps guarding against (cf. §5 / finding-④). If you deliberately adopt mypy 2.x, expect
+to annotate the bare `dict`/`list` generics it now flags, then lift the cap.

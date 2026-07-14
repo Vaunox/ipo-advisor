@@ -64,6 +64,10 @@ class IPOListRow(BaseModel):
     reason: str
     watch: list[str]
     kill_flags: list[str]
+    # v3 finding-④: True when the Live→History resolution is OVERDUE (silently stranded) — the book
+    # closed but no listing_date was ever stamped past the expected day + buffer, or a stamped row's
+    # price never backfilled. Lets the awaiting-listing surface name the strand, not hide it.
+    listing_overdue: bool = False
 
 
 class HistoryRow(BaseModel):

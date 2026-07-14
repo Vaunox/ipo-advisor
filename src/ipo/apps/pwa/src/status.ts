@@ -43,3 +43,23 @@ export function isListed(row: IPOListRow): boolean {
 export function alertRelevant(row: IPOListRow): boolean {
   return !isListed(row)
 }
+
+// Label for the History "Awaiting listing outcome" section (v3 finding-④). When the backend flags
+// `listing_overdue` (a SILENT strand — the Live→History resolution should have completed but hasn't),
+// the label names the strand honestly instead of the reassuring-but-false "awaiting listing" — which
+// is exactly the lie that lets a stuck IPO hide. `overdue` drives the warning badge. One definition,
+// shared, tested (status.test.ts) — never a second drifting copy.
+export function awaitingLabel(row: IPOListRow): { text: string; overdue: boolean } {
+  if (row.listing_overdue) {
+    return {
+      text: isListed(row)
+        ? 'listing outcome overdue — price never recorded'
+        : 'listing overdue — resolution may have failed',
+      overdue: true,
+    }
+  }
+  return {
+    text: isListed(row) ? 'listed · outcome pending' : 'book closed · awaiting listing',
+    overdue: false,
+  }
+}

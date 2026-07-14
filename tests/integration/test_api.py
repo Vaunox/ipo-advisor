@@ -425,3 +425,30 @@ def test_awaiting_listing_resolves_end_to_end_into_history(tmp_path: Path) -> No
     )
     assert hrow.net_return == pytest.approx(expected_net)
     assert hrow.listed_positive is (expected_net > 0)
+
+
+def test_board_flags_overdue_listing_strand() -> None:
+    """/board marks a silently-stranded listing overdue (v3 finding-④); healthy rows never do."""
+    config = load_config(env="dev", environ={})
+    resolved = next(r for r in load_records_from_csv(_CSV) if r.listing_open is not None)
+    stranded = resolved.model_copy(
+        update={
+            "ipo_id": resolved.ipo_id + "-strand",
+            "listing_date": None,  # book closed long ago, never stamped listed → Mode-1 strand
+            "listing_open": None,
+            "listing_close": None,
+        }
+    )
+    # The CSV records closed years ago, so the default IST clock is already far past the strand's
+    # expected-listing + buffer window (no clock override needed — and none of the naive-datetime
+    # trap that decision_asof's tz-aware comparison would spring).
+    engine = VerdictEngine(
+        repository=_ListRepo([resolved, stranded]),
+        calibrator=load_calibrator(_CAL),
+        scorer=WeightedScorer(config.feature_weights, config.features),
+        config=config,
+        regime=NiftyRegime(_NIFTY),
+    )
+    by_id = {r.ipo_id: r for r in engine.board()}
+    assert by_id[stranded.ipo_id].listing_overdue is True
+    assert by_id[resolved.ipo_id].listing_overdue is False  # fully resolved → no false alarm
