@@ -245,39 +245,61 @@ def test_status_reports_last_successful_ingest(tmp_path: Path) -> None:
 
 
 def test_allotment_without_store_is_honestly_unavailable() -> None:
-    """No registrar cache wired → /allotment reports available=false (v3 V3-6), never blanks."""
-    client, _ = _client(load_calibrator(_CAL))  # no allotment_store passed
+    """No context cache wired → /allotment reports available=false (v3 V3-6), never blanks."""
+    client, _ = _client(load_calibrator(_CAL))  # no context_store passed
     body = client.get("/allotment").json()
     assert body["available"] is False
     assert body["rows"] == []
 
 
-def test_allotment_serves_registrar_join(tmp_path: Path) -> None:
-    """/allotment joins in-scope IPOs with the registrar cache; missing entry → registrar null."""
-    from ipo.service.allotment_context import AllotmentStore
-
-    path = tmp_path / "registrar_info.json"
-    path.write_text(
-        '{"refreshed_at": "2026-07-14T09:00:00+05:30", '
-        '"registrars": {"ABC": {"name": "KFin Technologies", "website": "https://kfintech.com/"}}}',
-        encoding="utf-8",
-    )
+def _engine_with_records() -> VerdictEngine:
     config = load_config(env="dev", environ={})
-    records = load_records_from_csv(_CSV)
-    engine = VerdictEngine(
-        repository=_ListRepo(records),
+    return VerdictEngine(
+        repository=_ListRepo(load_records_from_csv(_CSV)),
         calibrator=load_calibrator(_CAL),
         scorer=WeightedScorer(config.feature_weights, config.features),
         config=config,
         regime=NiftyRegime(_NIFTY),
     )
-    client = TestClient(create_app(engine, allotment_store=AllotmentStore(path)))
+
+
+def test_allotment_serves_registrar_join(tmp_path: Path) -> None:
+    """/allotment joins in-scope IPOs with the registrar from the context cache (v3 V3-6)."""
+    from ipo.service.ipo_context import ContextStore
+
+    path = tmp_path / "ipo_context.json"
+    path.write_text(
+        '{"refreshed_at": "2026-07-14T09:00:00+05:30", "ipos": {"ABC": '
+        '{"registrar": {"name": "KFin Technologies", "website": "https://www.kfintech.com/"}}}}',
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(_engine_with_records(), context_store=ContextStore(path)))
     body = client.get("/allotment").json()
     assert body["available"] is True
-    # rows are display-only; each carries a registrar object or null, and an ipo_id/name/stage.
     for row in body["rows"]:
-        assert {"ipo_id", "name", "stage", "registrar"} <= set(row)
+        assert {"ipo_id", "name", "stage", "registrar", "registrar_state"} <= set(row)
         assert row["registrar"] is None or "website" in row["registrar"]
+
+
+def test_context_endpoint_serves_rhp(tmp_path: Path) -> None:
+    """/context/{id} surfaces the RHP link + its state; 404 for an unknown IPO (v3 V3-5)."""
+    from ipo.service.ipo_context import ContextStore
+
+    records = load_records_from_csv(_CSV)
+    rec = records[0]
+    path = tmp_path / "ipo_context.json"
+    path.write_text(
+        '{"refreshed_at": "2026-07-14T09:00:00+05:30", "ipos": {"'
+        + rec.ipo_id.upper()
+        + '": {"rhp_url": "https://www.sebi.gov.in/filings/x-rhp"}}}',
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(_engine_with_records(), context_store=ContextStore(path)))
+    body = client.get(f"/context/{rec.ipo_id}").json()
+    assert body["rhp_url"] == "https://www.sebi.gov.in/filings/x-rhp"
+    assert body["rhp_state"] == "present"
+    assert {"rhp_url", "rhp_state", "registrar", "registrar_state", "available"} <= set(body)
+    assert client.get("/context/NONEXISTENT-9999").status_code == 404
 
 
 def test_gate_survives_serialization() -> None:

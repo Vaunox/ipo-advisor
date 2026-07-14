@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useIpo, useTransitionsFor } from '../api/hooks'
+import { useIpo, useIpoContext, useTransitionsFor } from '../api/hooks'
 import type { IPODetail, IPOFeatures, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { Loading } from '../components/Loading'
+import { isAllowedExternalUrl, openExternalUrl } from '../external'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
 
@@ -53,6 +54,50 @@ const Check = () => (
     <path d="M20 6 9 17l-5-5" />
   </svg>
 )
+
+const fmtWhen = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+// v3 V3-5 — the filed RHP link. Display/routing only (from the per-IPO Upstox context cache, never a
+// model input). Labelled the *Red Herring Prospectus* explicitly — the final offer document, never a
+// generic "prospectus" and never the draft (DRHP was dropped as unusable). Opens the official SEBI
+// filing one-click (allowlisted); an issuer-hosted RHP renders as inert copyable text (we can't vouch
+// for arbitrary issuer domains). A missing link distinguishes "not filed yet" from "cache is stale".
+function RhpLink({ id }: { id: string }) {
+  const { data } = useIpoContext(id)
+  if (!data) return null // don't flash while loading
+  const { rhp_url, rhp_state, refreshed_at } = data
+  return (
+    <div className="card">
+      <h3 className="sec">Filed documents</h3>
+      {rhp_state === 'present' && isAllowedExternalUrl(rhp_url) ? (
+        <button className="btn al-check" onClick={() => openExternalUrl(rhp_url as string)}>
+          Red Herring Prospectus (RHP) ↗
+        </button>
+      ) : rhp_state === 'present' && rhp_url ? (
+        <div className="rhp-inert">
+          <span className="rhp-lab">Red Herring Prospectus (RHP)</span>
+          <span className="al-nolink" title="Unrecognized document host — open it manually">
+            open manually · <span className="mono al-url">{rhp_url}</span>
+          </span>
+        </div>
+      ) : rhp_state === 'stale' ? (
+        <div className="pending">
+          RHP link unknown — the context cache is stale (last refreshed{' '}
+          {refreshed_at ? fmtWhen(refreshed_at) : '—'}). Run <span className="mono">
+            scripts/refresh_context.py
+          </span> to check; it isn't shown as "not filed" because we haven't looked.
+        </div>
+      ) : rhp_state === 'unpublished' ? (
+        <div className="pending">RHP not filed yet for this IPO.</div>
+      ) : (
+        <div className="pending">
+          RHP link not loaded — run <span className="mono">scripts/refresh_context.py</span>.
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Subscription multiples arrive as raw floats (e.g. 3.477239327931627 = bid ÷ offered). Show them
 // the way the exchanges do: 2 decimals, trailing zeros trimmed — 3.48×, 19.22×, 242×.
@@ -271,6 +316,8 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
 
         <VerdictHistory id={id} />
+
+        <RhpLink id={id} />
 
         <div className="card">
           <h3 className="sec">{f.book_closed ? 'Subscription (final)' : 'Subscription (live)'}</h3>

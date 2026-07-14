@@ -1,26 +1,28 @@
-"""Refresh the Allotment-tab registrar cache from Upstox (v3 V3-6). DISPLAY-ONLY DATA.
+"""Refresh the per-IPO Upstox context cache (v3 V3-5/V3-6+). DISPLAY-ONLY DATA.
 
-Writes ``<data-dir>/allotment/registrar_info.json`` — the token-free registrar cache the app's
-Allotment tab reads. Registrar assignment is fixed when the RHP is filed and never changes, so this
-is occasional reference data (run it like ``run_backfill``/``fetch_vix``, not on a live cadence).
+Writes ``<data-dir>/context/ipo_context.json`` — the ONE token-free cache the app reads for every
+per-IPO Upstox *details* field it surfaces: the registrar (Allotment tab, V3-6), the RHP link
+(detail page, V3-5), and later lot_size / isin / anchor (V3-8/11/10). One store, one refresh, one
+staleness rule — not a separate cache per feature. Adding a field is a couple of lines here + store.
 
-**Runs anywhere — desktop OR the Part-II VM, unchanged.** It is deliberately self-contained: pure
-Python + ``requests``, no ``ipo`` package import, no Windows/desktop assumption, token from the
-environment, output path via ``--data-dir``. When the VM data layer lands it adopts this script
-as-is as the (VM-primary) refresher for this feed; local execution is the fallback — one pattern.
+These fields are fixed once filed, so this is occasional reference data — run it like
+``run_backfill`` / ``fetch_vix`` (e.g. when new IPOs appear), not on a live cadence.
 
-Boundary (why this is safe): the app only READS the cache this writes; the registrar data lands in
-a store entirely separate from ``IPORecord`` and can never reach a feature vector (import-graph
-proven). This tool never touches an order/trade endpoint — read-only GETs to the IPO catalogue only.
+**Runs anywhere — desktop OR the Part-II VM, unchanged.** Deliberately self-contained: pure Python +
+``requests``, no ``ipo`` import, no Windows/desktop assumption, token from the environment, output
+path via ``--data-dir``. When the VM data layer lands it adopts this script as-is as the VM-primary
+refresher; local execution is the fallback — one data pattern.
+
+Boundary: the app only READS what this writes; the context lands in a store separate from
+``IPORecord`` and can never reach a feature vector (import-graph proven). Read-only GETs to the IPO
+catalogue only — never an order/trade endpoint.
 
 Auth: reads ``UPSTOX_TOKEN`` from the environment (or a local ``.env`` beside this script / in CWD).
-The token is NEVER printed, logged, or written to the output. The output is public IPO/registrar
-business-contact data only — safe to share, commit, or sync to the app's data dir.
+The token is NEVER printed, logged, or written to the output. Output is public IPO business data.
 
 Run:
-    UPSTOX_TOKEN=... python scripts/refresh_allotment.py --data-dir <the app's data dir>
-    # dev default is ./data_store (the dev app's data dir); for the installed app pass the
-    # per-user engine-data dir; for the VM pass the VM's data plane.
+    UPSTOX_TOKEN=... python scripts/refresh_context.py --data-dir <the app's data dir>
+    # dev default is ./data_store; installed app: the per-user engine-data dir; VM: its data plane.
 """
 
 from __future__ import annotations
@@ -36,14 +38,15 @@ from pathlib import Path
 import requests
 
 _HOST = "https://api.upstox.com"
-_STATUSES = ("closed", "listed")  # allotment-relevant lifecycle stages
+# RHP first appears at 'open' (probe finding), so we cover open→closed→listed. 'upcoming' IPOs have
+# no symbol and no RHP — unjoinable, so they're excluded at ingest (never filtered at a call site).
+_STATUSES = ("open", "closed", "listed")
 _ISSUE_TYPE = "regular"  # mainboard only (SME excluded by the model's design)
-_RECORDS = 30  # max page size
-_MAX_PAGES = 50  # pagination safety cap
-_DETAIL_PAUSE_S = 0.3  # polite delay between per-IPO detail GETs
-# Honest client identity — the default python-requests UA is on this API's error-1010 blocklist;
-# this truthfully names the client (NOT a spoofed browser string).
-_UA = "ipo-advisor-allotment-refresh/1.0 (authorized-analytics-token; read-only IPO data)"
+_RECORDS = 30
+_MAX_PAGES = 50
+_DETAIL_PAUSE_S = 0.3
+# Honest client identity — the default python-requests UA is on this API's error-1010 blocklist.
+_UA = "ipo-advisor-context-refresh/1.0 (authorized-analytics-token; read-only IPO data)"
 _REGISTRAR_FIELDS = ("name", "registrar", "website", "email", "contact_number", "contact_name")
 
 
@@ -105,7 +108,7 @@ def _rows(payload: object) -> list[dict]:
 
 
 def _list_ids(token: str) -> dict[str, object]:
-    """Map upper(symbol) -> id across the allotment-relevant mainboard statuses."""
+    """Map upper(symbol) -> id across open+closed+listed. Blank-symbol IPOs are dropped here."""
     ids: dict[str, object] = {}
     for status in _STATUSES:
         for page in range(1, _MAX_PAGES + 1):
@@ -120,36 +123,40 @@ def _list_ids(token: str) -> dict[str, object]:
                 break
             rows = _rows(resp.json())
             for r in rows:
-                sym = str(r.get("symbol", "")).upper()
-                if sym and r.get("id") is not None:
-                    ids[sym] = r["id"]
+                sym = str(r.get("symbol") or "").strip().upper()
+                if sym and sym != "NONE" and r.get("id") is not None:  # exclude symbol-less IPOs
+                    ids.setdefault(sym, r["id"])  # first (open) wins over later duplicates
             if len(rows) < _RECORDS:
                 break
     return ids
 
 
-def _registrar(token: str, ipo_id: object) -> dict | None:
-    """GET /v2/ipos/{id} and pull the registrar_info block (or None if absent/unreadable)."""
+def _context(token: str, ipo_id: object) -> dict:
+    """GET /v2/ipos/{id} and pull the per-IPO context fields (registrar + rhp_url)."""
     resp = _get(f"/v2/ipos/{ipo_id}", token)
     if resp.status_code != 200:
-        return None
+        return {}
     data = resp.json().get("data")
     obj = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else None)
     if not isinstance(obj, dict):
-        return None
+        return {}
+    entry: dict = {}
     ri = obj.get("registrar_info")
-    if not isinstance(ri, dict):
-        return None
-    picked = {k: ri.get(k) for k in _REGISTRAR_FIELDS if ri.get(k) not in (None, "")}
-    # normalize the short code to `short` (the API calls it `registrar`); keep display `name`.
-    if "registrar" in picked:
-        picked["short"] = picked.pop("registrar")
-    return picked or None
+    if isinstance(ri, dict):
+        reg = {k: ri.get(k) for k in _REGISTRAR_FIELDS if ri.get(k) not in (None, "")}
+        if "registrar" in reg:
+            reg["short"] = reg.pop("registrar")  # the API's short code -> our `short`
+        if reg:
+            entry["registrar"] = reg
+    rhp = obj.get("rhp_url")  # Red Herring Prospectus (final offer doc); DRHP dropped (unusable)
+    if rhp:
+        entry["rhp_url"] = rhp
+    return entry
 
 
 def main() -> None:
-    """Fetch registrar_info across closed+listed mainboard IPOs; write the token-free cache."""
-    parser = argparse.ArgumentParser(description="Refresh the Allotment-tab registrar cache.")
+    """Fetch per-IPO context across open+closed+listed mainboard IPOs; write token-free cache."""
+    parser = argparse.ArgumentParser(description="Refresh the per-IPO Upstox context cache.")
     parser.add_argument(
         "--data-dir",
         default="data_store",
@@ -160,26 +167,28 @@ def main() -> None:
 
     token = _load_token()
     ids = _list_ids(token)
-    registrars: dict[str, dict] = {}
+    ipos: dict[str, dict] = {}
     for sym, ipo_id in sorted(ids.items()):
-        info = _registrar(token, ipo_id)
+        entry = _context(token, ipo_id)
         time.sleep(_DETAIL_PAUSE_S)
-        if info:
-            registrars[sym] = info
+        if entry:
+            ipos[sym] = entry
 
-    out_dir = Path(args.data_dir) / "allotment"
+    out_dir = Path(args.data_dir) / "context"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "registrar_info.json"
-    payload = {
-        "refreshed_at": datetime.now(tz=UTC).astimezone().isoformat(),
-        "registrars": registrars,
-    }
+    out_path = out_dir / "ipo_context.json"
+    payload = {"refreshed_at": datetime.now(tz=UTC).astimezone().isoformat(), "ipos": ipos}
     out_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-    print(f"\nWrote {len(registrars)} registrar entries to {out_path} (token-free).")
-    for sym in list(registrars)[:8]:
-        r = registrars[sym]
-        nm = str(r.get("name") or r.get("short") or "—")[:34]
-        print(f"  {sym:<12} {nm:<34} {r.get('website') or ''}")
+
+    n_reg = sum(1 for e in ipos.values() if e.get("registrar"))
+    n_rhp = sum(1 for e in ipos.values() if e.get("rhp_url"))
+    print(f"\nWrote {len(ipos)} IPO context entries to {out_path} (token-free).")
+    print(f"  with registrar: {n_reg}   with rhp_url: {n_rhp}")
+    for sym in list(ipos)[:8]:
+        r = ipos[sym].get("registrar") or {}
+        reg = str(r.get("name") or r.get("short") or "-")[:28]
+        has_rhp = "Y" if ipos[sym].get("rhp_url") else "-"
+        print(f"  {sym:<12} registrar={reg:<28} rhp={has_rhp}")
 
 
 if __name__ == "__main__":

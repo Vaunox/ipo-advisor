@@ -163,26 +163,36 @@ The app now tells the honest truth about how current its data is, and lets you f
 None of this touches the model: `/status`, the freshness store, and the refresh trigger are all
 outside the scoring path (verdicts/probabilities are byte-identical — proven per branch).
 
-### The Allotment tab's registrar cache (v3 V3-6)
+### The per-IPO Upstox context cache (v3 V3-5/V3-6+)
 
-The Allotment tab shows each recently-closed IPO's **registrar** and deep-links out to the
-registrar's own allotment-check site (the app never handles a PAN). That registrar data is **not**
-fetched by the app — it's an occasional, token-free cache you refresh:
+The **one** display-only Upstox cache feeds every per-IPO context field the app shows: the
+Allotment tab's **registrar** (V3-6, deep-links to the registrar's own allotment-check site — the
+app never handles a PAN), the detail page's **RHP link** (V3-5), and later lot_size / isin / anchor
+(V3-8/11/10). One cache, one refresh, one staleness rule. It is **not** fetched by the app — it's an
+occasional, token-free cache you refresh:
 
 ```
 # needs your Upstox Analytics Token in the environment (or research/.env): UPSTOX_TOKEN=...
-python scripts/refresh_allotment.py --data-dir <the app's data dir>
+python scripts/refresh_context.py --data-dir <the app's data dir>
 #   dev: --data-dir data_store   ·   installed app: the per-user engine-data dir the shell passes
 ```
 
-- Registrar assignment is **fixed when the RHP is filed and never changes**, so this is occasional
-  reference data — run it when new IPOs appear (like `run_backfill`), not on a cadence.
-- It writes `<data_dir>/allotment/registrar_info.json` (token-free, safe to share/commit/sync).
-- **Degrades honestly:** if the cache is missing the tab says "not loaded" and still lists the
-  in-scope IPOs (registrar "not yet available"); it never shows a stale registrar as current.
+- These fields are **fixed once filed and never change**, so this is occasional reference data —
+  run it when new IPOs appear (like `run_backfill`), not on a cadence. It queries open+closed+listed
+  (the RHP first appears at `open`).
+- It writes `<data_dir>/context/ipo_context.json` (token-free, safe to share/commit/sync).
+- **Degrades honestly:** a missing cache → the surface says "not loaded"; a per-IPO absence
+  distinguishes "not yet published/filed" from **"cache is stale"** (the cache predates the IPO) —
+  it never shows a stale value as current. Symbol-less (`'NONE'`) upcoming IPOs are excluded at
+  ingest.
 - **Severable & non-model:** the app only reads this cache; if Upstox is down you simply can't
-  refresh — verdicts, probabilities, and live signals are entirely unaffected. Registrar data is in
-  a store separate from the model and can never become a scoring input (import-graph proven).
+  refresh — verdicts, probabilities, and live signals are entirely unaffected. Context data lives in
+  a store separate from the model and can never become a scoring input (transitively import-graph
+  proven: no `ipo.service.*` is reachable from the scoring path).
+- **External links are host-allowlisted:** the app only opens pinned hosts — the eight registrar
+  portals and the SEBI filing host (`sebi.gov.in`) for RHPs. An issuer-hosted RHP or any other URL
+  renders as inert, copyable text, never a one-click open (a poisoned cache can't redirect the user
+  to an attacker page).
 - The script is **VM-runnable as-is** (pure Python + `requests`, no desktop assumptions): when the
   Part-II VM data layer lands it adopts this script unchanged as the VM-primary refresher, with
   local execution as the fallback — the same VM-primary/local-fallback discipline as every feed.
@@ -200,7 +210,7 @@ python scripts/refresh_allotment.py --data-dir <the app's data dir>
 | `scripts/run_accuracy_monitor.py` | Drift monitor: recent window vs OOS baseline | nothing (prints; exit 1 on alert) |
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat | nothing (prints; exit 1 if missing) |
-| `scripts/refresh_allotment.py` | v3 V3-6 — refresh the Allotment tab's registrar cache from Upstox (display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/allotment/registrar_info.json` (token-free) |
+| `scripts/refresh_context.py` | v3 V3-5/V3-6 — refresh the per-IPO Upstox context cache (registrar + RHP + …; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in

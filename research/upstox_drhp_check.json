@@ -1,0 +1,249 @@
+{
+  "by_status": {
+    "upcoming": {
+      "list_count": 24,
+      "sampled": 12,
+      "coverage": {
+        "rhp_url": "0/12",
+        "drhp_url": "1/12"
+      }
+    },
+    "open": {
+      "list_count": 2,
+      "sampled": 2,
+      "coverage": {
+        "rhp_url": "2/2",
+        "drhp_url": "0/2"
+      }
+    },
+    "active": {
+      "list_count": 0,
+      "sampled": 0,
+      "coverage": {}
+    },
+    "pre_apply": {
+      "list_count": 0,
+      "sampled": 0,
+      "coverage": {}
+    },
+    "pre_open": {
+      "list_count": 0,
+      "sampled": 0,
+      "coverage": {}
+    },
+    "closed": {
+      "list_count": 2,
+      "sampled": 2,
+      "coverage": {
+        "rhp_url": "2/2",
+        "drhp_url": "0/2"
+      }
+    },
+    "listed": {
+      "list_count": 30,
+      "sampled": 12,
+      "coverage": {
+        "rhp_url": "12/12",
+        "drhp_url": "0/12"
+      }
+    }
+  },
+  "samples": [
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": null
+    },
+    {
+      "status_queried": "upcoming",
+      "symbol": "NONE",
+      "detail_status": "upcoming",
+      "rhp_url": null,
+      "drhp_url": "https://www.sebi.gov.in/web/?file=/sebi_data/attachdocs/nov-2021/1637659122113.pdf"
+    },
+    {
+      "status_queried": "open",
+      "symbol": "ALPINETEX",
+      "detail_status": "open",
+      "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jul-2026/alpine-texworld-limited-rhp_102719.html",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "open",
+      "symbol": "SBIFUNDS",
+      "detail_status": "open",
+      "rhp_url": "https://www.sbimf.com/docs/default-source/sbi-funds/offer-documents/rhp-document.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "closed",
+      "symbol": "LASERPOWER",
+      "detail_status": "closed",
+      "rhp_url": "https://laserpowerinfra.com/wp-content/uploads/2026/07/Red-Herring-Prospectus.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "closed",
+      "symbol": "KUSUMGAR",
+      "detail_status": "closed",
+      "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jul-2026/kusumgar-limited-rhp_102510.html",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "KNACK",
+      "detail_status": "listed",
+      "rhp_url": "https://knackpackaging.com/INV/KnackPackagingLimited-RHP.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "AASTHA",
+      "detail_status": "listed",
+      "rhp_url": "https://aasthaspintex.com/pdf/RHP/RHP_Aastha.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "CSM",
+      "detail_status": "listed",
+      "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jun-2026/csm-technologies-limited-rhp_102194.html",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "RAMBHAJO",
+      "detail_status": "listed",
+      "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jun-2026/advit-jewels-limited-rhp_102061.html",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "CORDELIA",
+      "detail_status": "listed",
+      "rhp_url": "https://www.sebi.gov.in/filings/public-issues/jun-2026/waterways-leisure-tourism-limited-rhp_102226.html",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "TURTLEMINT",
+      "detail_status": "listed",
+      "rhp_url": "https://cdn.turtlemint.com/wp-content/uploads/20260615160850/IFA2047-RHP_June-15-2026.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "HEXAGON",
+      "detail_status": "listed",
+      "rhp_url": "https://hexagonnutrition.com/wp-content/uploads/2026/05/RHP-documents.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "CMRGREEN",
+      "detail_status": "listed",
+      "rhp_url": "https://assets.upstox.com/ipo/documents/rhp/cmr-green-technologies-rhp.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "BAGMANE",
+      "detail_status": "listed",
+      "rhp_url": "https://www.axiscapital.co.in/contents/5716-1777312447.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "KISSHT",
+      "detail_status": "listed",
+      "rhp_url": "https://www.nuvama.com/wp-content/uploads/2026/04/Project-NorthStar-RHP-Filing-version.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "OMPOWER",
+      "detail_status": "listed",
+      "rhp_url": "https://assets.upstox.com/ipo/documents/rhp/rhp_optl.pdf",
+      "drhp_url": null
+    },
+    {
+      "status_queried": "listed",
+      "symbol": "AMIRCHAND",
+      "detail_status": "listed",
+      "rhp_url": "https://assets.upstox.com/ipo/documents/rhp/RHP_Amir Chand Jagdish Kumar (Exports) Limited.pdf",
+      "drhp_url": null
+    }
+  ]
+}

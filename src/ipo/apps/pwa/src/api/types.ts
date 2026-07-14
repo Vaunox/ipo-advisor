@@ -152,6 +152,20 @@ export interface AllotmentView {
   rows: AllotmentRow[]
 }
 
+// One IPO's display-only Upstox context for the detail page (v3 V3-5) — never a model input.
+// `rhp_url` is the Red Herring Prospectus (final offer doc), labelled as such in the UI. `rhp_state`
+// inherits the shared staleness rule so a missing RHP distinguishes "not filed yet" from "cache
+// predates the filing".
+export interface IpoContextView {
+  ipo_id: string
+  available: boolean
+  refreshed_at: string | null
+  rhp_url: string | null
+  rhp_state: RegistrarState
+  registrar: RegistrarInfo | null
+  registrar_state: RegistrarState
+}
+
 // Live-ingest freshness (v3 BUG 1 / Defect 2). `last_successful_ingest` is the ONLY value the UI
 // may show as "Updated" — the last confirmed-good NSE pull, never a local API-read timestamp.
 // `last_attempt_ok === false` means the store is still served but the feed is failing (stale +

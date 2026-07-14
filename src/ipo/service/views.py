@@ -177,6 +177,28 @@ class AllotmentRow(BaseModel):
     registrar_state: str
 
 
+class IpoContextView(BaseModel):
+    """One IPO's display-only Upstox context for the detail page (v3 V3-5+) — never a model input.
+
+    Currently carries the RHP link (V3-5) and the registrar (shared with the Allotment tab); extend
+    with lot_size / isin / … as V3-8/11/10 land. Each cached field is paired with its freshness
+    state (``*_state``: present / unpublished / stale / not_loaded — see
+    ``AllotmentRow.registrar_state``), so a missing RHP distinguishes "not filed yet" from "cache
+    predates the filing" rather than a bare null. ``rhp_url`` is the *Red Herring Prospectus*
+    specifically (the final offer document),
+    labelled as such in the UI — not a generic "prospectus" and never the draft (DRHP was dropped as
+    unusable: 1/28 populated and unjoinable — see docs/v3/V3_PROGRESS.md).
+    """
+
+    ipo_id: str
+    available: bool
+    refreshed_at: datetime | None
+    rhp_url: str | None
+    rhp_state: str
+    registrar: RegistrarInfo | None
+    registrar_state: str
+
+
 class AllotmentView(BaseModel):
     """The Allotment tab payload (v3 V3-6) — read-only join of IPOs past close × registrar cache.
 
