@@ -291,14 +291,15 @@ def test_context_endpoint_serves_rhp(tmp_path: Path) -> None:
     path.write_text(
         '{"refreshed_at": "2026-07-14T09:00:00+05:30", "ipos": {"'
         + rec.ipo_id.upper()
-        + '": {"rhp_url": "https://www.sebi.gov.in/filings/x-rhp"}}}',
+        + '": {"rhp_url": "https://www.sebi.gov.in/filings/x-rhp", "lot_size": 70}}}',
         encoding="utf-8",
     )
     client = TestClient(create_app(_engine_with_records(), context_store=ContextStore(path)))
     body = client.get(f"/context/{rec.ipo_id}").json()
     assert body["rhp_url"] == "https://www.sebi.gov.in/filings/x-rhp"
     assert body["rhp_state"] == "present"
-    assert {"rhp_url", "rhp_state", "registrar", "registrar_state", "available"} <= set(body)
+    assert body["lot_size"] == 70 and body["lot_state"] == "present"  # v3 V3-8
+    assert {"rhp_url", "rhp_state", "lot_size", "lot_state", "registrar", "available"} <= set(body)
     assert client.get("/context/NONEXISTENT-9999").status_code == 404
 
 

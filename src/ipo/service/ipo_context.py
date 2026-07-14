@@ -49,12 +49,15 @@ _CACHE_STALE_DAYS = 14
 class IpoContext(BaseModel):
     """One IPO's cached Upstox context (display-only).
 
-    Every field is nullable — absence degrades, never fabricates. Extend here (lot_size, isin, …) as
-    V3-8/11/10 land; the store and the staleness rule do not change.
+    Every field is nullable — absence degrades, never fabricates. Extend here (isin, …) as V3-11/10
+    land; the store and the staleness rule do not change. ``lot_size`` (V3-8) is Upstox's bid-lot —
+    NSE provides it on 0% of IPOs, so this is the *only* source — shown as an INDICATIVE planning
+    figure (see IpoContextView), never as an exact reported value.
     """
 
     registrar: RegistrarInfo | None = None
     rhp_url: str | None = None
+    lot_size: int | None = None
 
 
 class _ContextCacheFile(BaseModel):
@@ -202,6 +205,7 @@ def build_ipo_context(
     ctx = store.get(record.ipo_id)
     reg = ctx.registrar if ctx else None
     rhp_url = ctx.rhp_url if ctx else None
+    lot_size = ctx.lot_size if ctx else None
 
     def _state(present: bool) -> str:
         return field_state(
@@ -218,6 +222,8 @@ def build_ipo_context(
         refreshed_at=store.refreshed_at,
         rhp_url=rhp_url,
         rhp_state=_state(rhp_url is not None),
+        lot_size=lot_size,
+        lot_state=_state(lot_size is not None),
         registrar=reg,
         registrar_state=_state(reg is not None),
     )

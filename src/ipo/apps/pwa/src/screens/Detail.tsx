@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useIpo, useIpoContext, useTransitionsFor } from '../api/hooks'
-import type { IPODetail, IPOFeatures, VerdictType } from '../api/types'
+import type { IPODetail, IPOFeatures, IpoContextView, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { Loading } from '../components/Loading'
 import { isAllowedExternalUrl, openExternalUrl } from '../external'
@@ -58,15 +58,28 @@ const Check = () => (
 const fmtWhen = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
+// v3 V3-8 — the bid lot as an INDICATIVE planning figure, never an exact reported value. NSE gives
+// lot_size on 0% of IPOs, so this is the sole (Upstox) source, corroborated only against the SEBI
+// ~₹14–15k minimum-application band — so it wears the '≈'/'approx' face of an estimate. No source is
+// named (the app doesn't attribute providers). The app places no bids; the broker enforces the true
+// lot at application time, so an off-by-one is a small planning delta, not an invalid bid. Amount is
+// lot × the band top (the cut-off), the standard maximum application.
+function lotIndicative(ctx: IpoContextView | undefined, bandHigh: number): string {
+  if (!ctx || ctx.lot_state === 'not_loaded') return '—'
+  if (ctx.lot_state === 'stale') return 'unknown — data stale'
+  if (ctx.lot_state === 'unpublished' || ctx.lot_size == null) return 'not published yet'
+  const amount = Math.round(ctx.lot_size * bandHigh).toLocaleString('en-IN')
+  return `≈ ${ctx.lot_size} shares · approx ₹${amount}`
+}
+
 // v3 V3-5 — the filed RHP link. Display/routing only (from the per-IPO Upstox context cache, never a
 // model input). Labelled the *Red Herring Prospectus* explicitly — the final offer document, never a
 // generic "prospectus" and never the draft (DRHP was dropped as unusable). Opens the official SEBI
 // filing one-click (allowlisted); an issuer-hosted RHP renders as inert copyable text (we can't vouch
 // for arbitrary issuer domains). A missing link distinguishes "not filed yet" from "cache is stale".
-function RhpLink({ id }: { id: string }) {
-  const { data } = useIpoContext(id)
-  if (!data) return null // don't flash while loading
-  const { rhp_url, rhp_state, refreshed_at } = data
+function RhpLink({ ctx }: { ctx: IpoContextView | undefined }) {
+  if (!ctx) return null // don't flash while loading
+  const { rhp_url, rhp_state, refreshed_at } = ctx
   return (
     <div className="card">
       <h3 className="sec">Filed documents</h3>
@@ -201,6 +214,7 @@ function Contributions({ d }: { d: IPODetail }) {
 
 export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: d, isLoading, isError, refetch } = useIpo(id)
+  const { data: ctx } = useIpoContext(id) // display-only Upstox context (RHP, lot) — never scored
   const [copied, setCopied] = useState(false)
 
   if (isLoading) return <Loading label="Loading verdict…" />
@@ -317,7 +331,7 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
 
         <VerdictHistory id={id} />
 
-        <RhpLink id={id} />
+        <RhpLink ctx={ctx} />
 
         <div className="card">
           <h3 className="sec">{f.book_closed ? 'Subscription (final)' : 'Subscription (live)'}</h3>
@@ -381,8 +395,13 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               </span>
             </div>
             <div className="r">
-              <span className="k">Lot</span>
-              <span className="v">{r.lot_size != null ? `${r.lot_size} sh` : '—'}</span>
+              <span
+                className="k gl"
+                data-tip="Indicative bid lot and the approximate application amount at the cut-off price — a planning estimate, not an exact figure. The app places no orders; your broker enforces the exact lot when you apply."
+              >
+                Lot (indicative)
+              </span>
+              <span className="v">{lotIndicative(ctx, r.price_band_high)}</span>
             </div>
           </div>
         </div>

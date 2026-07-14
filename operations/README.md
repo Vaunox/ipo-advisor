@@ -167,8 +167,10 @@ outside the scoring path (verdicts/probabilities are byte-identical — proven p
 
 The **one** display-only Upstox cache feeds every per-IPO context field the app shows: the
 Allotment tab's **registrar** (V3-6, deep-links to the registrar's own allotment-check site — the
-app never handles a PAN), the detail page's **RHP link** (V3-5), and later lot_size / isin / anchor
-(V3-8/11/10). One cache, one refresh, one staleness rule. It is **not** fetched by the app — it's an
+app never handles a PAN), the detail page's **RHP link** (V3-5) and **bid lot** (V3-8, shown as an
+*indicative* "≈ N shares · approx ₹…" — NSE provides lot_size on 0% of IPOs, so Upstox is the sole
+source and it's never presented as an exact reported figure), and later isin / anchor (V3-11/10).
+One cache, one refresh, one staleness rule. It is **not** fetched by the app — it's an
 occasional, token-free cache you refresh:
 
 ```
@@ -210,7 +212,7 @@ python scripts/refresh_context.py --data-dir <the app's data dir>
 | `scripts/run_accuracy_monitor.py` | Drift monitor: recent window vs OOS baseline | nothing (prints; exit 1 on alert) |
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat | nothing (prints; exit 1 if missing) |
-| `scripts/refresh_context.py` | v3 V3-5/V3-6 — refresh the per-IPO Upstox context cache (registrar + RHP + …; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
+| `scripts/refresh_context.py` | v3 V3-5/6/8 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + …; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in

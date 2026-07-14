@@ -180,8 +180,12 @@ class AllotmentRow(BaseModel):
 class IpoContextView(BaseModel):
     """One IPO's display-only Upstox context for the detail page (v3 V3-5+) — never a model input.
 
-    Currently carries the RHP link (V3-5) and the registrar (shared with the Allotment tab); extend
-    with lot_size / isin / … as V3-8/11/10 land. Each cached field is paired with its freshness
+    Carries the RHP link (V3-5), the bid ``lot_size`` (V3-8), and the registrar (shared with the
+    Allotment tab); extend with isin / … as V3-11/10 land. ``lot_size`` is Upstox's — NSE gives it
+    on 0% of IPOs, so it is the sole source and the UI shows it as an INDICATIVE planning figure
+    (``≈ N shares · approx ₹…``), never an exact reported value (a possibly-imprecise number must
+    not wear an authoritative face; the app places no bids, so the broker enforces the true lot at
+    application time). Each cached field is paired with its freshness
     state (``*_state``: present / unpublished / stale / not_loaded — see
     ``AllotmentRow.registrar_state``), so a missing RHP distinguishes "not filed yet" from "cache
     predates the filing" rather than a bare null. ``rhp_url`` is the *Red Herring Prospectus*
@@ -195,6 +199,8 @@ class IpoContextView(BaseModel):
     refreshed_at: datetime | None
     rhp_url: str | None
     rhp_state: str
+    lot_size: int | None
+    lot_state: str
     registrar: RegistrarInfo | None
     registrar_state: str
 

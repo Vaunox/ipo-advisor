@@ -185,6 +185,21 @@ def test_ipo_context_not_loaded(tmp_path: Path) -> None:
     assert ctx.rhp_state == "not_loaded" and ctx.registrar_state == "not_loaded"
 
 
+def test_ipo_context_lot_size_present_and_stale(tmp_path: Path) -> None:
+    rec = _rec("acme", close=date(2026, 7, 11))  # open_date 2026-06-01
+    present = build_ipo_context(
+        rec, _store(tmp_path, "2026-07-14T09:00:00+05:30", {"ACME": {"lot_size": 70}}), clock=_CLOCK
+    )
+    assert present.lot_size == 70 and present.lot_state == "present"
+    # no lot in a current cache → not published yet
+    cur = _store(tmp_path, "2026-07-14T09:00:00+05:30", {})
+    none_cur = build_ipo_context(rec, cur, clock=_CLOCK)
+    assert none_cur.lot_size is None and none_cur.lot_state == "unpublished"
+    # cache predates the IPO → stale, NOT "not published" (same single rule as registrar + RHP)
+    stale = build_ipo_context(rec, _store(tmp_path, "2026-05-01T09:00:00+05:30", {}), clock=_CLOCK)
+    assert stale.lot_state == "stale"
+
+
 def test_ipo_context_carries_registrar_too(tmp_path: Path) -> None:
     store = _store(
         tmp_path,
