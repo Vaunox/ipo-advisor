@@ -245,3 +245,15 @@ unbounded a routine `pip install -e ".[dev]"` pulled 2.x and **silently reddened
 with no code change** — a dependency that can break your own gate is itself the silent-failure class
 this project keeps guarding against (cf. §5 / finding-④). If you deliberately adopt mypy 2.x, expect
 to annotate the bare `dict`/`list` generics it now flags, then lift the cap.
+
+### Dev note — the scoring-path guard (Part I rule 1)
+
+Every v3 change must leave the scoring path byte-identical. Two checks, run on each branch:
+- **Cheap proxy:** `python scripts/check_scoring_path.py [base]` fails if a change touches anything
+  under `model` / `calibration` / `features` / `core`, `models/`, or `config/` — with one reviewed
+  allowlist entry, `src/ipo/core/logging.py` (a **write-only sink**, unreachable from
+  `features/build.py`; verdicts proven byte-identical when it changes). The allowlist keeps the
+  proxy *precise* — a guard that fires on a file it can't break trains you to override it, and then
+  you override the real firing too. Add to it only with a reason.
+- **Definitive:** dump verdicts on the branch vs the base and confirm **`MAX|Δprob| = 0.0`** across
+  all IPOs. The proxy is a fast pre-check; this is the actual invariant.
