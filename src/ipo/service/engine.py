@@ -32,6 +32,7 @@ from ipo.features.build import build_features
 from ipo.features.regime import compute_regime
 from ipo.model.verdict import evaluate
 from ipo.service.allotment import retail_allotment_odds
+from ipo.service.lifecycle import is_listing_overdue
 from ipo.service.transitions import TransitionStore
 from ipo.service.views import HistoryRow, IPODetail, IPOListRow, VerdictTransitionView
 
@@ -177,6 +178,7 @@ class VerdictEngine:
         One row per stored IPO, so the front end renders the whole board in a single read. The
         verdict is exactly ``verdict_for`` (no recomputation); the record fields are display-only.
         """
+        today = self._clock().date()
         rows: list[IPOListRow] = []
         for record in self._repo.list_all():
             v = self.verdict_for(record)
@@ -197,6 +199,7 @@ class VerdictEngine:
                     reason=v.reason,
                     watch=v.watch,
                     kill_flags=v.kill_flags,
+                    listing_overdue=is_listing_overdue(record, today),
                 )
             )
         return rows

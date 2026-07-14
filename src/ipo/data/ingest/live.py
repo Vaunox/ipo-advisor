@@ -92,7 +92,9 @@ def build_live_records(
 # a label-only annotation, but a transient archive-host failure on the one cycle that stamps the
 # listing must not lose it forever — so a just-listed issue whose price is still missing is re-tried
 # for a bounded window, then left as-is (avoids re-fetching the master list for stale rows forever).
-_PRICE_BACKFILL_DAYS = 10
+# Public because the listing-overdue detector (service.lifecycle) keys "stamped but never priced"
+# off the SAME window — past it, resolution has given up, so the row is genuinely stranded.
+PRICE_BACKFILL_DAYS = 10
 
 
 def resolve_listings(
@@ -105,7 +107,7 @@ def resolve_listings(
     has closed but that we haven't fully resolved, look them up in the (re-fetched) past-issues, and
     if listed stamp ``listing_date`` (+ listing-day open/close from the bhavcopy) — which drops the
     issue out of Live and into History. A row whose date is stamped but whose price is still missing
-    is retried for ``_PRICE_BACKFILL_DAYS`` so a throttled bhavcopy fetch isn't lost. Returns how
+    is retried for ``PRICE_BACKFILL_DAYS`` so a throttled bhavcopy fetch isn't lost. Returns how
     many rows were changed.
     """
     today = clock().date()
@@ -116,7 +118,7 @@ def resolve_listings(
         if r.listing_date is None:
             return True  # closed but unmarked → resolve
         # marked listed but price still missing → retry the bhavcopy for a bounded window
-        return r.listing_open is None and (today - r.listing_date).days <= _PRICE_BACKFILL_DAYS
+        return r.listing_open is None and (today - r.listing_date).days <= PRICE_BACKFILL_DAYS
 
     awaiting = [r for r in repo.list_all() if needs_resolution(r)]
     if not awaiting:

@@ -27,7 +27,7 @@ dependencies = [
 dev = [
     "ruff>=0.4",
     "black>=24.0",
-    "mypy>=1.9",
+    "mypy>=1.9,<2",  # cap <2: mypy 2.x tightened bare-generic checks and silently reddened the CI gate on main (no code change) — pin until the 2.x cutover is done deliberately
     "pytest>=8.0",
     "types-PyYAML",
     "types-requests",

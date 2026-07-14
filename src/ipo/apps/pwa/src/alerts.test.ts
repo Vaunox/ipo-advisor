@@ -43,6 +43,7 @@ function row(
     reason: '',
     watch: [],
     kill_flags: [],
+    listing_overdue: false,
   }
 }
 
