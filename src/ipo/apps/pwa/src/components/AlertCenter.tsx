@@ -1,4 +1,5 @@
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
+import { currentApplyAlerts, pruneRelevantIds, relevantApplyCrossings } from '../alerts'
 import { useTransitions } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { getAlertsSeen, setAlertsSeen } from '../state/prefs'
@@ -7,9 +8,13 @@ import { VMETA } from '../verdict'
 const fmtDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
-// The notifications surface: the current APPLY signals you'd be alerted about, plus the persisted
-// history of APPLY crossings from the engine's transition log (recorded as the verdict crossed,
-// never re-derived) — the honest "when did this become APPLY" trail.
+// The notifications surface: the current APPLY signals you'd be alerted about, plus the APPLY
+// crossings from the engine's transition log (recorded as the verdict crossed, never re-derived).
+//
+// v3 BUG 2 — relevance-scoped, not unbounded. Both lists show only IPOs whose outcome is still
+// UNRESOLVED (`alertRelevant`: not yet listed — see status.ts), and crossings are deduped to the
+// latest per IPO. The full transition log is untouched (it stays the permanent per-IPO audit trail
+// on the detail view + primes the scheduler); this is a filtered VIEW over it, not a prune of it.
 export function AlertCenter({
   board,
   onOpenIpo,
@@ -22,10 +27,24 @@ export function AlertCenter({
   // and only re-lights when a genuinely new IPO crosses into APPLY.
   const [seen, setSeen] = useState<Set<string>>(() => new Set(getAlertsSeen()))
   const wrap = useRef<HTMLDivElement>(null)
-  const alerts = (board ?? []).filter((r) => r.verdict === 'APPLY')
+  const rows = board ?? []
+  // Current APPLY signals + latest-per-IPO crossings, both scoped to still-unresolved IPOs (v3 BUG 2).
+  const alerts = currentApplyAlerts(rows)
   const { data: transitions } = useTransitions()
-  const crossings = (transitions ?? []).filter((t) => t.crossed_into_apply)
+  const crossings = relevantApplyCrossings(transitions ?? [], rows)
   const unread = alerts.filter((a) => !seen.has(a.ipo_id)).length
+
+  // Prune the persisted "seen" set to ids that are still relevant (on the board and not yet listed),
+  // so it can't grow without bound as IPOs list and leave (v3 BUG 2).
+  useEffect(() => {
+    const persisted = getAlertsSeen()
+    const pruned = pruneRelevantIds(persisted, rows)
+    if (pruned.length !== persisted.length) {
+      setAlertsSeen(pruned)
+      setSeen(new Set(pruned))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board])
 
   useEffect(() => {
     const onDoc = (e: globalThis.MouseEvent) => {

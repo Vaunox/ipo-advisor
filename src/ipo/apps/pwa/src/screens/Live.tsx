@@ -3,6 +3,7 @@ import { useBoard } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { Loading } from '../components/Loading'
 import { getLastSeen, getPinned, seedLastSeen, togglePinned } from '../state/prefs'
+import { midnight, statusLabel, today } from '../status'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
 
@@ -11,26 +12,6 @@ const STAR = (
     <path d="M12 2l3 6.5 7 .6-5.3 4.7L18.5 21 12 17.3 5.5 21l1.8-7.2L2 9.1l7-.6z" />
   </svg>
 )
-
-const midnight = (d: string) => new Date(d + 'T00:00:00')
-const today = () => {
-  const t = new Date()
-  t.setHours(0, 0, 0, 0)
-  return t
-}
-
-function statusLabel(row: IPOListRow): { text: string; live: boolean; closesToday: boolean } {
-  const t = today()
-  const open = midnight(row.open_date)
-  const close = midnight(row.close_date)
-  const listing = row.listing_date ? midnight(row.listing_date) : null
-  const closesToday = !listing && +close === +t
-  if (listing && listing <= t) return { text: 'Listed', live: false, closesToday: false }
-  if (close < t) return { text: 'Closed', live: false, closesToday: false }
-  if (closesToday) return { text: 'CLOSES TODAY', live: true, closesToday: true }
-  if (open <= t) return { text: 'Open', live: true, closesToday: false }
-  return { text: 'Upcoming', live: false, closesToday: false }
-}
 
 const sizeLabel = (cr: number | null): string => (cr != null ? `₹${cr.toLocaleString('en-IN')} cr` : '—')
 

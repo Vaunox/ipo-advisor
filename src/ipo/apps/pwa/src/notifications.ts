@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { useTransitions } from './api/hooks'
+import { relevantTransitions } from './alerts'
+import { useBoard, useTransitions } from './api/hooks'
 import type { VerdictTransition } from './api/types'
 import {
   getNotifications,
@@ -47,6 +48,7 @@ function fire(t: VerdictTransition): void {
 // notifies only about FUTURE transitions, never replays history.
 export function useCrossingNotifications(): void {
   const { data } = useTransitions()
+  const { data: board } = useBoard()
 
   useEffect(() => {
     if (!isDesktop() || typeof Notification === 'undefined') return
@@ -57,11 +59,20 @@ export function useCrossingNotifications(): void {
     if (!isDesktop() || typeof Notification === 'undefined') return
     const all = data ?? []
     if (!all.length) return
-    const allKeys = all.map((t) => key(t.ipo_id, t.asof))
+    // Relevance needs the board. Until it's loaded, do nothing — never advance/clear the frontier
+    // blind, or a transient empty relevance set could make every crossing look "fresh" and re-fire
+    // en masse (v3 BUG 2).
+    if (!board) return
 
-    // First run: adopt the whole existing log silently so only genuinely new transitions notify.
+    // Scope the seen-frontier to still-relevant IPOs so it stays bounded: once an IPO lists (or
+    // leaves the board) its keys drop out — and it's excluded from candidates below too, so it can
+    // never re-fire. The full transition log is untouched; this only bounds the local frontier.
+    const relevant = relevantTransitions(all, board)
+    const relevantKeys = relevant.map((t) => key(t.ipo_id, t.asof))
+
+    // First run: adopt the existing (relevant) log silently so only genuinely new transitions notify.
     if (!isNotifSeeded()) {
-      setNotifiedCrossings(allKeys)
+      setNotifiedCrossings(relevantKeys)
       markNotifSeeded()
       return
     }
@@ -71,12 +82,13 @@ export function useCrossingNotifications(): void {
 
     // Master switch off, or neither category enabled: advance the seen-frontier and fire nothing.
     if (!prefs.native || (!prefs.applyCrossing && !prefs.anyChange)) {
-      setNotifiedCrossings(allKeys)
+      setNotifiedCrossings(relevantKeys)
       return
     }
 
     // APPLY crossings are governed by `applyCrossing`; every other verdict change by `anyChange`.
-    const candidates = all.filter((t) =>
+    // Only still-relevant IPOs are candidates — no native toast for an IPO that has already listed.
+    const candidates = relevant.filter((t) =>
       t.crossed_into_apply ? prefs.applyCrossing : prefs.anyChange,
     )
     const fresh = candidates.filter((c) => !known.has(key(c.ipo_id, c.asof)))
@@ -87,6 +99,6 @@ export function useCrossingNotifications(): void {
     if (fresh.length && Notification.permission === 'granted') {
       for (const c of fresh) fire(c)
     }
-    setNotifiedCrossings(allKeys) // advance the seen-frontier to every observed transition
-  }, [data])
+    setNotifiedCrossings(relevantKeys) // advance the seen-frontier to every still-relevant transition
+  }, [data, board])
 }

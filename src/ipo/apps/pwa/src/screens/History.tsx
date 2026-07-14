@@ -3,6 +3,7 @@ import { useBoard, useCalibration, useHistory } from '../api/hooks'
 import type { CalibrationView, HistoryRow, IPOListRow, VerdictType } from '../api/types'
 import { Loading } from '../components/Loading'
 import { getCosts } from '../state/prefs'
+import { isListed, midnight, today } from '../status'
 import { VMETA } from '../verdict'
 
 const Search = () => (
@@ -182,22 +183,13 @@ function ReliabilityDiagram({ cal }: { cal: CalibrationView }) {
   )
 }
 
-const awMidnight = (d: string): number => +new Date(`${d}T00:00:00`)
-const awToday = (): number => {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return +d
-}
-
 // Once a book closes the IPO leaves Live, but its net-of-cost outcome can't be shown until it lists
 // and the listing price backfills. This surfaces those in-between IPOs so a closed / just-listed
 // call never silently vanishes between Live and the outcome table below.
 function AwaitingList({ rows, onOpen }: { rows: IPOListRow[]; onOpen: (id: string) => void }) {
   if (!rows.length) return null
   const status = (r: IPOListRow): string =>
-    r.listing_date != null && awMidnight(r.listing_date) <= awToday()
-      ? 'listed · outcome pending'
-      : 'book closed · awaiting listing'
+    isListed(r) ? 'listed · outcome pending' : 'book closed · awaiting listing'
   return (
     <div className="card">
       <h3 className="sec">Awaiting listing outcome ({rows.length})</h3>
@@ -292,11 +284,10 @@ export function History({ onOpen }: { onOpen: (id: string) => void }) {
   const awaiting = useMemo(() => {
     const brows = board.data ?? []
     const done = new Set((history ?? []).map((h) => h.ipo_id))
-    const t = awToday()
+    const t = +today()
     return brows.filter((r) => {
       if (done.has(r.ipo_id)) return false
-      const listed = r.listing_date != null && awMidnight(r.listing_date) <= t
-      return listed || awMidnight(r.close_date) < t
+      return isListed(r) || +midnight(r.close_date) < t
     })
   }, [board.data, history])
 
