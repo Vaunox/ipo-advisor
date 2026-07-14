@@ -162,6 +162,15 @@ class VerdictEngine:
         """Compute verdicts for every stored IPO."""
         return [self.verdict_for(record, asof=asof) for record in self._repo.list_all()]
 
+    def list_records(self) -> list[IPORecord]:
+        """Every stored IPO record (read-only). Used by the display-only Allotment join (v3 V3-6).
+
+        Returns the canonical records verbatim; the caller (the /allotment endpoint) joins them with
+        the separate registrar cache for display and never scores them, so registrar data stays out
+        of the model.
+        """
+        return self._repo.list_all()
+
     def board(self) -> list[IPOListRow]:
         """Display rows for the list view: each IPO's metadata + verbatim verdict (read-only).
 

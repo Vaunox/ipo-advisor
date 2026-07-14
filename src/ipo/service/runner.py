@@ -31,6 +31,7 @@ from ipo.core.logging import get_logger
 from ipo.data.ingest.state import IngestStateStore
 from ipo.data.store.repository import ParquetRepository
 from ipo.model.scorer import WeightedScorer
+from ipo.service.allotment_context import AllotmentStore
 from ipo.service.api import create_app
 from ipo.service.engine import VerdictEngine
 from ipo.service.notify import build_notifier, notify_crossings
@@ -135,6 +136,7 @@ def build_service(
     push_transport: Callable[[str], None] | None = None,
     refresh: Callable[[], None] | None = None,
     ingest_state: IngestStateStore | None = None,
+    allotment_store: AllotmentStore | None = None,
     clock: Callable[[], datetime] = now_ist,
 ) -> Service:
     """Wire the layers into a running service (composition only — no new logic).
@@ -186,6 +188,7 @@ def build_service(
             engine,
             calibration_report_path=calibration_report_path,
             ingest_state=ingest_state,
+            allotment_store=allotment_store,
         ),
     )
 
@@ -264,6 +267,10 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     ingest_state = (
         IngestStateStore(data_dir / "ingest_state.json") if config.scrape.live_ingest else None
     )
+    # Display-only registrar cache the Allotment tab reads (v3 V3-6). The app only READS it — the
+    # fetch is an external, VM-runnable job (scripts/refresh_allotment.py) writing into this same
+    # data plane. Read-only + off the scheduler → severable: Upstox down never touches verdicts.
+    allotment_store = AllotmentStore(data_dir / "allotment" / "registrar_info.json")
     service = build_service(
         config,
         repository=repository,
@@ -274,6 +281,7 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         transition_store=TransitionStore(data_dir / "verdict_transitions.json"),
         refresh=_live_refresh(config, repository, data_dir, ingest_state),
         ingest_state=ingest_state,
+        allotment_store=allotment_store,
         # A logging transport so a 'push' notify channel never crashes for lack of one (the
         # user-facing alerts are the renderer's native toasts; this just journals crossings).
         push_transport=lambda message: log.info("notify_crossing", extra={"message": message}),

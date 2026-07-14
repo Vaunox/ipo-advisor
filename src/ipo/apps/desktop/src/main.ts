@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { type ChildProcess } from 'node:child_process'
 import path from 'node:path'
 import {
@@ -236,6 +236,20 @@ ipcMain.handle('engine:restart', (): Promise<boolean> => restartEngine())
 // pull (via the parent-only stdin channel), not just a client re-read of a possibly-stale store.
 // Returns whether the request was delivered; the engine debounces and does the polite fetch.
 ipcMain.handle('engine:refresh', (): boolean => triggerEngineRefresh(child))
+
+// v3 V3-6: open a registrar's allotment-check page in the user's real browser. Only https URLs are
+// opened (the renderer passes URLs that came from the trusted registrar cache); anything else is
+// refused. Nothing is navigated inside the app — the user's PAN is entered on the registrar's site.
+ipcMain.handle('shell:openExternal', (_e, url: unknown): boolean => {
+  if (typeof url !== 'string') return false
+  try {
+    if (new URL(url).protocol !== 'https:') return false
+  } catch {
+    return false
+  }
+  void shell.openExternal(url)
+  return true
+})
 
 app.whenReady().then(boot).catch((e) => console.error('[boot] failed', e))
 

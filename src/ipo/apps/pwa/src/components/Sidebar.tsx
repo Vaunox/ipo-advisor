@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import type { View } from '../nav'
-import { IconHistory, IconSettings, IconSignals, IconUpcoming } from './Icons'
+import { IconAllotment, IconHistory, IconSettings, IconSignals, IconUpcoming } from './Icons'
 
 const NAV: { id: View; label: string; icon: ReactNode }[] = [
   { id: 'live', label: 'Live signals', icon: <IconSignals /> },
   { id: 'upcoming', label: 'Upcoming', icon: <IconUpcoming /> },
+  { id: 'allotment', label: 'Allotment', icon: <IconAllotment /> },
   { id: 'history', label: 'History', icon: <IconHistory /> },
   { id: 'settings', label: 'Settings', icon: <IconSettings /> },
 ]

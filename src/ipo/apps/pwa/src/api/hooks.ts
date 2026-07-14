@@ -4,6 +4,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from './client'
 import type {
+  AllotmentView,
   CalibrationView,
   HistoryRow,
   IPODetail,
@@ -55,6 +56,11 @@ export const useHistory = (costs?: { stt: number; dp: number; oth: number }) =>
 
 export const useCalibration = () =>
   useQuery({ queryKey: ['calibration'], queryFn: () => apiGet<CalibrationView>('/calibration') })
+
+// Allotment tab (v3 V3-6) — display-only registrar cache. Read-only; degrades to available=false
+// when no cache is loaded (the tab says so). Never a scoring input.
+export const useAllotment = () =>
+  useQuery({ queryKey: ['allotment'], queryFn: () => apiGet<AllotmentView>('/allotment') })
 
 export const useTransitions = () =>
   useQuery({
