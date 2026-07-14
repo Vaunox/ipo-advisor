@@ -11,17 +11,23 @@ Exercised over real HTTP via FastAPI's TestClient:
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 from fastapi.testclient import TestClient
 
 from ipo.calibration.calibrate import load_calibrator
 from ipo.calibration.dataset import load_records_from_csv
+from ipo.calibration.label import net_listing_return
 from ipo.calibration.regime import NiftyRegime
 from ipo.core.config import load_config
 from ipo.core.interfaces import Calibrator
 from ipo.core.types import IPORecord, ListingLabel
+from ipo.data.ingest.live import resolve_listings
+from ipo.data.sources.nse import NseClient, NsePastIssue
+from ipo.data.store.repository import ParquetRepository
 from ipo.model.calibrator_placeholder import PlaceholderCalibrator
 from ipo.model.scorer import WeightedScorer
 from ipo.service.api import create_app
@@ -320,3 +326,98 @@ def test_gate_survives_serialization() -> None:
     # Un-gated: the gate is NOT bypassed at the response layer — null + banner.
     assert u.json()["probability"] is None
     assert "UNCALIBRATED" in u.json()["reason"]
+
+
+class _ListingStub:
+    """NseClient stub for the resolution path: reports one past issue + its listing-day price."""
+
+    def __init__(self, past: NsePastIssue, price: tuple[float, float]) -> None:
+        self._past = past
+        self._price = price
+
+    def past_issues(self, *, force: bool = False) -> list[NsePastIssue]:
+        return [self._past]
+
+    def listing_prices(self, symbol: str, listing_day: object) -> tuple[float, float] | None:
+        return self._price if symbol.upper() == self._past.symbol.upper() else None
+
+
+def test_awaiting_listing_resolves_end_to_end_into_history(tmp_path: Path) -> None:
+    """End-to-end lifecycle proof (v3 resolution-path verification): an IPO awaiting listing,
+    once NSE reports it listed with a price, LEAVES the awaiting surface and appears in History
+    with the correct net-of-cost outcome + HIT/MISS — observed through the same engine surfaces
+    the app serves (board / history), on a real ``ParquetRepository`` (the production store shape).
+
+    Guards the awaiting-listing -> History transition end-to-end under the CURRENT code
+    (``resolve_listings`` -> ``listing_date``/price -> board status split + ``/history`` gate).
+    Kusumgar and Laser Power are the first live IPOs to exercise it; a silent break here would
+    strand them in awaiting-listing indefinitely.
+    """
+    config = load_config(env="dev", environ={})
+    original = next(
+        r
+        for r in load_records_from_csv(_CSV)
+        if r.listing_open is not None and r.listing_close is not None
+    )
+    issue_price = original.issue_price
+    listing_open, listing_close = original.listing_open, original.listing_close
+    listing_day = original.listing_date
+    assert listing_open is not None and listing_close is not None and listing_day is not None
+
+    # Seed a REAL ParquetRepository with that record stripped back to "awaiting listing":
+    # its book has closed, but it is not yet marked listed and carries no listing price.
+    awaiting = original.model_copy(
+        update={"listing_date": None, "listing_open": None, "listing_close": None}
+    )
+    repo = ParquetRepository(tmp_path)
+    repo.upsert(awaiting)
+    engine = VerdictEngine(
+        repository=repo,
+        calibrator=load_calibrator(_CAL),
+        scorer=WeightedScorer(config.feature_weights, config.features),
+        config=config,
+        regime=NiftyRegime(_NIFTY),
+    )
+
+    # BEFORE: no outcome row (History gates on listing_open), and the board row is pre-listing
+    # (listing_date is None -> statusLabel renders Closed/awaiting, NOT Listed).
+    assert awaiting.ipo_id not in {h.ipo_id for h in engine.history()}
+    before = next(r for r in engine.board() if r.ipo_id == awaiting.ipo_id)
+    assert before.listing_date is None
+
+    # NSE now reports it listed, with a listing-day price. Clock is after every historical date.
+    past = NsePastIssue(
+        symbol=awaiting.ipo_id.upper(),
+        company=awaiting.name,
+        segment=str(awaiting.segment),
+        price_band_low=awaiting.price_band_low,
+        price_band_high=awaiting.price_band_high,
+        open_date=awaiting.open_date,
+        close_date=awaiting.close_date,
+        listing_date=listing_day,
+    )
+    client = cast(NseClient, _ListingStub(past, (listing_open, listing_close)))
+    resolved = resolve_listings(repo, client, clock=lambda: datetime(2027, 1, 1, 12, 0))
+    assert resolved == 1
+
+    # AFTER (a): the record is stamped with listing_date + the listing price.
+    r = repo.get(awaiting.ipo_id)
+    assert r is not None
+    assert r.listing_date == listing_day
+    assert (r.listing_open, r.listing_close) == (listing_open, listing_close)
+
+    # AFTER (b): it LEAVES the awaiting surface — the board row now carries listing_date, so
+    # statusLabel flips it to Listed (out of Live, out of History's board-derived awaiting set).
+    after = next(r for r in engine.board() if r.ipo_id == awaiting.ipo_id)
+    assert after.listing_date == listing_day
+
+    # AFTER (c): it appears in History with the correct actual net return + HIT/MISS call.
+    hrow = next(h for h in engine.history() if h.ipo_id == awaiting.ipo_id)
+    expected_net = net_listing_return(
+        issue_price,
+        listing_open,
+        config.sell_costs,
+        nominal_application_value=config.calibration.nominal_application_value,
+    )
+    assert hrow.net_return == pytest.approx(expected_net)
+    assert hrow.listed_positive is (expected_net > 0)
