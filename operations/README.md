@@ -163,6 +163,30 @@ The app now tells the honest truth about how current its data is, and lets you f
 None of this touches the model: `/status`, the freshness store, and the refresh trigger are all
 outside the scoring path (verdicts/probabilities are byte-identical — proven per branch).
 
+### The Allotment tab's registrar cache (v3 V3-6)
+
+The Allotment tab shows each recently-closed IPO's **registrar** and deep-links out to the
+registrar's own allotment-check site (the app never handles a PAN). That registrar data is **not**
+fetched by the app — it's an occasional, token-free cache you refresh:
+
+```
+# needs your Upstox Analytics Token in the environment (or research/.env): UPSTOX_TOKEN=...
+python scripts/refresh_allotment.py --data-dir <the app's data dir>
+#   dev: --data-dir data_store   ·   installed app: the per-user engine-data dir the shell passes
+```
+
+- Registrar assignment is **fixed when the RHP is filed and never changes**, so this is occasional
+  reference data — run it when new IPOs appear (like `run_backfill`), not on a cadence.
+- It writes `<data_dir>/allotment/registrar_info.json` (token-free, safe to share/commit/sync).
+- **Degrades honestly:** if the cache is missing the tab says "not loaded" and still lists the
+  in-scope IPOs (registrar "not yet available"); it never shows a stale registrar as current.
+- **Severable & non-model:** the app only reads this cache; if Upstox is down you simply can't
+  refresh — verdicts, probabilities, and live signals are entirely unaffected. Registrar data is in
+  a store separate from the model and can never become a scoring input (import-graph proven).
+- The script is **VM-runnable as-is** (pure Python + `requests`, no desktop assumptions): when the
+  Part-II VM data layer lands it adopts this script unchanged as the VM-primary refresher, with
+  local execution as the fallback — the same VM-primary/local-fallback discipline as every feed.
+
 ## Appendix — kept operator scripts (what writes what)
 
 | Script | Purpose | Writes |
@@ -176,6 +200,7 @@ outside the scoring path (verdicts/probabilities are byte-identical — proven p
 | `scripts/run_accuracy_monitor.py` | Drift monitor: recent window vs OOS baseline | nothing (prints; exit 1 on alert) |
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat | nothing (prints; exit 1 if missing) |
+| `scripts/refresh_allotment.py` | v3 V3-6 — refresh the Allotment tab's registrar cache from Upstox (display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/allotment/registrar_info.json` (token-free) |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in
