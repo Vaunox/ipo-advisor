@@ -25,4 +25,7 @@ contextBridge.exposeInMainWorld('ipoDesktop', {
   getPrefs: (): Promise<UiPrefs | null> => ipcRenderer.invoke('prefs:get'),
   setPrefs: (ui: UiPrefs): Promise<void> => ipcRenderer.invoke('prefs:set', ui),
   restartEngine: (): Promise<boolean> => ipcRenderer.invoke('engine:restart'),
+  // Ask the engine for a real NSE pull (v3 BUG 1 / Defect 1). The renderer stays read-only: this is
+  // a request routed through the trusted shell, not a mutating call to the engine's GET-only API.
+  refresh: (): Promise<boolean> => ipcRenderer.invoke('engine:refresh'),
 })

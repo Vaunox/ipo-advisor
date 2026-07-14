@@ -45,7 +45,10 @@ export function findRepoRoot(start: string): string {
 }
 
 /** Spawn the engine on `port`. Dev runs the module from source with the venv python; prod runs the
- *  bundled PyInstaller binary. stdout/stderr are piped so the shell can log/observe the engine. */
+ *  bundled PyInstaller binary. stdout/stderr are piped so the shell can log/observe the engine;
+ *  stdin is piped so the shell can ask the engine to run a real NSE pull on window open/focus (v3
+ *  BUG 1 / Defect 1). stdin is a parent-only channel — the renderer cannot reach it, so the HTTP API
+ *  stays GET-only and the UI stays incapable of making the engine act (Inviolable Rule 6). */
 export function spawnEngine(port: number, opts: SpawnOpts): ChildProcess {
   const dataDirArgs = opts.dataDir ? ['--data-dir', opts.dataDir] : []
   if (opts.dev) {
@@ -56,13 +59,26 @@ export function spawnEngine(port: number, opts: SpawnOpts): ChildProcess {
     return spawn(py, ['-m', 'ipo.service.runner', '--port', String(port), ...dataDirArgs], {
       cwd: opts.repoRoot,
       env: { ...process.env, PYTHONPATH: path.join(opts.repoRoot, 'src'), PYTHONUNBUFFERED: '1' },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
   }
   if (!opts.enginePath) throw new Error('enginePath is required in production')
   return spawn(opts.enginePath, ['--port', String(port), ...dataDirArgs], {
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
   })
+}
+
+/** Ask the engine to run a real NSE pull now, by writing the refresh command to its stdin. The
+ *  engine debounces (coalesces a focus burst into one polite pull), so the shell can fire freely on
+ *  window open/focus. Best-effort: a closed/absent pipe is a no-op (the scheduler still refreshes on
+ *  its cadence). Returns whether the command was written. */
+export function triggerEngineRefresh(child: ChildProcess | null): boolean {
+  if (!child || !child.stdin || child.stdin.destroyed) return false
+  try {
+    return child.stdin.write('refresh\n')
+  } catch {
+    return false
+  }
 }
 
 /** Poll GET {base}/health until it returns 200, or the timeout elapses. */

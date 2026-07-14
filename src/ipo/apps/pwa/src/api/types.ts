@@ -118,3 +118,14 @@ export interface CalibrationView {
   auc: number | null
   bins: ReliabilityBin[]
 }
+
+// Live-ingest freshness (v3 BUG 1 / Defect 2). `last_successful_ingest` is the ONLY value the UI
+// may show as "Updated" — the last confirmed-good NSE pull, never a local API-read timestamp.
+// `last_attempt_ok === false` means the store is still served but the feed is failing (stale +
+// retrying). `live_ingest === false` = no live feed wired (timestamps null by construction).
+export interface StatusView {
+  live_ingest: boolean
+  last_successful_ingest: string | null
+  last_attempt: string | null
+  last_attempt_ok: boolean | null
+}

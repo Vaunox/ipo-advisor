@@ -31,6 +31,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from ipo.core.types import Verdict
+from ipo.data.ingest.state import IngestStateStore
 from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
 from ipo.service.views import (
@@ -38,16 +39,26 @@ from ipo.service.views import (
     HistoryRow,
     IPODetail,
     IPOListRow,
+    StatusView,
     VerdictTransitionView,
 )
 
 
-def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = None) -> FastAPI:
+def create_app(
+    engine: VerdictEngine,
+    *,
+    calibration_report_path: Path | None = None,
+    ingest_state: IngestStateStore | None = None,
+) -> FastAPI:
     """Build the read-only advisory API over a composed ``VerdictEngine``.
 
     ``calibration_report_path`` points at the persisted held-out reliability report
     (``models/reliability.json``); when absent, ``/calibration`` serves gate/version with empty
     bins (it never fabricates a calibration curve).
+
+    ``ingest_state`` (v3 BUG 1 / Defect 2) is the live-ingest freshness store ``/status`` serves;
+    when absent (no live feed wired) ``/status`` reports ``live_ingest=false`` with null
+    timestamps — it never invents a freshness it cannot prove.
     """
     app = FastAPI(title="IPO Listing-Gains Advisor", version="0.1.0")
 
@@ -65,6 +76,31 @@ def create_app(engine: VerdictEngine, *, calibration_report_path: Path | None = 
     def health() -> dict[str, str]:
         """Liveness probe."""
         return {"status": "ok"}
+
+    @app.get("/status", response_model=StatusView)
+    def status() -> StatusView:
+        """Live-ingest freshness — the honest "how fresh is this?" the UI binds its clock to.
+
+        ``last_successful_ingest`` reflects the last *confirmed-good* NSE pull and nothing else (v3
+        BUG 1 / Defect 2). It advances only on a real fetch — never on this read, never on app open.
+        A failing feed leaves it stale while ``last_attempt_ok`` goes false, so the UI can say "last
+        successful pull Xh ago — retrying" instead of implying freshness. This is a read of recorded
+        state, not a trigger — reading ``/status`` never causes an ingest.
+        """
+        if ingest_state is None:
+            return StatusView(
+                live_ingest=False,
+                last_successful_ingest=None,
+                last_attempt=None,
+                last_attempt_ok=None,
+            )
+        s = ingest_state.current()
+        return StatusView(
+            live_ingest=True,
+            last_successful_ingest=s.last_success,
+            last_attempt=s.last_attempt,
+            last_attempt_ok=s.last_attempt_ok,
+        )
 
     @app.get("/ipos", response_model=list[Verdict])
     def ipos() -> list[Verdict]:

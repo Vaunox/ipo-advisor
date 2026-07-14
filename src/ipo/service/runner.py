@@ -28,6 +28,7 @@ from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, load_config
 from ipo.core.interfaces import Calibrator, Notifier, Repository
 from ipo.core.logging import get_logger
+from ipo.data.ingest.state import IngestStateStore
 from ipo.data.store.repository import ParquetRepository
 from ipo.model.scorer import WeightedScorer
 from ipo.service.api import create_app
@@ -42,6 +43,19 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 # keeping stale records forever (provisioning otherwise never overwrites). v2 dropped the fabricated
 # demo companies; a mismatch clears the store so the clean seed + live ingest rebuild it.
 _SEED_VERSION = "2"
+
+# v3 BUG 1 / Defect 1 — the shell asks for a real NSE pull on window open/focus (and via the manual
+# Refresh button) by writing this command to the engine's stdin. This is a parent-only channel: the
+# desktop shell spawned the process, so only it can write the pipe — the read-only HTTP API stays
+# GET-only and the renderer stays incapable of making the engine act (Inviolable Rule 6 preserved
+# structurally, not by policy).
+_STDIN_REFRESH_COMMAND = "refresh"
+
+# Coalesce a focus burst (Electron fires several show/focus/restore events on one reopen) into at
+# most one polite pull: a stdin-triggered refresh is skipped if any ingest was ATTEMPTED within this
+# window. Measured against ``last_attempt`` (not ``last_success``) so a burst is coalesced and a
+# down-NSE isn't hammered, while a genuine reopen minutes later still triggers a fresh pull.
+_STDIN_REFRESH_DEBOUNCE_SEC = 15.0
 
 
 def _resource_root() -> Path:
@@ -120,12 +134,17 @@ def build_service(
     transition_store: TransitionStore | None = None,
     push_transport: Callable[[str], None] | None = None,
     refresh: Callable[[], None] | None = None,
+    ingest_state: IngestStateStore | None = None,
     clock: Callable[[], datetime] = now_ist,
 ) -> Service:
     """Wire the layers into a running service (composition only — no new logic).
 
     ``transition_store`` is the durable verdict-change log (injected so tests can isolate it); it
     defaults to ``verdict_transitions.json`` under the configured data dir.
+
+    ``ingest_state`` (v3 BUG 1 / Defect 2) is the live-ingest freshness store the ``/status``
+    endpoint serves; the ``refresh`` closure records into the same instance so the served timestamp
+    only ever reflects a real, successful NSE pull.
     """
     scorer = WeightedScorer(config.feature_weights, config.features)
     regime = NiftyRegime(nifty_path)
@@ -163,18 +182,26 @@ def build_service(
         engine=engine,
         scheduler=scheduler,
         notifier=notifier,
-        api=create_app(engine, calibration_report_path=calibration_report_path),
+        api=create_app(
+            engine,
+            calibration_report_path=calibration_report_path,
+            ingest_state=ingest_state,
+        ),
     )
 
 
 def _live_refresh(
-    config: AppConfig, repository: Repository, data_dir: Path
+    config: AppConfig,
+    repository: Repository,
+    data_dir: Path,
+    ingest_state: IngestStateStore | None = None,
 ) -> Callable[[], None] | None:
     """Build the scheduler's live-ingest refresh (NSE current issues → store), or None if disabled.
 
     Constructs the polite NSE client (cookie-handshake, rate-limited; robots off — NSE disallows
     ``/api``, operator-authorized public data) and returns a callback the scheduler runs each cycle.
-    ``refresh_from_nse`` never raises, so a live-data hiccup degrades to the last store.
+    ``refresh_from_nse`` never raises, so a live-data hiccup degrades to the last store — and, when
+    ``ingest_state`` is supplied, records that hiccup so the freshness timestamp stays honest.
     """
     if not config.scrape.live_ingest:
         return None
@@ -193,7 +220,7 @@ def _live_refresh(
     nse = NseClient(client, RawCache(root=data_dir / "raw_cache"))
 
     def refresh() -> None:
-        refresh_from_nse(repository, nse)
+        refresh_from_nse(repository, nse, state=ingest_state)
 
     return refresh
 
@@ -230,6 +257,9 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     data_dir = Path(args.data_dir) if args.data_dir else Path(config.storage.data_dir)
     _provision_data_dir(data_dir, res, manage=frozen)
     repository = ParquetRepository(data_dir)
+    log = get_logger("ipo.service.runner")
+    # One shared freshness store: the refresh path writes it, /status reads it (v3 BUG 1/Defect 2).
+    ingest_state = IngestStateStore(data_dir / "ingest_state.json")
     service = build_service(
         config,
         repository=repository,
@@ -238,20 +268,48 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         vix_path=res / "data" / "backfill" / "vix.csv",
         calibration_report_path=res / "models" / "reliability.json",
         transition_store=TransitionStore(data_dir / "verdict_transitions.json"),
-        refresh=_live_refresh(config, repository, data_dir),
+        refresh=_live_refresh(config, repository, data_dir, ingest_state),
+        ingest_state=ingest_state,
         # A logging transport so a 'push' notify channel never crashes for lack of one (the
         # user-facing alerts are the renderer's native toasts; this just journals crossings).
-        push_transport=lambda message: get_logger("ipo.service.runner").info(
-            "notify_crossing", extra={"message": message}
-        ),
+        push_transport=lambda message: log.info("notify_crossing", extra={"message": message}),
     )
+
+    # The scheduler loop and the shell-triggered on-open refresh both run a cycle; a shared lock
+    # serializes them so two cycles never overlap on the store (v3 BUG 1 / Defect 1).
+    cycle_lock = threading.Lock()
 
     def loop() -> None:
         while True:
-            service.run_cycle()
+            with cycle_lock:
+                service.run_cycle()
             time.sleep(service.scheduler.next_cadence_minutes() * 60)
 
+    def stdin_refresh_loop() -> None:
+        """Run a real refresh cycle when the desktop shell writes 'refresh' to our stdin.
+
+        Debounced against the last ingest *attempt* so a focus burst coalesces into one polite pull
+        and a failing NSE isn't hammered. On EOF (the shell exited / closed the pipe) the loop ends.
+        Guarded by ``cycle_lock`` so it never races the scheduler loop.
+        """
+        stream = sys.stdin
+        if stream is None:  # no stdin (e.g. detached) → on-open refresh simply unavailable
+            return
+        for line in stream:
+            if line.strip() != _STDIN_REFRESH_COMMAND:
+                continue
+            last = ingest_state.current().last_attempt
+            if last is not None:
+                age = (now_ist() - last).total_seconds()
+                if age < _STDIN_REFRESH_DEBOUNCE_SEC:
+                    log.info("stdin_refresh_debounced", extra={"age_sec": round(age, 1)})
+                    continue
+            log.info("stdin_refresh_triggered")
+            with cycle_lock:
+                service.run_cycle()
+
     threading.Thread(target=loop, daemon=True).start()
+    threading.Thread(target=stdin_refresh_loop, daemon=True).start()
     uvicorn.run(service.api, host=args.host, port=args.port)
 
 

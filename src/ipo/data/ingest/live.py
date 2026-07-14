@@ -24,6 +24,7 @@ from ipo.core.constants import SEGMENT_MAINBOARD
 from ipo.core.interfaces import Repository
 from ipo.core.logging import get_logger
 from ipo.core.types import IPORecord, Segment
+from ipo.data.ingest.state import IngestStateStore
 from ipo.data.sources.base import SourceError
 from ipo.data.sources.nse import NseClient, NseCurrentIssue, NseSubscription
 
@@ -156,21 +157,41 @@ def resolve_listings(
 
 
 def refresh_from_nse(
-    repo: Repository, client: NseClient, *, clock: Callable[[], datetime] = now_ist
+    repo: Repository,
+    client: NseClient,
+    *,
+    clock: Callable[[], datetime] = now_ist,
+    state: IngestStateStore | None = None,
 ) -> int:
     """Pull live current mainboard IPOs, resolve any that have listed, and upsert. Never raises.
 
     A whole-fetch failure (NSE unreachable, cookie/handshake, source drift) is logged and yields 0 —
     the app keeps serving the last known store rather than going dark. Listing resolution moves
     just-listed issues out of Live and into History.
+
+    ``state`` (v3 BUG 1 / Defect 2), when supplied, records the freshness truth: every attempt sets
+    ``last_attempt``, but ``last_success`` advances **only** when the NSE current-issues pull
+    genuinely succeeds. Reaching NSE — not the record count — is what "fresh" means (a successful
+    pull that finds no active IPOs is still a successful pull). Degrade-don't-crash is preserved;
+    the failure is now *recorded* (visible) instead of silently swallowed.
     """
+    attempt = clock()
+    ok = True
+    error: str | None = None
     try:
         records = build_live_records(client, clock=clock)
     except SourceError as exc:
         _log.warning("live_refresh_failed", extra={"error": str(exc)})
         records = []
+        ok = False
+        error = str(exc)
     if records:
         repo.upsert_many(records)
     resolve_listings(repo, client, clock=clock)  # complete the lifecycle; never raises
-    _log.info("live_refresh_done", extra={"records": len(records)})
+    if state is not None:
+        if ok:
+            state.record_success(attempt)
+        else:
+            state.record_failure(attempt, error or "unknown ingest failure")
+    _log.info("live_refresh_done", extra={"records": len(records), "ok": ok})
     return len(records)

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useBoard, useCalibration, useHealth } from '../api/hooks'
+import { useCalibration, useHealth, useStatus } from '../api/hooks'
 import { recalibrationCount } from '../recalib'
 import { toast } from '../toast'
 import {
@@ -42,18 +42,21 @@ function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 export function Settings() {
   const qc = useQueryClient()
   const health = useHealth()
-  const board = useBoard()
+  const status = useStatus()
   const cal = useCalibration()
-  const lastRefresh =
-    board.dataUpdatedAt > 0
-      ? new Date(board.dataUpdatedAt).toLocaleTimeString('en-US', {
-          timeZone: 'Asia/Kolkata',
-          hour12: true,
-          hour: 'numeric',
-          minute: '2-digit',
-          second: '2-digit',
-        })
-      : null
+  // The honest freshness clock: the last *successful* NSE pull, not a local API-read timestamp
+  // (v3 BUG 1 / Defect 2). `feedFailing` = store still served but the latest pull failed.
+  const st = status.data
+  const lastRefresh = st?.last_successful_ingest
+    ? new Date(st.last_successful_ingest).toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour12: true,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : null
+  const feedFailing = !!st && st.live_ingest && st.last_attempt_ok === false
   const [theme, setTheme] = useState<ThemeMode>(getThemeMode())
   const [density, setDens] = useState<Density>(getDensity())
   const [notif, setNotifState] = useState<NotifPrefs>(getNotifications())
@@ -98,6 +101,20 @@ export function Settings() {
       toast('Restarting engine…')
     } else {
       toast('Engine restart is available in the desktop app')
+    }
+  }
+  // v3 BUG 1 / Defect 1 + V3-13: ask the engine for a REAL NSE pull via the shell (not a client
+  // re-read of a possibly-stale store). The freshness chip advances only once the pull lands.
+  const refreshNow = () => {
+    const api = (window as unknown as { ipoDesktop?: { refresh?: () => Promise<boolean> } }).ipoDesktop
+    if (api?.refresh) {
+      void api.refresh()
+      toast('Fetching fresh data from NSE…')
+    } else {
+      // Browser/dev without the shell: no privileged pull path — re-read what the engine has and
+      // say so honestly rather than implying a live fetch happened.
+      void qc.invalidateQueries()
+      toast('Re-reading latest from the engine (live pull needs the desktop app)')
     }
   }
 
@@ -212,10 +229,17 @@ export function Settings() {
         </div>
         <div className="set-row">
           <div className="k">
-            Last refresh<small>verdicts last pulled from the engine</small>
+            Last refresh<small>last successful NSE pull</small>
           </div>
-          <div className="mono" style={{ fontSize: 12, color: 'var(--tx2)' }}>
-            {lastRefresh ? `${lastRefresh} IST` : '—'}
+          <div
+            className="mono"
+            style={{ fontSize: 12, color: feedFailing ? 'var(--marginal)' : 'var(--tx2)' }}
+          >
+            {lastRefresh
+              ? `${lastRefresh} IST${feedFailing ? ' · retrying' : ''}`
+              : st?.live_ingest === false
+                ? 'live feed off'
+                : '—'}
           </div>
         </div>
         <div className="set-row">
@@ -251,13 +275,7 @@ export function Settings() {
         <div className="set-row">
           <div className="k">Actions</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="btn"
-              onClick={() => {
-                void qc.invalidateQueries()
-                toast('Refreshing verdicts…')
-              }}
-            >
+            <button className="btn" onClick={refreshNow}>
               Refresh now
             </button>
             <button className="btn danger" onClick={restartEngine}>

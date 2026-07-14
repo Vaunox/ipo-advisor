@@ -207,6 +207,43 @@ def test_calibration_degrades_without_report() -> None:
     assert body["gate_passed"] is True and body["version"]
 
 
+def test_status_without_ingest_state_asserts_no_freshness() -> None:
+    """No live feed wired → /status is honestly blank, never a fabricated timestamp (Defect 2)."""
+    client, _ = _client(load_calibrator(_CAL))  # no ingest_state passed
+    body = client.get("/status").json()
+    assert body["live_ingest"] is False
+    assert body["last_successful_ingest"] is None
+    assert body["last_attempt"] is None
+    assert body["last_attempt_ok"] is None
+
+
+def test_status_reports_last_successful_ingest(tmp_path: Path) -> None:
+    """/status surfaces the recorded last-successful-pull time — the one honest freshness clock."""
+    from datetime import datetime
+
+    from ipo.data.ingest.state import IngestStateStore
+
+    store = IngestStateStore(tmp_path / "ingest_state.json")
+    store.record_success(datetime(2026, 7, 14, 9, 0))
+    store.record_failure(datetime(2026, 7, 14, 12, 0), "nse unreachable")  # newer attempt failed
+
+    config = load_config(env="dev", environ={})
+    records = load_records_from_csv(_CSV)
+    engine = VerdictEngine(
+        repository=_ListRepo(records),
+        calibrator=load_calibrator(_CAL),
+        scorer=WeightedScorer(config.feature_weights, config.features),
+        config=config,
+        regime=NiftyRegime(_NIFTY),
+    )
+    client = TestClient(create_app(engine, ingest_state=store))
+    body = client.get("/status").json()
+    assert body["live_ingest"] is True
+    assert body["last_successful_ingest"].startswith("2026-07-14T09:00:00")  # stays at the success
+    assert body["last_attempt"].startswith("2026-07-14T12:00:00")  # newer failed attempt shown
+    assert body["last_attempt_ok"] is False  # → UI shows stale + retrying, not "fresh"
+
+
 def test_gate_survives_serialization() -> None:
     records = load_records_from_csv(_CSV)
     rec = next(r for r in records if r.qib_sub is not None and r.listing_open is not None)

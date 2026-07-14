@@ -8,6 +8,7 @@ import type {
   HistoryRow,
   IPODetail,
   IPOListRow,
+  StatusView,
   Verdict,
   VerdictTransition,
 } from './types'
@@ -16,6 +17,16 @@ export const useHealth = () =>
   useQuery({
     queryKey: ['health'],
     queryFn: () => apiGet<{ status: string }>('/health'),
+    refetchInterval: 5000,
+    retry: false,
+  })
+
+// Live-ingest freshness (v3 BUG 1 / Defect 2). Polled on the health cadence so the "Updated …" chip
+// tracks the last *successful* NSE pull closely (it advances only when a real fetch lands).
+export const useStatus = () =>
+  useQuery({
+    queryKey: ['status'],
+    queryFn: () => apiGet<StatusView>('/status'),
     refetchInterval: 5000,
     retry: false,
   })

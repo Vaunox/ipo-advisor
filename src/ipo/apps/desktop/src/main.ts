@@ -1,7 +1,14 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray } from 'electron'
 import { type ChildProcess } from 'node:child_process'
 import path from 'node:path'
-import { findRepoRoot, freePort, killEngine, spawnEngine, waitForHealth } from './sidecar'
+import {
+  findRepoRoot,
+  freePort,
+  killEngine,
+  spawnEngine,
+  triggerEngineRefresh,
+  waitForHealth,
+} from './sidecar'
 import {
   type AppSettings,
   type StartupPrefs,
@@ -164,6 +171,12 @@ async function boot(): Promise<void> {
   win.on('resized', persistBounds)
   win.on('moved', persistBounds)
 
+  // v3 BUG 1 / Defect 1: opening or returning to the window asks the engine for a REAL NSE pull, so
+  // the verdicts you see on open are current — not a stale snapshot under a fresh-looking timestamp.
+  // We fire freely on focus/restore; the engine debounces (coalesces a burst into one polite pull).
+  win.on('focus', () => triggerEngineRefresh(child))
+  win.on('restore', () => triggerEngineRefresh(child))
+
   createTray()
 
   // Show the splash (the readiness gate, made visible) while we wait — the dashboard is NOT loaded.
@@ -218,6 +231,11 @@ ipcMain.handle('prefs:set', (_e, ui: UiPrefs): void => {
 })
 
 ipcMain.handle('engine:restart', (): Promise<boolean> => restartEngine())
+
+// v3 BUG 1 / Defect 1 + V3-13: the header/Settings Refresh button asks the engine for a REAL NSE
+// pull (via the parent-only stdin channel), not just a client re-read of a possibly-stale store.
+// Returns whether the request was delivered; the engine debounces and does the polite fetch.
+ipcMain.handle('engine:refresh', (): boolean => triggerEngineRefresh(child))
 
 app.whenReady().then(boot).catch((e) => console.error('[boot] failed', e))
 

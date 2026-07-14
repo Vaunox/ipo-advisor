@@ -353,11 +353,14 @@ body.compact .meter { margin-top:6px; }
 .sync { width:7px; height:7px; border-radius:50%; background:var(--tx3); flex:none; opacity:.6; }
 .sync.on { background:var(--apply); opacity:1; animation:syncpulse 1s ease-in-out infinite; }
 .sync.err { background:var(--skip); opacity:1; animation:syncpulse 1s ease-in-out infinite; }
+.sync.warn { background:var(--marginal); opacity:1; animation:syncpulse 1s ease-in-out infinite; }
 @keyframes syncpulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
 .syncstat { display:flex; align-items:center; gap:7px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; }
 .syncstat-t { font-family:'Fira Code'; font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .syncstat.err { border-color:color-mix(in srgb, var(--skip) 45%, transparent); }
 .syncstat.err .syncstat-t { color:var(--skip); }
+.syncstat.warn { border-color:color-mix(in srgb, var(--marginal) 45%, transparent); }
+.syncstat.warn .syncstat-t { color:var(--marginal); }
 
 @media (prefers-reduced-motion:reduce) {
   * { animation:none !important; transition:none !important; }

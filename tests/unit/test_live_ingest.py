@@ -194,6 +194,57 @@ def test_refresh_never_raises_on_source_error() -> None:
     assert repo.records == []
 
 
+# --- freshness state recording (v3 BUG 1 / Defect 2) --------------------------------------------
+
+_INGEST_CLOCK = lambda: datetime(2026, 7, 14, 9, 0)  # noqa: E731
+
+
+def test_refresh_records_success_freshness(tmp_path: object) -> None:
+    from pathlib import Path
+
+    from ipo.data.ingest.state import IngestStateStore
+
+    subs = {"KNACK": NseSubscription(qib=3.48, nii=19.22, retail=4.23, total=7.21)}
+    repo = _Repo()
+    store = IngestStateStore(cast(Path, tmp_path) / "ingest_state.json")
+    refresh_from_nse(
+        cast(Repository, repo), _client([_KNACK], subs), clock=_INGEST_CLOCK, state=store
+    )
+    s = store.current()
+    assert s.last_success == datetime(2026, 7, 14, 9, 0)  # a real pull advanced the honest clock
+    assert s.last_attempt_ok is True
+
+
+def test_refresh_failure_does_not_advance_success(tmp_path: object) -> None:
+    from pathlib import Path
+
+    from ipo.data.ingest.state import IngestStateStore
+
+    store = IngestStateStore(cast(Path, tmp_path) / "ingest_state.json")
+    store.record_success(datetime(2026, 7, 14, 6, 0))  # an earlier good pull
+    repo = _Repo()
+    # NSE unreachable this cycle → refresh degrades to 0 AND records the failure without lying
+    n = refresh_from_nse(cast(Repository, repo), _client(None), clock=_INGEST_CLOCK, state=store)
+    assert n == 0
+    s = store.current()
+    assert s.last_success == datetime(2026, 7, 14, 6, 0)  # unchanged — still honestly stale
+    assert s.last_attempt == datetime(2026, 7, 14, 9, 0)  # the failed attempt is visible
+    assert s.last_attempt_ok is False
+
+
+def test_refresh_success_with_zero_records_is_still_fresh(tmp_path: object) -> None:
+    """Reaching NSE and finding no active IPOs is a SUCCESSFUL pull — freshness advances."""
+    from pathlib import Path
+
+    from ipo.data.ingest.state import IngestStateStore
+
+    store = IngestStateStore(cast(Path, tmp_path) / "ingest_state.json")
+    repo = _Repo()
+    n = refresh_from_nse(cast(Repository, repo), _client([]), clock=_INGEST_CLOCK, state=store)
+    assert n == 0  # no records upserted…
+    assert store.current().last_success == datetime(2026, 7, 14, 9, 0)  # …but NSE was reached
+
+
 # --- listing resolution (Live → History lifecycle) ---------------------------------------------
 
 _CLOCK = lambda: datetime(2026, 7, 10, 12, 0)  # noqa: E731 — 2026-07-10, a week after KNACK closed

@@ -131,3 +131,20 @@ class CalibrationView(BaseModel):
     brier: float | None
     auc: float | None
     bins: list[ReliabilityBinView]
+
+
+class StatusView(BaseModel):
+    """Live-ingest freshness (v3 BUG 1 / Defect 2) — the honest "how fresh is this?" for the UI.
+
+    ``last_successful_ingest`` is the only value the UI may present as "Updated" — the timestamp of
+    the last *confirmed-good* NSE pull, advancing solely on a real fetch (never on app open, render,
+    or a local API read). ``last_attempt`` / ``last_attempt_ok`` describe the most recent try, so
+    the UI can show a truthful "last successful pull Xh ago — retrying" when NSE is failing while
+    the store is still served. ``live_ingest`` is False when the build has no live feed wired (the
+    timestamps are then ``None`` by construction, not a swallowed failure).
+    """
+
+    live_ingest: bool
+    last_successful_ingest: datetime | None
+    last_attempt: datetime | None
+    last_attempt_ok: bool | None
