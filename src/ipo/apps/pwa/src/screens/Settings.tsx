@@ -13,12 +13,12 @@ import {
   getDensity,
   getNotifications,
   getStartup,
-  getThemeMode,
   setCosts,
   setDensity,
   setNotifications,
   setStartup,
   setThemeMode,
+  useThemeMode,
 } from '../state/prefs'
 
 function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
@@ -57,7 +57,7 @@ export function Settings() {
       })
     : null
   const feedFailing = !!st && st.live_ingest && st.last_attempt_ok === false
-  const [theme, setTheme] = useState<ThemeMode>(getThemeMode())
+  const theme = useThemeMode() // reactive read from the shared store (v3 BUG 3) — no local cache
   const [density, setDens] = useState<Density>(getDensity())
   const [notif, setNotifState] = useState<NotifPrefs>(getNotifications())
   const [costs, setCostsState] = useState<Costs>(getCosts())
@@ -81,10 +81,7 @@ export function Settings() {
     else toast('Saved — applies when running the desktop app')
   }
 
-  const pickTheme = (m: ThemeMode) => {
-    setThemeMode(m)
-    setTheme(m)
-  }
+  const pickTheme = (m: ThemeMode) => setThemeMode(m) // store update re-renders via useThemeMode
   const pickDensity = (d: Density) => {
     setDensity(d)
     setDens(d)

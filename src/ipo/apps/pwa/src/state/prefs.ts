@@ -2,6 +2,7 @@
 // "system" follows prefers-color-scheme), density (a body class), pinned IPOs, last-seen verdicts
 // (for the CHANGED badge), and broker cost assumptions (net-of-cost display).
 
+import { useSyncExternalStore } from 'react'
 import type { VerdictType } from '../api/types'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
@@ -85,6 +86,24 @@ function load(): Prefs {
 
 let prefs = load()
 
+// A tiny subscribable store (v3 BUG 3). Consumers that must react to changes from *other* writers
+// (theme — see useThemeMode) subscribe here instead of caching the value in local state; every
+// persistence call (saveLocal, and save via it) fires notify(), so a change from any writer reaches
+// every subscriber. Snapshots are primitives compared by value, so an unrelated change (e.g. costs)
+// notifies theme subscribers but triggers no re-render.
+const listeners = new Set<() => void>()
+// Subscribe to any store change (returns an unsubscribe). Backs `useThemeMode`; exported so the
+// store's notify contract is directly testable and available to future reactive hooks.
+export function subscribe(cb: () => void): () => void {
+  listeners.add(cb)
+  return () => {
+    listeners.delete(cb)
+  }
+}
+function notify(): void {
+  for (const l of listeners) l()
+}
+
 // Durable store: in the packaged desktop shell the source of truth is the app's config file
 // (settings.json in the Electron user-data dir), reached over IPC via the preload bridge — because
 // localStorage under the file:// origin the shell loads is not reliably persisted across restarts.
@@ -123,6 +142,7 @@ function saveLocal() {
   } catch {
     /* ignore quota / disabled storage */
   }
+  notify() // wake reactive consumers (useThemeMode) — every setter routes through here
 }
 
 // Durable save: the localStorage mirror PLUS a write-through to the app config file (desktop). Only
@@ -185,6 +205,27 @@ export function setThemeMode(mode: ThemeMode): void {
   save()
   applyTheme(mode, true)
 }
+
+// Reactive theme read (v3 BUG 3). Theme has several co-mounted writers — the header ThemeToggle,
+// the Settings control, and the `t` shortcut — so consumers must NOT cache it in local state (that
+// desynced and swallowed the first click after an external change). Subscribing to the store makes
+// all consumers agree by construction, in any order. `getThemeMode` is a primitive snapshot, so
+// useSyncExternalStore re-renders only when the theme value actually changes.
+export function useThemeMode(): ThemeMode {
+  return useSyncExternalStore(subscribe, getThemeMode, getThemeMode)
+}
+
+// ── Single-writer local-cache caveat (v3 BUG 3) — READ THIS BEFORE ADDING A WRITER ──────────────
+// The values below (density, notifications, costs, startup, pinned) are each changed from exactly
+// ONE place — the Settings screen, or Live for `pinned` — which also owns the control that reads
+// them. So those components legitimately cache the value in local `useState`: with a single writer
+// there is nothing to desync from. THEME is the exception (multiple co-mounted writers), which is
+// why it is read reactively via `useThemeMode()` above and these are not.
+//   ⚠ If you EVER add a second writer for any value below, do NOT keep the local `useState` cache —
+//   read it through a `useThemeMode`-style `useSyncExternalStore` hook (the store already notify()s
+//   on every change). Leaving the cache in place will reproduce BUG 3 (a stale read → the classic
+//   swallowed-first-click / off-by-one toggle).
+// ────────────────────────────────────────────────────────────────────────────────────────────────
 
 /* ---- density ---- */
 export const getDensity = (): Density => prefs.density
