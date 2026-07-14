@@ -297,7 +297,8 @@ def test_context_endpoint_serves_rhp(tmp_path: Path) -> None:
     path.write_text(
         '{"refreshed_at": "2026-07-14T09:00:00+05:30", "ipos": {"'
         + rec.ipo_id.upper()
-        + '": {"rhp_url": "https://www.sebi.gov.in/filings/x-rhp", "lot_size": 70}}}',
+        + '": {"rhp_url": "https://www.sebi.gov.in/filings/x-rhp", "lot_size": 70, '
+        '"isin": "INE0ABC01019", "industry": "Cable"}}}',
         encoding="utf-8",
     )
     client = TestClient(create_app(_engine_with_records(), context_store=ContextStore(path)))
@@ -305,6 +306,9 @@ def test_context_endpoint_serves_rhp(tmp_path: Path) -> None:
     assert body["rhp_url"] == "https://www.sebi.gov.in/filings/x-rhp"
     assert body["rhp_state"] == "present"
     assert body["lot_size"] == 70 and body["lot_state"] == "present"  # v3 V3-8
+    assert body["isin"] == "INE0ABC01019" and body["isin_state"] == "present"  # v3 V3-11
+    assert body["industry"] == "Cable" and body["industry_state"] == "present"  # v3 V3-11
+    assert {"isin", "isin_state", "industry", "industry_state"} <= set(body)
     assert {"rhp_url", "rhp_state", "lot_size", "lot_state", "registrar", "available"} <= set(body)
     assert client.get("/context/NONEXISTENT-9999").status_code == 404
 

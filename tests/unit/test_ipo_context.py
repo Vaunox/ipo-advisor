@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from datetime import date, datetime
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def _rec(ipo_id: str, *, close: date, listing: date | None = None) -> IPORecord:
     )
 
 
-def _store(tmp_path: Path, refreshed_at: str, ipos: dict) -> ContextStore:
+def _store(tmp_path: Path, refreshed_at: str, ipos: Mapping[str, object]) -> ContextStore:
     """Write a context cache ({SYMBOL: {registrar?, rhp_url?}}) and open a store over it."""
     path = tmp_path / "context" / "ipo_context.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -45,7 +46,7 @@ def _store(tmp_path: Path, refreshed_at: str, ipos: dict) -> ContextStore:
     return ContextStore(path)
 
 
-def _store_reg(tmp_path: Path, registrars: dict) -> ContextStore:
+def _store_reg(tmp_path: Path, registrars: Mapping[str, object]) -> ContextStore:
     """Convenience: a current cache carrying only registrars ({SYMBOL: registrar_fields})."""
     ipos = {k: {"registrar": v} for k, v in registrars.items()}
     return _store(tmp_path, "2026-07-14T09:00:00+05:30", ipos)
@@ -113,8 +114,9 @@ def test_join_attaches_registrar_or_none(tmp_path: Path) -> None:
     )
     records = [_rec("hasreg", close=date(2026, 7, 11)), _rec("noreg", close=date(2026, 7, 11))]
     by_id = {r.ipo_id: r for r in build_allotment_view(records, store, clock=_CLOCK).rows}
-    assert by_id["hasreg"].registrar is not None
-    assert by_id["hasreg"].registrar.website == "https://www.kfintech.com/"  # type: ignore[union-attr]
+    reg = by_id["hasreg"].registrar
+    assert reg is not None
+    assert reg.website == "https://www.kfintech.com/"
     assert by_id["noreg"].registrar is None
 
 
@@ -198,6 +200,30 @@ def test_ipo_context_lot_size_present_and_stale(tmp_path: Path) -> None:
     # cache predates the IPO → stale, NOT "not published" (same single rule as registrar + RHP)
     stale = build_ipo_context(rec, _store(tmp_path, "2026-05-01T09:00:00+05:30", {}), clock=_CLOCK)
     assert stale.lot_state == "stale"
+
+
+def test_ipo_context_isin_and_industry_present_and_degrade(tmp_path: Path) -> None:
+    """V3-11 reference fields flow through the same store + the one shared staleness rule."""
+    rec = _rec("acme", close=date(2026, 7, 11))  # open_date 2026-06-01
+    present = build_ipo_context(
+        rec,
+        _store(
+            tmp_path,
+            "2026-07-14T09:00:00+05:30",
+            {"ACME": {"isin": "INE0ABC01019", "industry": "Cable"}},
+        ),
+        clock=_CLOCK,
+    )
+    assert present.isin == "INE0ABC01019" and present.isin_state == "present"
+    assert present.industry == "Cable" and present.industry_state == "present"
+    # current cache, no values → not-yet-published (honest, not a bare null)
+    cur = _store(tmp_path, "2026-07-14T09:00:00+05:30", {})
+    none_cur = build_ipo_context(rec, cur, clock=_CLOCK)
+    assert none_cur.isin is None and none_cur.isin_state == "unpublished"
+    assert none_cur.industry is None and none_cur.industry_state == "unpublished"
+    # cache predates the IPO → stale (same single rule as registrar / RHP / lot_size)
+    stale = build_ipo_context(rec, _store(tmp_path, "2026-05-01T09:00:00+05:30", {}), clock=_CLOCK)
+    assert stale.isin_state == "stale" and stale.industry_state == "stale"
 
 
 def test_ipo_context_carries_registrar_too(tmp_path: Path) -> None:
