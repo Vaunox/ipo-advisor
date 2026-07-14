@@ -138,6 +138,31 @@ CSV) is a genuine fault and exits non-zero.
 
 ---
 
+## 5. Data freshness & manual refresh (v3 BUG 1)
+
+The app now tells the honest truth about how current its data is, and lets you force a pull.
+
+- **The "Updated …" timestamp = the last *successful* NSE pull**, not the last time the UI talked to
+  the local engine. It advances **only** when a live NSE fetch actually lands — never on app open,
+  render, or a local read. It is served by the engine's **`GET /status`** endpoint and persisted in
+  the per-user data dir as **`ingest_state.json`** (`last_success` / `last_attempt` /
+  `last_attempt_ok`). This file self-heals — if it's missing or corrupt the engine starts "blank"
+  and the first successful pull repopulates it; it is safe to delete.
+- **Amber "Updated … · retrying"** (header chip and Settings → Last refresh) means the store is still
+  being served but the **most recent NSE pull failed** — the data is genuinely stale and the engine
+  is retrying. This is the intended honest signal, not a crash. If it persists for hours, NSE is
+  unreachable from this machine (check connectivity / whether NSE has started blocking the IP).
+- **Opening or returning to the window triggers a real NSE pull.** The desktop shell asks the engine
+  to fetch via a parent-only stdin channel (the renderer stays read-only and the HTTP API stays
+  GET-only — no order/mutation path is introduced). The engine **debounces** (≈15 s), so a burst of
+  focus events coalesces into one polite pull.
+- **"Refresh now"** (Settings) and the **header Refresh** control do a **real** pull, not a re-read of
+  the possibly-stale store. In a browser/dev context with no desktop shell, Refresh honestly falls
+  back to re-reading the engine and says so (a live pull needs the packaged app).
+
+None of this touches the model: `/status`, the freshness store, and the refresh trigger are all
+outside the scoring path (verdicts/probabilities are byte-identical — proven per branch).
+
 ## Appendix — kept operator scripts (what writes what)
 
 | Script | Purpose | Writes |

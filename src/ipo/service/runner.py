@@ -259,7 +259,11 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     repository = ParquetRepository(data_dir)
     log = get_logger("ipo.service.runner")
     # One shared freshness store: the refresh path writes it, /status reads it (v3 BUG 1/Defect 2).
-    ingest_state = IngestStateStore(data_dir / "ingest_state.json")
+    # Only wired when live ingestion is on — so /status honestly reports live_ingest=false (and the
+    # chip shows "Live", not a forever-"awaiting" timestamp) when there is no feed to be fresh from.
+    ingest_state = (
+        IngestStateStore(data_dir / "ingest_state.json") if config.scrape.live_ingest else None
+    )
     service = build_service(
         config,
         repository=repository,
@@ -298,7 +302,7 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         for line in stream:
             if line.strip() != _STDIN_REFRESH_COMMAND:
                 continue
-            last = ingest_state.current().last_attempt
+            last = ingest_state.current().last_attempt if ingest_state is not None else None
             if last is not None:
                 age = (now_ist() - last).total_seconds()
                 if age < _STDIN_REFRESH_DEBOUNCE_SEC:
