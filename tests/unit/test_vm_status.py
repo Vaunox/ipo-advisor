@@ -8,6 +8,7 @@ login, or the 27-day tier — but NOT on a healthy VM whose only note is a sub-2
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -22,8 +23,10 @@ _NOW = datetime(2026, 7, 15, 18, 0, tzinfo=IST)
 def _healthy(data: Path, *, login_days_ago: int = 2) -> None:
     """Lay down a fully-healthy data dir: fresh ingest, markers, context, and a recent login."""
     IngestStateStore(data / "ingest_state.json").record_success(_NOW - timedelta(minutes=10))
-    (data / "keepalive.marker").write_text("", encoding="utf-8")
-    (data / "bot.marker").write_text("", encoding="utf-8")
+    for marker in ("keepalive.marker", "bot.marker"):
+        path = data / marker
+        path.write_text("", encoding="utf-8")
+        os.utime(path, (_NOW.timestamp(), _NOW.timestamp()))  # pin mtime → deterministic freshness
     ctx = data / "context" / "ipo_context.json"
     ctx.parent.mkdir(parents=True, exist_ok=True)
     refreshed = (_NOW - timedelta(hours=3)).isoformat()
