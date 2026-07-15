@@ -293,6 +293,43 @@ malformed/truncated drop makes `archive_pull.py` **exit non-zero and merge nothi
 the VM back into the app's engine-data dir (same shape). The rendezvous git history is a second,
 independent backup of every drop.
 
+### VM monitoring, heartbeat & keepalive (v3 V3-3) — off by default; deploy runbook
+
+Two independent mechanisms keep the VM data plane visible and alive; each ships dark and stands alone.
+
+**Primary — heartbeat-staleness detector (always on, can't-itself-fail).** The VM writes a small
+`heartbeat.json` (last beat, ingest freshness, free disk, keepalive marker) each cycle and pushes it
+to a git **heartbeat channel**; your desktop `run_heartbeat --vm-heartbeat <clone>/heartbeat.json`
+reads it and **names any failure honestly** (`VM heartbeat - last beat 1d ago — the VM's fetch cycle
+may have stopped`, `VM ingest - NSE fetch failing …`, `VM disk - 4% free …`) and **exits non-zero**.
+This needs *nothing alive on the VM* at check time and *no VM credentials on the desktop* — it's a
+git-history read. It carries essentially every failure mode; with no `--vm-heartbeat` it's inert.
+
+**Backup — one out-of-band liveness ping.** For the single time-sensitive, unrecoverable case (Oracle
+reclaiming the instance), `vm_heartbeat.py` pings a free dead-man's-switch monitor (`HC_PING_URL`,
+e.g. healthchecks.io) each cycle; the monitor emails you when pings **stop**. One liveness bit, not an
+alerting stack. No `HC_PING_URL` → no ping (dark).
+
+**Deploy (you provision):**
+
+1. **Heartbeat channel** — simplest: a dedicated `heartbeat` branch of the archive repo (reuses the
+   key; a *different* branch from the drops, so the desktop-drop and VM-heartbeat pushes never race).
+   Clone it on the VM; clone (or reuse) it on the desktop.
+2. **Dead-man's-switch** — create a check on healthchecks.io (or ntfy/Telegram), expected ~daily; put
+   its ping URL in the VM env as `HC_PING_URL`.
+3. **VM systemd — heartbeat** (`oneshot`, after each ingest / daily): `Environment=HC_PING_URL=…`;
+   `ExecStart=…/python …/scripts/vm_heartbeat.py --data-dir /opt/ipo/data --beat /opt/hb/heartbeat.json`;
+   then `ExecStart=/usr/bin/git -C /opt/hb commit -am beat` and `ExecStart=/usr/bin/git -C /opt/hb push`.
+4. **VM systemd — keepalive** (`nice`d timer, e.g. every 30 min): `ExecStart=…/python
+   …/scripts/vm_keepalive.py --data-dir /opt/ipo/data --seconds 120`. **Tune + verify:** after a day,
+   check the Oracle console CPU metric sits **above the reclaim bar over the window** (it averages, so
+   a brief spike is not enough) — raise `--seconds`/frequency until it does. Steady genuine fetch load
+   does most of the work; this is the top-up.
+5. **Desktop** — before the heartbeat ritual, `git -C <hb-clone> pull`, then
+   `run_heartbeat --vm-heartbeat <hb-clone>/heartbeat.json`.
+6. **HARD calendar item — Oracle console login every ≤30 days.** No script can prevent *account*-level
+   reclaim; this is a manual recurring reminder you set. It is load-bearing, not optional.
+
 ## Appendix — kept operator scripts (what writes what)
 
 | Script | Purpose | Writes |
@@ -305,11 +342,13 @@ independent backup of every drop.
 | `scripts/run_recalibration_check.py` | Dry-run: does a re-fit reproduce the shipped calibrator? | nothing (read-only) |
 | `scripts/run_accuracy_monitor.py` | Drift monitor: recent window vs OOS baseline | nothing (prints; exit 1 on alert) |
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
-| `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) | nothing (prints; exit 1 if a feed is missing **or** a listing is overdue) |
+| `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) **+ VM-liveness check** (`--vm-heartbeat`, v3 V3-3) | nothing (prints; exit 1 if a feed is missing, a listing is overdue, **or** the VM heartbeat is stale/degraded) |
 | `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
 | `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
 | `scripts/archive_drop.ps1` | v3 V3-2 — app-side drop: push `verdict_transitions.json` (+ records) to the private archive rendezvous (outbound-only; dark-ship no-op if unconfigured) | commits to the rendezvous git clone |
 | `scripts/archive_pull.py` | v3 V3-2 — VM-side pull-merge: validate + append-merge a drop into the durable archive (rejects malformed; idempotent) | `<archive>/verdict_transitions.json`, `<archive>/logs/pull.log` |
+| `scripts/vm_heartbeat.py` | v3 V3-3 — VM-side: write the liveness heartbeat + ping the dead-man's-switch monitor (dark-ship without `HC_PING_URL`) | `<channel>/heartbeat.json`, `<data_dir>/logs/heartbeat.log` |
+| `scripts/vm_keepalive.py` | v3 V3-3 — VM-side: bounded CPU keepalive (anti-reclaim) + touch the marker the heartbeat checks | `<data_dir>/keepalive.marker` |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in
