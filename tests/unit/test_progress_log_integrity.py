@@ -22,7 +22,19 @@ _BLUEPRINT = _ROOT / "docs" / "v3" / "MASTER_BLUEPRINT_v3.md"
 _SHIPPED = frozenset(
     # V3-7 and V3-10 are dropped, not shipped — but their rows carry the "do not re-propose"
     # reasoning, so they must persist just as much as a shipped item's row.
-    {"BUG 1", "BUG 2", "BUG 3", "V3-5", "V3-6", "V3-7", "V3-8", "V3-10", "V3-11", "Finding-④"}
+    {
+        "BUG 1",
+        "BUG 2",
+        "BUG 3",
+        "V3-1",
+        "V3-5",
+        "V3-6",
+        "V3-7",
+        "V3-8",
+        "V3-10",
+        "V3-11",
+        "Finding-④",
+    }
 )
 
 # A data row starts with "| <ISO date> |". The header ("| Date |") and separator ("|---|") do not.

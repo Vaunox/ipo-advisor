@@ -218,6 +218,31 @@ python scripts/refresh_context.py --data-dir <the app's data dir>
   Part-II VM data layer lands it adopts this script unchanged as the VM-primary refresher, with
   local execution as the fallback — the same VM-primary/local-fallback discipline as every feed.
 
+### The VM data plane (v3 V3-1) — off by default (ships dark)
+
+The app can read its two data stores (the NSE record store and the Upstox context cache) from a **VM
+read-API** instead of scraping locally — VM-primary, with an **honest local fallback**. It is **off by
+default**: with no `VM_BASE_URL` set the engine runs exactly as before the VM existed (pure local
+scrape, no indicator), so every build ships dark until you deploy the VM.
+
+- **Enable it** by setting one variable in the engine's environment:
+  ```
+  VM_BASE_URL=http://<vm-host>:<port>   # the VM read-API base — GET-only: /health, /records, /context
+  ```
+  Read directly by the runner, deliberately **not** an `IPO_*` key, so VM wiring can never leak into
+  the model config.
+- **Behavior:** each refresh pulls both stores from the VM; on any failure (unreachable, non-200,
+  malformed/truncated envelope, timeout — 10s × 2 retries) that store falls back to local and the
+  header sync chip says so honestly — **records** re-scrape fresh from NSE (still current), **context**
+  keeps the last-known cache and ages (the Upstox token lives on the VM, so it can't self-refresh).
+  Both stores from the VM → the chip stays quiet.
+- **The VM side** is `scripts/run_vm_server.py --data-dir <vm-data> --host 0.0.0.0 --port <p>` —
+  GET-only, serving whatever the VM's own fetch jobs (`run_ingest.py` + `refresh_context.py`, run **on**
+  the VM) have written. It never runs the model, and the served data is public + token-free.
+- **Read-only by construction:** the app can only READ from the VM — there is no mutation route in the
+  read-API. The output half (app history → durable VM archive) is **V3-2**, and by design the **VM
+  pulls** it (the app never pushes).
+
 ## Appendix — kept operator scripts (what writes what)
 
 | Script | Purpose | Writes |
@@ -232,6 +257,7 @@ python scripts/refresh_context.py --data-dir <the app's data dir>
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) | nothing (prints; exit 1 if a feed is missing **or** a listing is overdue) |
 | `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
+| `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in
