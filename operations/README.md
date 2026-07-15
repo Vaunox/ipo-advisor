@@ -245,6 +245,29 @@ scrape, no indicator), so every build ships dark until you deploy the VM.
   read-API. The output half (app history → durable VM archive) is **V3-2**, and by design the **VM
   pulls** it (the app never pushes).
 
+### The VM's Upstox context refresh — live (v3 V3-1) + token rotation
+
+On the deployed VM (`<VM_IP>`), `refresh_context.py` runs **3×/day at 08:15 / 13:15 / 18:15 IST**
+(`ipo-context.timer` → `ipo-context.service`, `Persistent=true` so a missed slot catches up on boot).
+Each run writes `data/context/ipo_context.json`; `run_vm_server.py` serves it at `/context`. It is
+cheap (~40s CPU, ~400 IPOs/run) — the fields are fixed once filed, so a few daytime passes are enough
+to pick up newly-opened IPOs; this is the "occasional" cadence, not a live one.
+
+- **Token:** `UPSTOX_TOKEN` in `/etc/ipo/context.env` (owner `root:root`, mode `600`), loaded into the
+  service via `EnvironmentFile=` — systemd reads it as root and injects it into the `<vm-user>`-run
+  process, so the secret file is never world-readable and never leaves the box (nor git; `/etc/ipo` is
+  outside `/opt/ipo`). It is a **one-year read-only Analytics Token** (non-trading, no static-IP
+  requirement, IPO-catalogue endpoints only) that **expires `01/07/2027`**.
+- **Rotation (once a year, early July):** SSH to the VM, then:
+  ```
+  sudo nano /etc/ipo/context.env        # replace the UPSTOX_TOKEN=… line with the fresh token, save
+  sudo systemctl start ipo-context.service   # immediate refresh, don't wait for the next slot
+  ```
+  **Set a calendar reminder for ~late June 2027** to mint and place the next token.
+- **Degrades honestly:** if the token ever lapses, the refresh **fails loudly** (systemd logs a
+  non-zero exit) and the context cache simply **ages** — records/NSE and every verdict are unaffected,
+  nothing crashes. The surface shows context as stale rather than presenting a stale value as current.
+
 ### Durable archive (v3 V3-2) — off by default; deploy runbook
 
 The app's `verdict_transitions.json` (the one non-reproducible thing it holds — *when* each verdict
