@@ -128,3 +128,12 @@ def test_format_alert_break_and_recovered() -> None:
     )
     assert brk == "⚠️ NSE ingest — NSE fetch failing — last good pull 4h ago"
     assert format_alert(Transition("Read-API", "recovered", "up")) == "✅ Read-API recovered — up"
+
+
+def test_never_recorded_string_adapts_per_surface() -> None:
+    # one canonical detail; the digest uses the "Oracle login" column (no inner label), the alert
+    # (which has no column) prepends "Oracle login —" via format_alert
+    oracle = assess_oracle_login(None, _TODAY)
+    alert = format_alert(Transition("Oracle login", "break", oracle.feed.detail))
+    assert alert == "⚠️ Oracle login — none recorded — run /login to start the 30-day countdown"
+    assert "⚠️ none recorded — run /login" in format_digest(_status(_ok_rows(), None))

@@ -98,3 +98,25 @@ def test_load_alert_state_absent_or_corrupt_is_empty(tmp_path: Path) -> None:
     bad = tmp_path / "alert_state.json"
     bad.write_text("{ truncated", encoding="utf-8")
     assert load_alert_state(bad) == {}
+
+
+def test_never_recorded_oracle_fires_on_first_observation() -> None:
+    # A fresh VM boots into "none": there is no ok->none transition, so the engine must treat an
+    # initial broken state (prior absent) as a break — else the worst state waits for a digest.
+    detail = "none recorded — run /login to start the 30-day countdown"
+    first, state = diff_transitions({}, [_cond("Oracle login", "none", detail)], _NOW)
+    assert [t.kind for t in first] == ["break"]  # fires once on first sighting
+    again, _ = diff_transitions(state, [_cond("Oracle login", "none", detail)], _NOW)
+    assert again == []  # then suppresses like any other condition
+
+
+def test_dead_bot_listener_is_diffed_and_alerted() -> None:
+    # "A dead sender can't announce its own death": the listener dim is a real alert condition the
+    # (independent) alert-check fires when the daemon is down — not merely a digest line.
+    prev = {"Commands": ConditionState("ok", _NOW, 0)}
+    down, state = diff_transitions(
+        prev, [_cond("Commands", "broken", "listener not running")], _NOW
+    )
+    assert [t.kind for t in down] == ["break"]
+    back, _ = diff_transitions(state, [_cond("Commands", "ok", "listening")], _NOW)
+    assert [t.kind for t in back] == ["recovered"]

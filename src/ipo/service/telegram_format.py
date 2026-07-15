@@ -114,3 +114,8 @@ def format_alert(transition: Transition) -> str:
     if transition.kind == "recovered":
         return f"✅ {transition.key} recovered — {transition.detail}"
     return f"⚠️ {transition.key} — {transition.detail}"
+
+
+def format_login_confirmation(recorded: date) -> str:
+    """The ``/login`` reply confirming the recorded Oracle sign-in date (DD/MM/YYYY)."""
+    return f"✅ Recorded Oracle sign-in {_fmt_ist_date(recorded)} — 30-day countdown reset."
