@@ -289,6 +289,7 @@ source files, with three sharp edges:
 | Area | `scripts/` | `src/ipo/service/` |
 |---|---|---|
 | Records + read-API + context | `run_live_ingest.py`, `run_vm_server.py`, `refresh_context.py` | — |
+| Durable archive (v3 V3-2 revised) | `vm_archive_snapshot.py` | — |
 | Keepalive / heartbeat | `vm_keepalive.py`, `vm_heartbeat.py` | `vm_health.py`, `heartbeat.py` |
 | Telegram (V3-3) | `vm_telegram_bot.py`, `vm_telegram_digest.py`, `vm_alert_check.py` | `telegram.py`, `telegram_format.py`, `telegram_alerts.py`, `telegram_commands.py`, `vm_status.py`, `oracle_login.py` |
 
@@ -302,62 +303,62 @@ install picks up new `.py` files with no reinstall (no dependency changed). To s
 robustly on Windows, `tar` **only the named files** into a small archive and `scp` that (a streaming
 `tar | ssh` pipe can hang in Git Bash).
 
-### Durable archive (v3 V3-2) — off by default; deploy runbook
+### Durable archive (v3 V3-2, revised) — VM-write snapshot, live
 
-The app's `verdict_transitions.json` (the one non-reproducible thing it holds — *when* each verdict
-changed) is backed up to a **private git archive repo** the app can never corrupt: a local scheduled
-task **drops** it outbound (git push), a VM timer **pulls → validates → append-merges** it into a
-durable archive. Ships dark — nothing runs until the steps below. The archive has exactly one **writer**
-(the desktop drop) and one **reader** (the VM pull), on **separate keys split by direction**; each
-private half lives only in its own environment, **never committed** (same posture as the Upstox token).
+**Decision (2026-07-15/16): the desktop drop is permanently dropped.** App-facing data (records +
+final-close subscription + context) lives only as the parquet on the VM disk during normal operation;
+a knowing tradeoff — if the VM is ever reclaimed, un-rescrapeable close-time values for already-closed
+IPOs are lost forever for that stretch. What's preserved instead is a **durable, versioned, off-box
+mirror**: the VM itself pushes a daily snapshot of `ipo_records.parquet` + `ipo_context.json` to
+`ipo-archive`, so a reclaim loses at most since-the-last-snapshot data, not everything.
 
-**One-time setup (you provision):**
+`ipo-archive` (`github.com/Vaunox/ipo-archive`) is now a **single-writer, append-only durable copy**,
+not a two-source cross-check — the original "compromised VM can't corrupt the archive" guarantee (which
+depended on the VM holding only a read-only key) is explicitly given up in exchange for the VM being
+able to write. The replacement guarantee is **append-only at the repo level**:
 
-1. **Create a private archive repo** — its own repo, NOT a branch of the code repo (operational data:
-   separate lifecycle + sensitivity). An empty private repo is enough; note its SSH URL.
-2. **Two keys, split by direction (least privilege).**
-   - **Desktop → archive (write):** a write-scoped key living only in the desktop drop task's
-     environment — the *only* credential that can push to the durable archive.
-   - **VM → archive (read-only):** generated **on the VM** (`ssh-keygen -t ed25519 -f
-     /home/<vm-user>/.ssh/archive_readonly -N ""`); register the **public** half as a **read-only** deploy
-     key (leave "Allow write access" **unchecked**). A compromised VM can then only *read* the archive,
-     never corrupt the transition history — V3-2's append-only guarantee at the credential level.
+- **Repo is public** (required — GitHub branch protection/rulesets are Pro-only on private repos on
+  this account). The data (NSE subscription/context figures) is not treated as sensitive; this was a
+  deliberate call, not an oversight.
+- **Branch protection on `main`**: force-push disabled, deletion disabled (`allow_force_pushes: false`,
+  `allow_deletions: false` — applied via Settings → Branches → rule on `main`, or
+  `gh api -X PUT repos/Vaunox/ipo-archive/branches/main/protection -F required_status_checks=null -F enforce_admins=true -F required_pull_request_reviews=null -F restrictions=null -F allow_force_pushes=false -F allow_deletions=false`).
+  A compromised VM can still **push new commits**, but can never rewrite or delete history.
+- **VM deploy key is write-scoped**, generated **on the VM** (`ssh-keygen -t ed25519 -f
+  /home/<vm-user>/.ssh/archive_write -N ""`), title `ipo-vm-archive-write`, registered with "Allow write
+  access" checked. The prior read-only key (`ipo-vm-archive-readonly`) has been deleted from the repo's
+  deploy keys — there is no reader role anymore.
 
-   Keep each private half only in its own environment; **never commit any key.** If your host supports
-   it, protect the archive against force-push too.
-3. **Clone the rendezvous on both machines** — desktop: `git clone <ssh-url> C:\ipo-archive`; VM:
-   `git clone <ssh-url> /opt/ipo-archive`.
-
-**App-side drop (desktop, daily via Task Scheduler).** Register a daily task; `-DataDir` is the
-installed app's engine-data dir, `-Rendezvous` the desktop clone (the whole `/TR` value is one line):
-
-```
-schtasks /Create /TN "IPO Archive Drop" /SC DAILY /ST 20:30 /RL LIMITED /F /TR "powershell -ExecutionPolicy Bypass -NoProfile -File C:\path\to\scripts\archive_drop.ps1 -DataDir %APPDATA%\ipo-advisor-desktop\engine-data -Rendezvous C:\ipo-archive"
-```
-
-- The task's environment must expose the SSH key to `git` (a key under `%USERPROFILE%\.ssh` via
-  ssh-agent, or `GIT_SSH_COMMAND` pointing at it). **The key is never in the repo.**
-- Runs whether or not the app is open (it just reads the file + pushes). No `-Rendezvous`, or a
-  non-git path → the script is a **silent no-op**, so it is safe to register before the repo exists.
-
-**VM-side pull-merge (daily via systemd timer).** `/etc/systemd/system/ipo-archive-pull.service`:
+**Mechanism — VM-side snapshot push, daily via systemd timer.** `scripts/vm_archive_snapshot.py` (pure
+copy, git-free, unit-tested — [tests/unit/test_archive_snapshot.py](../tests/unit/test_archive_snapshot.py))
+mirrors `<data_dir>/ipo_records.parquet` and `<data_dir>/context/ipo_context.json` into the
+`/opt/ipo-archive` clone; the systemd unit's own shell step commits **only if something changed**
+(`git diff --cached --quiet` guard — a no-op cycle produces zero commits) and pushes with the write key.
+`/etc/systemd/system/ipo-archive-snapshot.service`:
 
 ```
 [Service]
 Type=oneshot
-Environment=GIT_SSH_COMMAND=ssh -i /home/<vm-user>/.ssh/archive_readonly -o IdentitiesOnly=yes
-ExecStart=/usr/bin/git -C /opt/ipo-archive pull --ff-only
-ExecStart=/opt/ipo/.venv/bin/python /opt/ipo/scripts/archive_pull.py --source /opt/ipo-archive/verdict_transitions.json --archive /opt/ipo/archive --records /opt/ipo-archive/ipo_records.parquet
+Environment="GIT_SSH_COMMAND=ssh -i /home/<vm-user>/.ssh/archive_write -o IdentitiesOnly=yes"
+ExecStart=/opt/ipo/.venv/bin/python /opt/ipo/scripts/vm_archive_snapshot.py --data-dir /opt/ipo/data --archive-clone /opt/ipo-archive
+ExecStart=/bin/bash -c 'cd /opt/ipo-archive && git add -A && { git diff --cached --quiet || git commit -q -m "snapshot $(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)"; } && git push -q origin HEAD'
 ```
 
-`/etc/systemd/system/ipo-archive-pull.timer` → `[Timer] OnCalendar=*-*-* 21:00:00` + `Persistent=true`,
-`[Install] WantedBy=timers.target`; enable with `systemctl enable --now ipo-archive-pull.timer`. A
-malformed/truncated drop makes `archive_pull.py` **exit non-zero and merge nothing** (visible in
-`journalctl -u ipo-archive-pull`); a healthy run logs `archive_pull_merged` to `<archive>/logs/pull.log`.
+`/etc/systemd/system/ipo-archive-snapshot.timer` → `[Timer] OnCalendar=*-*-* 21:00:00 Asia/Kolkata` +
+`Persistent=true`, `[Install] WantedBy=timers.target`; `systemctl enable --now
+ipo-archive-snapshot.timer`. The repo's git identity is set locally (`git -C /opt/ipo-archive config
+user.name/user.email`) matching the heartbeat repo's convention. **Live-verified 2026-07-15**: a manual
+run pushed both files to `main` (commit `3c8801e`), and an immediate rerun with unchanged data produced
+no new commit.
 
-**Recovery** — to restore history on a fresh machine, copy `<archive>/verdict_transitions.json` from
-the VM back into the app's engine-data dir (same shape). The rendezvous git history is a second,
-independent backup of every drop.
+**Retired:** `ipo-archive-pull.service`/`.timer`, `scripts/archive_drop.ps1`, and the desktop "IPO
+Archive Drop" scheduled task are all gone — there is nothing left to pull now that the desktop never
+drops. `scripts/archive_pull.py` and its underlying `ipo.archive.pull`/`ipo.archive.validate` modules
+are unused but left in place (dead, harmless, not wired to any unit) rather than deleted outright.
+
+**Recovery** — to restore state on a fresh VM, `git clone` `ipo-archive` and copy `ipo_records.parquet`
+/ `ipo_context.json` back into the data dir. This is now the *only* durable copy — there is no second,
+independent backup of the drop as there was under the old two-writer design.
 
 ### VM monitoring, heartbeat & keepalive (v3 V3-3) — off by default; deploy runbook
 
@@ -437,8 +438,9 @@ verdict `run_heartbeat` surfaces. No manufactured outage; the VM can be up and s
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) **+ VM-liveness check** (`--vm-heartbeat`, v3 V3-3) **+ fallback self-test verdict** (`--fallback-selftest`, v3 V3-4) | nothing (prints; exit 1 if a feed is missing, a listing is overdue, the VM heartbeat is stale/degraded, **or** the fallback self-test FAILED/stale) |
 | `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
 | `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
-| `scripts/archive_drop.ps1` | v3 V3-2 — app-side drop: push `verdict_transitions.json` (+ records) to the private archive rendezvous (outbound-only; dark-ship no-op if unconfigured) | commits to the rendezvous git clone |
-| `scripts/archive_pull.py` | v3 V3-2 — VM-side pull-merge: validate + append-merge a drop into the durable archive (rejects malformed; idempotent) | `<archive>/verdict_transitions.json`, `<archive>/logs/pull.log` |
+| `scripts/archive_drop.ps1` | **Retired** (v3 V3-2, superseded) — desktop drop is permanently dropped; no longer scheduled | — |
+| `scripts/archive_pull.py` | **Retired** (v3 V3-2, superseded) — left in place, unused; nothing pulls into `ipo-archive` anymore | — |
+| `scripts/vm_archive_snapshot.py` | v3 V3-2 (revised) — VM-side: mirror records + context into the `ipo-archive` clone (pure copy; the unit's shell step commits/pushes) | `<archive-clone>/ipo_records.parquet`, `<archive-clone>/ipo_context.json`, `<data_dir>/logs/archive_snapshot.log` |
 | `scripts/vm_heartbeat.py` | v3 V3-3 — VM-side: write the liveness heartbeat + ping the dead-man's-switch monitor (dark-ship without `HC_PING_URL`) | `<channel>/heartbeat.json`, `<data_dir>/logs/heartbeat.log` |
 | `scripts/vm_keepalive.py` | v3 V3-3 — VM-side: bounded CPU keepalive (anti-reclaim) + touch the marker the heartbeat checks | `<data_dir>/keepalive.marker` |
 | `scripts/fallback_selftest.py` | v3 V3-4 — weekly: drive the REAL local fallback (VM up) into a throwaway store + record the verdict; run_heartbeat surfaces FAILED/stale | `<out>/fallback_selftest.json` |
