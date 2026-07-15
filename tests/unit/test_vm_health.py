@@ -9,13 +9,18 @@ work. Offline + deterministic.
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import ModuleType
 
 from ipo.service.heartbeat import OK, STALE
 from ipo.service.vm_health import (
     VmHeartbeat,
+    assess_oracle_login,
+    assess_token_expiry,
+    check_bot_listener,
+    check_context,
+    check_read_api,
     check_vm_heartbeat,
     ping_liveness,
     read_heartbeat,
@@ -157,3 +162,56 @@ def test_keepalive_burns_bounded_and_touches_marker(tmp_path: Path) -> None:
 def test_keepalive_burn_is_hard_capped(tmp_path: Path) -> None:
     keepalive = _load_script("vm_keepalive")
     assert keepalive.MAX_SECONDS <= 600.0  # a misconfig can never peg a core indefinitely
+
+
+# --- V3-3 Telegram-surface dimensions + the Oracle-login countdown (single source) -------------
+
+
+def test_read_api_probe_result_is_honest() -> None:
+    assert check_read_api(True).status == OK
+    down = check_read_api(False)
+    assert down.status == STALE and "not responding" in down.detail
+
+
+def test_context_freshness_is_named() -> None:
+    assert check_context(None, _NOW).status == STALE  # never refreshed
+    stale = check_context(_NOW - timedelta(hours=20), _NOW)
+    assert stale.status == STALE and "context refresh failing" in stale.detail
+    assert check_context(_NOW - timedelta(hours=3), _NOW).status == OK
+
+
+def test_bot_listener_tolerates_a_normal_poll_gap_but_flags_silence() -> None:
+    assert check_bot_listener(None, _NOW).status == STALE  # not running
+    assert check_bot_listener(_NOW - timedelta(seconds=50), _NOW).status == OK  # normal poll gap
+    dead = check_bot_listener(_NOW - timedelta(minutes=10), _NOW)
+    assert dead.status == STALE and "may be down" in dead.detail
+
+
+def test_oracle_login_never_recorded_is_first_class() -> None:
+    h = assess_oracle_login(None, date(2026, 7, 15))
+    assert h.tier == "none" and h.days_ago is None
+    assert not h.feed.ok and "none recorded" in h.feed.detail and "/login" in h.feed.detail
+
+
+def test_oracle_login_tiers_at_the_thresholds() -> None:
+    today = date(2026, 7, 15)
+    assert assess_oracle_login(today - timedelta(days=2), today).tier == "ok"
+    assert assess_oracle_login(today - timedelta(days=20), today).tier == "ok"
+    assert assess_oracle_login(today - timedelta(days=21), today).tier == "warn"
+    assert assess_oracle_login(today - timedelta(days=26), today).tier == "warn"
+    assert assess_oracle_login(today - timedelta(days=27), today).tier == "urgent"
+
+
+def test_oracle_login_warn_and_urgent_are_not_ok() -> None:
+    today = date(2026, 7, 15)
+    assert not assess_oracle_login(today - timedelta(days=21), today).feed.ok
+    urgent = assess_oracle_login(today - timedelta(days=30), today)
+    assert "log in NOW" in urgent.feed.detail
+
+
+def test_token_expiry_informational_until_the_warn_window() -> None:
+    today = date(2026, 7, 15)
+    healthy = assess_token_expiry(date(2027, 7, 1), today)
+    assert healthy.feed.ok and healthy.days_left == 351
+    assert assess_token_expiry(today + timedelta(days=10), today).feed.status == STALE
+    assert assess_token_expiry(today - timedelta(days=1), today).feed.detail == "EXPIRED"
