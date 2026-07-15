@@ -18,6 +18,10 @@ The golden rule that governs all of this: **a feature is never in the number unt
 it, and the shipped calibrator never changes silently.** Recalibration produces a *candidate* you
 review and promote by hand; nothing here auto-swaps the model users run.
 
+**This repo is public.** Wherever this manual references the VM, `` `<VM_IP>` `` and `` `<vm-user>` ``
+are placeholders — the real host and login live in a local/private operator note, not here. Substitute
+them yourself when running any command below against the actual box.
+
 ---
 
 ## 1. Routine health checks — run periodically, read the result
