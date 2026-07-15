@@ -158,3 +158,22 @@ def test_alert_check_fires_on_transition_and_owns_only_alert_state(
     sent.clear()
     ac.run_alert_check(tmp_path, now=_NOW, probe=lambda _: False)  # same state → suppressed
     assert sent == []
+
+
+def test_daemon_enters_poll_loop_even_if_setmycommands_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # setMyCommands runs at daemon startup; a Telegram API failure there must not block the loop
+    # or crash the daemon (same never-raises guarantee as send_telegram).
+    bot = _load("vm_telegram_bot")
+    _set_creds(monkeypatch)
+    monkeypatch.setattr(bot, "set_my_commands", lambda *a, **k: False)  # registration fails
+    polled: list[int] = []
+
+    def _get(*_args: object, **_kwargs: object) -> list[object]:
+        polled.append(1)
+        return []
+
+    monkeypatch.setattr(bot, "get_updates", _get)
+    bot.run_daemon(tmp_path, poll_limit=2)
+    assert len(polled) == 2  # the loop still ran despite the menu-registration failure

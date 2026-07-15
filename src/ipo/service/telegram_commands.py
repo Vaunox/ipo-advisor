@@ -22,8 +22,8 @@ _log = get_logger("ipo.service.telegram_commands")
 # Single source of truth for the "/" menu (Telegram setMyCommands) AND the fallback help below — so
 # the popup list and what handle_update dispatches can't drift apart.
 COMMANDS: tuple[tuple[str, str], ...] = (
-    ("status", "Current VM health snapshot (OK/DEGRADED, all dimensions)"),
-    ("login", "Record today as your last Oracle console sign-in"),
+    ("status", "VM Status"),
+    ("login", "Oracle Login Confirmation"),
 )
 
 _HELP = "Commands: " + " · ".join(f"/{name}" for name, _ in COMMANDS)
