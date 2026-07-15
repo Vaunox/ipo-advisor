@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68,<90", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,32 +11,36 @@ requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [{ name = "IPO Advisor Operator" }]
 dependencies = [
-    "pydantic>=2.6",
-    "pydantic-settings>=2.2",
-    "pyyaml>=6.0",
-    "tzdata>=2024.1",  # IANA tz database for zoneinfo (required on Windows)
-    "pyarrow>=15.0",  # Parquet store (Layer 1 output contract)
-    "requests>=2.31",  # polite HTTP client for live source adapters
-    "beautifulsoup4>=4.12",  # HTML parsing for the Chittorgarh microdata adapter
-    "numpy>=1.26",  # calibration math (reliability, Platt/isotonic, walk-forward)
-    "fastapi>=0.110",  # advisory-only REST API (Phase 6, read-only endpoints)
-    "uvicorn>=0.29",  # ASGI server for the service
+    # Every code dep carries an upper bound (next major) — an unbounded pin can silently break the
+    # gate/behaviour on a major bump with no code change (see the Dev/CI note in operations/README).
+    "pydantic>=2.6,<3",
+    "pydantic-settings>=2.2,<3",
+    "pyyaml>=6.0,<7",
+    "tzdata>=2024.1",  # UNCAPPED on purpose: a pure DATA package (IANA tz db) — you want the latest DST rules
+    "pyarrow>=15.0,<25",  # Parquet store (Layer 1 output contract)
+    "requests>=2.31,<3",  # polite HTTP client for live source adapters
+    "beautifulsoup4>=4.12,<5",  # HTML parsing for the Chittorgarh microdata adapter
+    "numpy>=1.26,<3",  # calibration math (reliability, Platt/isotonic, walk-forward)
+    "fastapi>=0.110,<1",  # advisory-only REST API (Phase 6, read-only endpoints)
+    "uvicorn>=0.29,<1",  # ASGI server for the service
 ]
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.4",
-    "black>=24.0",
-    "mypy>=1.9,<2",  # cap <2: mypy 2.x tightened bare-generic checks and silently reddened the CI gate on main (no code change) — pin until the 2.x cutover is done deliberately
-    "pytest>=8.0",
-    "types-PyYAML",
-    "types-requests",
+    # ALL dev-tool pins carry an upper bound (next major) — a formatter/linter/type-checker major
+    # bump silently reddens the CI gate with zero code change (black 26.x, mypy 2.x both did).
+    "ruff>=0.4,<1",
+    "black>=24.0,<27",  # black reformats yearly (26.x did); cap the major
+    "mypy>=1.9,<2",  # mypy 2.x tightened bare-generic checks; cap until the 2.x cutover is deliberate
+    "pytest>=8.0,<10",
+    "types-PyYAML",  # stub package, versionless — tracks pyyaml
+    "types-requests",  # stub package, versionless — tracks requests
     "httpx>=0.27,<1.0",  # FastAPI TestClient; cap <1.0 until the starlette/httpx2 cutover is handled
-    "pre-commit>=3.6",
+    "pre-commit>=3.6,<5",
 ]
 packaging = [
-    "pyinstaller>=6.10",  # freeze the engine into the sidecar binary the desktop app ships (GATE 7)
-    "pillow>=10.0",  # generate the app icon (packaging/make_icon.py)
+    "pyinstaller>=6.10,<7",  # freeze the engine into the sidecar binary the desktop app ships (GATE 7)
+    "pillow>=10.0,<13",  # generate the app icon (packaging/make_icon.py)
 ]
 
 [tool.setuptools.packages.find]

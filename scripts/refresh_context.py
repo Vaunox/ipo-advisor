@@ -118,8 +118,10 @@ def _list_ids(token: str) -> dict[str, object]:
             )
             resp = _get(path, token)
             if resp.status_code != 200:
-                print(f"[list {status} p{page}] HTTP {resp.status_code}: {resp.text[:200]}",
-                      file=sys.stderr)
+                print(
+                    f"[list {status} p{page}] HTTP {resp.status_code}: {resp.text[:200]}",
+                    file=sys.stderr,
+                )
                 break
             rows = _rows(resp.json())
             for r in rows:

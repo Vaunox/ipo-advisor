@@ -237,14 +237,21 @@ python scripts/refresh_context.py --data-dir <the app's data dir>
 the (now-consolidated) gate docs were removed; their results live permanently in
 [`docs/PROJECT_LOG.md`](../docs/PROJECT_LOG.md).*
 
-### Dev/CI note — the mypy version pin
+### Dev/CI note — STANDING RULE: every code/tool pin carries an upper bound
 
-The CI type-check gate runs `mypy` (bare, over `src` / `tests` / `scripts`). The dev dependency is
-pinned **`mypy>=1.9,<2`**. Reason: mypy 2.x tightened its bare-generic checks, and while the pin was
-unbounded a routine `pip install -e ".[dev]"` pulled 2.x and **silently reddened the gate on `main`
-with no code change** — a dependency that can break your own gate is itself the silent-failure class
-this project keeps guarding against (cf. §5 / finding-④). If you deliberately adopt mypy 2.x, expect
-to annotate the bare `dict`/`list` generics it now flags, then lift the cap.
+**Every dependency in `pyproject.toml` is pinned `>=X,<next-major` — the ONLY exception is a pure
+data package (`tzdata`), where you want the latest.** Reason: an unbounded pin lets a routine
+`pip install -e ".[dev]"` pull a new major that **silently reddens the gate on `main` with no code
+change** — the same silent-failure class this project keeps guarding against (cf. §5 / finding-④). It
+has bitten this project three times (unbounded-alert growth → **mypy 2.x** → **black 26.x**), so it is
+now a rule, not a case-by-case fix. When you add a dependency, add its upper bound. To adopt a new
+major, do it deliberately in one pass: bump the cap, run the full gate, fix what the new major flags
+(mypy: annotate; black: `black .` + commit the reformat), then commit. Notable caps:
+
+- **`mypy>=1.9,<2`** — mypy 2.x tightened bare-generic checks.
+- **`black>=24.0,<27`** — black changes its stable style yearly (26.x reformatted `logging.py` +
+  `refresh_context.py`).
+- **`httpx>=0.27,<1.0`** — pinned until the starlette/httpx2 TestClient cutover is handled.
 
 ### Dev note — the scoring-path guard (Part I rule 1)
 
