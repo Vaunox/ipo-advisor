@@ -273,17 +273,24 @@ to pick up newly-opened IPOs; this is the "occasional" cadence, not a live one.
 The app's `verdict_transitions.json` (the one non-reproducible thing it holds — *when* each verdict
 changed) is backed up to a **private git archive repo** the app can never corrupt: a local scheduled
 task **drops** it outbound (git push), a VM timer **pulls → validates → append-merges** it into a
-durable archive. Ships dark — nothing runs until the steps below. The SSH deploy key lives only in the
-two schedulers' environments; **never commit it** (same posture as the Upstox token).
+durable archive. Ships dark — nothing runs until the steps below. The archive has exactly one **writer**
+(the desktop drop) and one **reader** (the VM pull), on **separate keys split by direction**; each
+private half lives only in its own environment, **never committed** (same posture as the Upstox token).
 
 **One-time setup (you provision):**
 
 1. **Create a private archive repo** — its own repo, NOT a branch of the code repo (operational data:
    separate lifecycle + sensitivity). An empty private repo is enough; note its SSH URL.
-2. **Deploy key** — generate an SSH key, add the public half to the archive repo as a deploy key
-   **with write access** (the drop pushes); keep the private half only in the two environments below.
-   If your host supports it, protect the branch against force-push — then a compromised app can at
-   worst *add* junk commits (which the VM validates away), never rewrite history.
+2. **Two keys, split by direction (least privilege).**
+   - **Desktop → archive (write):** a write-scoped key living only in the desktop drop task's
+     environment — the *only* credential that can push to the durable archive.
+   - **VM → archive (read-only):** generated **on the VM** (`ssh-keygen -t ed25519 -f
+     /home/<vm-user>/.ssh/archive_readonly -N ""`); register the **public** half as a **read-only** deploy
+     key (leave "Allow write access" **unchecked**). A compromised VM can then only *read* the archive,
+     never corrupt the transition history — V3-2's append-only guarantee at the credential level.
+
+   Keep each private half only in its own environment; **never commit any key.** If your host supports
+   it, protect the archive against force-push too.
 3. **Clone the rendezvous on both machines** — desktop: `git clone <ssh-url> C:\ipo-archive`; VM:
    `git clone <ssh-url> /opt/ipo-archive`.
 
@@ -304,7 +311,7 @@ schtasks /Create /TN "IPO Archive Drop" /SC DAILY /ST 20:30 /RL LIMITED /F /TR "
 ```
 [Service]
 Type=oneshot
-Environment=GIT_SSH_COMMAND=ssh -i /home/ipo/.ssh/archive_key -o IdentitiesOnly=yes
+Environment=GIT_SSH_COMMAND=ssh -i /home/<vm-user>/.ssh/archive_readonly -o IdentitiesOnly=yes
 ExecStart=/usr/bin/git -C /opt/ipo-archive pull --ff-only
 ExecStart=/opt/ipo/.venv/bin/python /opt/ipo/scripts/archive_pull.py --source /opt/ipo-archive/verdict_transitions.json --archive /opt/ipo/archive --records /opt/ipo-archive/ipo_records.parquet
 ```
@@ -337,14 +344,20 @@ alerting stack. No `HC_PING_URL` → no ping (dark).
 
 **Deploy (you provision):**
 
-1. **Heartbeat channel** — simplest: a dedicated `heartbeat` branch of the archive repo (reuses the
-   key; a *different* branch from the drops, so the desktop-drop and VM-heartbeat pushes never race).
-   Clone it on the VM; clone (or reuse) it on the desktop.
+1. **Heartbeat repo (separate from the archive).** The VM *pushes* beats, so it needs a **write** key —
+   which must never touch the durable archive (that key is read-only, above). So the heartbeat gets its
+   **own throwaway repo** holding nothing precious: generate a second key **on the VM** (`ssh-keygen -t
+   ed25519 -f /home/<vm-user>/.ssh/heartbeat_write -N ""`) and register its **public** half as a **write**
+   deploy key on that repo alone — blast radius is liveness pings, nothing else. (This supersedes the
+   earlier "a `heartbeat` branch of the archive repo, one key" note: a read-only archive key can't
+   coexist with a shared heartbeat-write key.) Clone it on the VM; clone/reuse on the desktop.
 2. **Dead-man's-switch** — create a check on healthchecks.io (or ntfy/Telegram), expected ~daily; put
    its ping URL in the VM env as `HC_PING_URL`.
-3. **VM systemd — heartbeat** (`oneshot`, after each ingest / daily): `Environment=HC_PING_URL=…`;
+3. **VM systemd — heartbeat** (`oneshot`, after each ingest / daily): `Environment=HC_PING_URL=…` and
+   `Environment=GIT_SSH_COMMAND=ssh -i /home/<vm-user>/.ssh/heartbeat_write -o IdentitiesOnly=yes`;
    `ExecStart=…/python …/scripts/vm_heartbeat.py --data-dir /opt/ipo/data --beat /opt/hb/heartbeat.json`;
-   then `ExecStart=/usr/bin/git -C /opt/hb commit -am beat` and `ExecStart=/usr/bin/git -C /opt/hb push`.
+   then `ExecStart=/usr/bin/git -C /opt/hb commit -am beat` and `ExecStart=/usr/bin/git -C /opt/hb push`
+   (the write key is scoped to the heartbeat repo only).
 4. **VM systemd — keepalive** (`nice`d timer, e.g. every 30 min): `ExecStart=…/python
    …/scripts/vm_keepalive.py --data-dir /opt/ipo/data --seconds 120`. **Tune + verify:** after a day,
    check the Oracle console CPU metric sits **above the reclaim bar over the window** (it averages, so
