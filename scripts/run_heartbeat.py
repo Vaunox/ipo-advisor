@@ -27,6 +27,7 @@ from ipo.service.heartbeat import (
     stale_feeds,
 )
 from ipo.service.lifecycle import overdue_listings
+from ipo.service.vm_health import check_vm_heartbeat, read_heartbeat, vm_degraded
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -121,10 +122,22 @@ def main() -> None:
         help="live record store to audit for stranded listings (default: the dev data_store; "
         "point at the packaged app's engine-data dir to check the real store)",
     )
+    parser.add_argument(
+        "--vm-heartbeat",
+        help="path to the VM heartbeat.json (from the heartbeat git channel clone); when given, "
+        "the VM data plane's liveness is checked too; a stale/failing VM exits non-zero (v3 V3-3)",
+    )
     args = parser.parse_args()
     today = now_ist().date()
     feeds = _collect(today)
     strands = _overdue_strands(Path(args.data_dir), today)
+    # v3 V3-3: the always-on VM-liveness detector — reads the VM's git-pushed heartbeat (nothing
+    # need be alive on the VM at check time). Empty unless --vm-heartbeat is given (ships dark).
+    vm_rows = (
+        check_vm_heartbeat(read_heartbeat(Path(args.vm_heartbeat)), now_ist())
+        if args.vm_heartbeat
+        else []
+    )
 
     lines = [f"data-source heartbeat @ {today.isoformat()}", ""]
     lines += [f"  [{f.status:<7}] {f.name} - {f.detail}" for f in feeds]
@@ -133,12 +146,21 @@ def main() -> None:
         lines += [f"            - {ipo_id} ({state})" for ipo_id, state in strands]
     else:
         lines.append("  [OK     ] Listing resolution - no stranded listings")
+    if vm_rows:
+        lines.append("")
+        lines += [f"  [{r.status:<7}] {r.name} - {r.detail}" for r in vm_rows]
 
     stale = stale_feeds(feeds)
     missing = any_missing(feeds)
+    vm_bad = bool(vm_rows) and vm_degraded(vm_rows)
     lines.append("")
     if missing:
         lines.append("result: ERROR - a required artifact is MISSING")
+    elif vm_bad:
+        lines.append(
+            "result: ATTENTION - the VM data plane is DEGRADED (see the VM lines above) - fetch "
+            "may have stopped, disk may be low, or the instance is at reclaim risk; act now"
+        )
     elif strands:
         lines.append(
             f"result: ATTENTION - {len(strands)} listing(s) OVERDUE - the resolution path may have "
@@ -153,7 +175,7 @@ def main() -> None:
         lines.append("result: OK - all feeds fresh")
 
     print("\n".join(lines))  # noqa: T201
-    if missing or strands:
+    if missing or strands or vm_bad:
         raise SystemExit(1)
 
 
