@@ -19,7 +19,14 @@ from ipo.service.telegram_format import format_login_confirmation
 
 _log = get_logger("ipo.service.telegram_commands")
 
-_HELP = "Commands: /status · /login"
+# Single source of truth for the "/" menu (Telegram setMyCommands) AND the fallback help below — so
+# the popup list and what handle_update dispatches can't drift apart.
+COMMANDS: tuple[tuple[str, str], ...] = (
+    ("status", "Current VM health snapshot (OK/DEGRADED, all dimensions)"),
+    ("login", "Record today as your last Oracle console sign-in"),
+)
+
+_HELP = "Commands: " + " · ".join(f"/{name}" for name, _ in COMMANDS)
 _ORACLE_LOGIN_FILE = "oracle_login.json"
 
 

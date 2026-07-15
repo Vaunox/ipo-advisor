@@ -13,7 +13,7 @@ from pathlib import Path
 
 from ipo.core.constants import IST
 from ipo.service.oracle_login import read_oracle_login
-from ipo.service.telegram_commands import handle_update
+from ipo.service.telegram_commands import COMMANDS, handle_update
 
 _AUTH = 42
 _STAMP = datetime(2026, 7, 15, 9, 30, tzinfo=IST)
@@ -69,3 +69,13 @@ def test_malformed_update_is_ignored(tmp_path: Path) -> None:
         {}, authorized_chat_id=_AUTH, data_dir=tmp_path, now=_STAMP, render_status=lambda: "X"
     )
     assert reply is None  # no message field → ignored
+
+
+def test_command_menu_matches_dispatch_and_help(tmp_path: Path) -> None:
+    # COMMANDS is the single source: the "/" menu lists exactly what handle_update dispatches, and
+    # the fallback help (unknown command) mentions each — so the popup and the dispatch can't drift
+    assert {name for name, _ in COMMANDS} == {"status", "login"}
+    help_reply = _handle(tmp_path, _AUTH, "/nope")
+    assert help_reply is not None
+    for name, _desc in COMMANDS:
+        assert f"/{name}" in help_reply

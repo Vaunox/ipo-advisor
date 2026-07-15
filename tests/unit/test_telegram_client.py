@@ -61,3 +61,23 @@ def test_get_updates_parses_result_list(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp())
     # only well-formed dict updates survive
     assert telegram.get_updates("tok", None) == [{"update_id": 1}]
+
+
+def test_set_my_commands_dark_ships_without_token() -> None:
+    assert telegram.set_my_commands(None, [("status", "x")]) is False
+
+
+def test_set_my_commands_never_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*_args: object, **_kwargs: object) -> object:
+        raise requests.RequestException("down")
+
+    monkeypatch.setattr(requests, "post", boom)
+    assert telegram.set_my_commands("tok", [("status", "x")]) is False
+
+
+def test_set_my_commands_true_on_http_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Resp:
+        status_code = 200
+
+    monkeypatch.setattr(requests, "post", lambda *a, **k: _Resp())
+    assert telegram.set_my_commands("tok", [("status", "x")]) is True

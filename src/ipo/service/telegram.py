@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Iterable
 
 import requests
 
@@ -85,6 +86,34 @@ def send_telegram(
             _log.warning("telegram_send_error", extra={"attempt": attempt})
         if attempt < retries:
             time.sleep(min(2.0, 0.5 * (attempt + 1)))
+    return False
+
+
+def set_my_commands(token: str | None, commands: Iterable[tuple[str, str]]) -> bool:
+    """Register the bot's "/" command menu (Bot API ``setMyCommands``). Never raises.
+
+    Telegram persists this server-side, so one successful call makes the menu appear whenever the
+    operator types "/" — no per-poll re-registration. Strictly additive: dark-ship no-op with no
+    ``token``; a failure is logged and swallowed, and the daemon's next restart retries.
+
+    Args:
+        token: Bot token, or ``None`` to no-op.
+        commands: ``(name, description)`` pairs (names: lowercase letters/digits/underscores).
+
+    Returns:
+        ``True`` if Telegram accepted the registration (HTTP 200); ``False`` otherwise.
+    """
+    if not token:
+        return False
+    url = f"{_API}/bot{token}/setMyCommands"
+    payload = {"commands": [{"command": name, "description": desc} for name, desc in commands]}
+    try:
+        resp = requests.post(url, json=payload, timeout=_SEND_TIMEOUT)
+        if resp.status_code == 200:
+            return True
+        _log.warning("telegram_setcommands_non200", extra={"status": resp.status_code})
+    except requests.RequestException:
+        _log.warning("telegram_setcommands_error")
     return False
 
 

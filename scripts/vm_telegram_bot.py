@@ -1,7 +1,8 @@
 """VM Telegram bot — the long-poll command daemon (v3 V3-3). Dark-ships without creds.
 
-Always-on systemd service (Type=simple, Restart=always). Each cycle long-polls getUpdates,
-dispatches /status + /login to handle_update (owner-only), sends replies, and touches bot.marker
+Always-on systemd service (Type=simple, Restart=always). On start it registers the "/" menu
+(setMyCommands, once — Telegram persists it), then each cycle long-polls getUpdates, dispatches
+/status + /login to handle_update (owner-only), sends replies, and touches bot.marker
 as proof-of-life (the independent alert-check flags a stale marker as a dead listener). The
 getUpdates offset advances past each processed update so nothing is reprocessed; a restart
 re-reading an old update is harmless because both commands are idempotent.
@@ -22,9 +23,9 @@ from pathlib import Path
 
 from ipo.core.calendar import now_ist
 from ipo.core.logging import configure_logging, get_logger
-from ipo.service.telegram import get_updates, send_telegram, telegram_env
+from ipo.service.telegram import get_updates, send_telegram, set_my_commands, telegram_env
 from ipo.service.telegram_alerts import load_alert_state, since_notes
-from ipo.service.telegram_commands import handle_update
+from ipo.service.telegram_commands import COMMANDS, handle_update
 from ipo.service.telegram_format import format_status
 from ipo.service.vm_status import build_status
 
@@ -77,6 +78,8 @@ def run_daemon(data_dir: Path, *, poll_limit: int | None = None) -> None:
     except ValueError:
         _log.warning("telegram_bot_bad_chat_id")
         return
+    if not set_my_commands(token, COMMANDS):  # once per process start; Telegram persists it
+        _log.warning("telegram_bot_commands_not_registered")
     offset: int | None = None
     count = 0
     while poll_limit is None or count < poll_limit:
