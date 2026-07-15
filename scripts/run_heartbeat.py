@@ -19,6 +19,7 @@ from pathlib import Path
 
 from ipo.core.calendar import latest_covered_year, now_ist, review_due
 from ipo.data.store.repository import ParquetRepository
+from ipo.service.fallback_selftest import check_selftest, read_selftest
 from ipo.service.heartbeat import (
     FeedHealth,
     any_missing,
@@ -127,6 +128,11 @@ def main() -> None:
         help="path to the VM heartbeat.json (from the heartbeat git channel clone); when given, "
         "the VM data plane's liveness is checked too; a stale/failing VM exits non-zero (v3 V3-3)",
     )
+    parser.add_argument(
+        "--fallback-selftest",
+        help="path to fallback_selftest.json; when given, the weekly local-fallback self-test's "
+        "verdict is checked and a FAILED/stale result exits non-zero (v3 V3-4)",
+    )
     args = parser.parse_args()
     today = now_ist().date()
     feeds = _collect(today)
@@ -137,6 +143,12 @@ def main() -> None:
         check_vm_heartbeat(read_heartbeat(Path(args.vm_heartbeat)), now_ist())
         if args.vm_heartbeat
         else []
+    )
+    # v3 V3-4: the local-fallback self-test verdict. None unless --fallback-selftest given (dark).
+    fallback_row = (
+        check_selftest(read_selftest(Path(args.fallback_selftest)), now_ist())
+        if args.fallback_selftest
+        else None
     )
 
     lines = [f"data-source heartbeat @ {today.isoformat()}", ""]
@@ -149,10 +161,13 @@ def main() -> None:
     if vm_rows:
         lines.append("")
         lines += [f"  [{r.status:<7}] {r.name} - {r.detail}" for r in vm_rows]
+    if fallback_row is not None:
+        lines.append(f"  [{fallback_row.status:<7}] {fallback_row.name} - {fallback_row.detail}")
 
     stale = stale_feeds(feeds)
     missing = any_missing(feeds)
     vm_bad = bool(vm_rows) and vm_degraded(vm_rows)
+    fallback_bad = fallback_row is not None and not fallback_row.ok
     lines.append("")
     if missing:
         lines.append("result: ERROR - a required artifact is MISSING")
@@ -160,6 +175,11 @@ def main() -> None:
         lines.append(
             "result: ATTENTION - the VM data plane is DEGRADED (see the VM lines above) - fetch "
             "may have stopped, disk may be low, or the instance is at reclaim risk; act now"
+        )
+    elif fallback_bad:
+        lines.append(
+            "result: ATTENTION - the local FALLBACK self-test failed or went stale (see above) - "
+            "the VM-down path may have rotted; investigate before you actually need it"
         )
     elif strands:
         lines.append(
@@ -175,7 +195,7 @@ def main() -> None:
         lines.append("result: OK - all feeds fresh")
 
     print("\n".join(lines))  # noqa: T201
-    if missing or strands or vm_bad:
+    if missing or strands or vm_bad or fallback_bad:
         raise SystemExit(1)
 
 
