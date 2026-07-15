@@ -237,8 +237,10 @@ scrape, no indicator), so every build ships dark until you deploy the VM.
   keeps the last-known cache and ages (the Upstox token lives on the VM, so it can't self-refresh).
   Both stores from the VM → the chip stays quiet.
 - **The VM side** is `scripts/run_vm_server.py --data-dir <vm-data> --host 0.0.0.0 --port <p>` —
-  GET-only, serving whatever the VM's own fetch jobs (`run_ingest.py` + `refresh_context.py`, run **on**
-  the VM) have written. It never runs the model, and the served data is public + token-free.
+  GET-only, serving whatever the VM's own fetch jobs (`run_live_ingest.py` for records + `refresh_context.py`
+  for context, run **on** the VM) have written — **not** `run_ingest.py` (that is the seed/backfill
+  pipeline; the VM needs the app's *live* NSE fetch, `run_live_ingest.py` → `refresh_from_nse`). It
+  never runs the model, and the served data is public + token-free.
 - **Read-only by construction:** the app can only READ from the VM — there is no mutation route in the
   read-API. The output half (app history → durable VM archive) is **V3-2**, and by design the **VM
   pulls** it (the app never pushes).
@@ -353,7 +355,8 @@ verdict `run_heartbeat` surfaces. No manufactured outage; the VM can be up and s
 
 | Script | Purpose | Writes |
 |---|---|---|
-| `scripts/run_ingest.py` | Ingestion pipeline (sources → merge → hygiene → store + labels) | the record store |
+| `scripts/run_ingest.py` | Ingestion pipeline (sources → merge → hygiene → store + labels) — the **seed/backfill** pipeline, NOT the live fetch | the record store |
+| `scripts/run_live_ingest.py` | v3 V3-1 — the VM's **records timer**: one LIVE NSE fetch (`refresh_from_nse`, the app's exact path) into `--data-dir`; writes `ipo_records.parquet` + the genuine `ingest_state.json` | `<data_dir>/ipo_records.parquet`, `<data_dir>/ingest_state.json` |
 | `scripts/run_backfill.py` | Polite official-NSE backfill of the mainboard sample | `data/backfill/mainboard_ipos.csv` |
 | `scripts/fetch_vix.py` | India VIX daily-close backfill (append-only) | `data/backfill/vix.csv` |
 | `scripts/run_calibrate.py` | **Fit + gate** the calibrator (the recalibration ritual, §2) | `models/calibrator.json`, `docs/CALIBRATION.md` |
