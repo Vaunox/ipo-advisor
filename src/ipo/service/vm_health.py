@@ -20,7 +20,7 @@ from pathlib import Path
 import requests
 from pydantic import BaseModel, ValidationError
 
-from ipo.service.heartbeat import OK, STALE, FeedHealth
+from ipo.service.heartbeat import OK, STALE, FeedHealth, ago
 
 # Freshness budgets (overridable). Defaults assume a daily VM cycle with a more-frequent keepalive.
 BEAT_MAX_AGE = timedelta(hours=30)  # one missed daily cycle + buffer
@@ -47,16 +47,6 @@ def read_heartbeat(path: Path) -> VmHeartbeat | None:
         return VmHeartbeat.model_validate_json(path.read_text(encoding="utf-8-sig"))
     except (ValueError, ValidationError):
         return None
-
-
-def _ago(delta: timedelta) -> str:
-    """Compact human age: '42m', '3h', '2d'."""
-    secs = max(0, int(delta.total_seconds()))
-    if secs < 3600:
-        return f"{secs // 60}m"
-    if secs < 86400:
-        return f"{secs // 3600}h"
-    return f"{secs // 86400}d"
 
 
 def check_vm_heartbeat(
@@ -86,11 +76,11 @@ def check_vm_heartbeat(
             FeedHealth(
                 "VM heartbeat",
                 STALE,
-                f"last beat {_ago(beat_age)} ago — the VM's fetch cycle may have stopped",
+                f"last beat {ago(beat_age)} ago — the VM's fetch cycle may have stopped",
             )
         ]
 
-    rows = [FeedHealth("VM heartbeat", OK, f"last beat {_ago(beat_age)} ago")]
+    rows = [FeedHealth("VM heartbeat", OK, f"last beat {ago(beat_age)} ago")]
 
     # Ingest freshness — the "NSE blocking the datacenter IP" case.
     if hb.ingest_last_success is None:
@@ -103,11 +93,11 @@ def check_vm_heartbeat(
                 FeedHealth(
                     "VM ingest",
                     STALE,
-                    f"NSE fetch failing — last good pull {_ago(ingest_age)} ago{tail}",
+                    f"NSE fetch failing — last good pull {ago(ingest_age)} ago{tail}",
                 )
             )
         else:
-            rows.append(FeedHealth("VM ingest", OK, f"last good pull {_ago(ingest_age)} ago"))
+            rows.append(FeedHealth("VM ingest", OK, f"last good pull {ago(ingest_age)} ago"))
 
     # Disk — the "disk fills" case.
     if hb.disk_free_pct < disk_min_free_pct:
@@ -133,11 +123,11 @@ def check_vm_heartbeat(
                 FeedHealth(
                     "VM keepalive",
                     STALE,
-                    f"keepalive last ran {_ago(ka_age)} ago — Oracle reclaim risk",
+                    f"keepalive last ran {ago(ka_age)} ago — Oracle reclaim risk",
                 )
             )
         else:
-            rows.append(FeedHealth("VM keepalive", OK, f"keepalive {_ago(ka_age)} ago"))
+            rows.append(FeedHealth("VM keepalive", OK, f"keepalive {ago(ka_age)} ago"))
 
     return rows
 

@@ -330,6 +330,25 @@ alerting stack. No `HC_PING_URL` → no ping (dark).
 6. **HARD calendar item — Oracle console login every ≤30 days.** No script can prevent *account*-level
    reclaim; this is a manual recurring reminder you set. It is load-bearing, not optional.
 
+### Weekly fallback self-test (v3 V3-4) — off by default; deploy runbook
+
+V3-1's local fallback only runs when the VM is down, so it can rot undiscovered until the day you need
+it. This self-test drives the **genuine** local path on demand (only the trigger is faked — a
+`VmClient` that raises `VmUnavailable` — while `refresh_from_nse` → the real `NseClient` → real NSE →
+validation → write is all genuine) into a **throwaway, always-cleaned-up** store, and records a
+verdict `run_heartbeat` surfaces. No manufactured outage; the VM can be up and serving.
+
+1. **Weekly scheduled task (desktop, repo `.venv` Python).** It uses the SAME polite `NseClient` as
+   the live ingest (rate limit + UA — one hit a week is trivial load):
+   ```
+   schtasks /Create /TN "IPO Fallback Selftest" /SC WEEKLY /D SUN /ST 09:00 /RL LIMITED /F /TR "C:\path\to\.venv\Scripts\python.exe C:\path\to\scripts\fallback_selftest.py --out C:\path\to\data_store\fallback_selftest.json"
+   ```
+2. **Ritual.** Add `--fallback-selftest <path>/fallback_selftest.json` to your `run_heartbeat` run. A
+   FAILED scrape (feed-shape change / broken dependency) → `[STALE] local fallback - self-test FAILED
+   …` and exit 1; a stale result (the weekly task stopped) → `… self-test stale … weekly test not
+   running?` and exit 1; healthy → `[OK] local fallback - self-test passed 3d ago (7 records)`. Off
+   unless the flag is given — ships dark.
+
 ## Appendix — kept operator scripts (what writes what)
 
 | Script | Purpose | Writes |
@@ -342,13 +361,14 @@ alerting stack. No `HC_PING_URL` → no ping (dark).
 | `scripts/run_recalibration_check.py` | Dry-run: does a re-fit reproduce the shipped calibrator? | nothing (read-only) |
 | `scripts/run_accuracy_monitor.py` | Drift monitor: recent window vs OOS baseline | nothing (prints; exit 1 on alert) |
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
-| `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) **+ VM-liveness check** (`--vm-heartbeat`, v3 V3-3) | nothing (prints; exit 1 if a feed is missing, a listing is overdue, **or** the VM heartbeat is stale/degraded) |
+| `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) **+ VM-liveness check** (`--vm-heartbeat`, v3 V3-3) **+ fallback self-test verdict** (`--fallback-selftest`, v3 V3-4) | nothing (prints; exit 1 if a feed is missing, a listing is overdue, the VM heartbeat is stale/degraded, **or** the fallback self-test FAILED/stale) |
 | `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
 | `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
 | `scripts/archive_drop.ps1` | v3 V3-2 — app-side drop: push `verdict_transitions.json` (+ records) to the private archive rendezvous (outbound-only; dark-ship no-op if unconfigured) | commits to the rendezvous git clone |
 | `scripts/archive_pull.py` | v3 V3-2 — VM-side pull-merge: validate + append-merge a drop into the durable archive (rejects malformed; idempotent) | `<archive>/verdict_transitions.json`, `<archive>/logs/pull.log` |
 | `scripts/vm_heartbeat.py` | v3 V3-3 — VM-side: write the liveness heartbeat + ping the dead-man's-switch monitor (dark-ship without `HC_PING_URL`) | `<channel>/heartbeat.json`, `<data_dir>/logs/heartbeat.log` |
 | `scripts/vm_keepalive.py` | v3 V3-3 — VM-side: bounded CPU keepalive (anti-reclaim) + touch the marker the heartbeat checks | `<data_dir>/keepalive.marker` |
+| `scripts/fallback_selftest.py` | v3 V3-4 — weekly: drive the REAL local fallback (VM up) into a throwaway store + record the verdict; run_heartbeat surfaces FAILED/stale | `<out>/fallback_selftest.json` |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in

@@ -13,7 +13,7 @@ required artifact is an error. This is a read-only operator ritual; it changes n
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 # Status values, in worsening order for reporting.
 OK = "OK"
@@ -96,3 +96,13 @@ def any_missing(feeds: list[FeedHealth]) -> bool:
 def stale_feeds(feeds: list[FeedHealth]) -> list[FeedHealth]:
     """The feeds that are older than their freshness budget (warnings)."""
     return [f for f in feeds if f.status == STALE]
+
+
+def ago(delta: timedelta) -> str:
+    """Compact human age for heartbeat details: '42m', '3h', '2d'. Shared by V3-3/V3-4."""
+    secs = max(0, int(delta.total_seconds()))
+    if secs < 3600:
+        return f"{secs // 60}m"
+    if secs < 86400:
+        return f"{secs // 3600}h"
+    return f"{secs // 86400}d"
