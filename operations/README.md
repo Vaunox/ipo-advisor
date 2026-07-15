@@ -243,6 +243,56 @@ scrape, no indicator), so every build ships dark until you deploy the VM.
   read-API. The output half (app history → durable VM archive) is **V3-2**, and by design the **VM
   pulls** it (the app never pushes).
 
+### Durable archive (v3 V3-2) — off by default; deploy runbook
+
+The app's `verdict_transitions.json` (the one non-reproducible thing it holds — *when* each verdict
+changed) is backed up to a **private git archive repo** the app can never corrupt: a local scheduled
+task **drops** it outbound (git push), a VM timer **pulls → validates → append-merges** it into a
+durable archive. Ships dark — nothing runs until the steps below. The SSH deploy key lives only in the
+two schedulers' environments; **never commit it** (same posture as the Upstox token).
+
+**One-time setup (you provision):**
+
+1. **Create a private archive repo** — its own repo, NOT a branch of the code repo (operational data:
+   separate lifecycle + sensitivity). An empty private repo is enough; note its SSH URL.
+2. **Deploy key** — generate an SSH key, add the public half to the archive repo as a deploy key
+   **with write access** (the drop pushes); keep the private half only in the two environments below.
+   If your host supports it, protect the branch against force-push — then a compromised app can at
+   worst *add* junk commits (which the VM validates away), never rewrite history.
+3. **Clone the rendezvous on both machines** — desktop: `git clone <ssh-url> C:\ipo-archive`; VM:
+   `git clone <ssh-url> /opt/ipo-archive`.
+
+**App-side drop (desktop, daily via Task Scheduler).** Register a daily task; `-DataDir` is the
+installed app's engine-data dir, `-Rendezvous` the desktop clone (the whole `/TR` value is one line):
+
+```
+schtasks /Create /TN "IPO Archive Drop" /SC DAILY /ST 20:30 /RL LIMITED /F /TR "powershell -ExecutionPolicy Bypass -NoProfile -File C:\path\to\scripts\archive_drop.ps1 -DataDir %APPDATA%\ipo-advisor-desktop\engine-data -Rendezvous C:\ipo-archive"
+```
+
+- The task's environment must expose the SSH key to `git` (a key under `%USERPROFILE%\.ssh` via
+  ssh-agent, or `GIT_SSH_COMMAND` pointing at it). **The key is never in the repo.**
+- Runs whether or not the app is open (it just reads the file + pushes). No `-Rendezvous`, or a
+  non-git path → the script is a **silent no-op**, so it is safe to register before the repo exists.
+
+**VM-side pull-merge (daily via systemd timer).** `/etc/systemd/system/ipo-archive-pull.service`:
+
+```
+[Service]
+Type=oneshot
+Environment=GIT_SSH_COMMAND=ssh -i /home/ipo/.ssh/archive_key -o IdentitiesOnly=yes
+ExecStart=/usr/bin/git -C /opt/ipo-archive pull --ff-only
+ExecStart=/opt/ipo/.venv/bin/python /opt/ipo/scripts/archive_pull.py --source /opt/ipo-archive/verdict_transitions.json --archive /opt/ipo/archive --records /opt/ipo-archive/ipo_records.parquet
+```
+
+`/etc/systemd/system/ipo-archive-pull.timer` → `[Timer] OnCalendar=*-*-* 21:00:00` + `Persistent=true`,
+`[Install] WantedBy=timers.target`; enable with `systemctl enable --now ipo-archive-pull.timer`. A
+malformed/truncated drop makes `archive_pull.py` **exit non-zero and merge nothing** (visible in
+`journalctl -u ipo-archive-pull`); a healthy run logs `archive_pull_merged` to `<archive>/logs/pull.log`.
+
+**Recovery** — to restore history on a fresh machine, copy `<archive>/verdict_transitions.json` from
+the VM back into the app's engine-data dir (same shape). The rendezvous git history is a second,
+independent backup of every drop.
+
 ## Appendix — kept operator scripts (what writes what)
 
 | Script | Purpose | Writes |
@@ -258,6 +308,8 @@ scrape, no indicator), so every build ships dark until you deploy the VM.
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) | nothing (prints; exit 1 if a feed is missing **or** a listing is overdue) |
 | `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
 | `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
+| `scripts/archive_drop.ps1` | v3 V3-2 — app-side drop: push `verdict_transitions.json` (+ records) to the private archive rendezvous (outbound-only; dark-ship no-op if unconfigured) | commits to the rendezvous git clone |
+| `scripts/archive_pull.py` | v3 V3-2 — VM-side pull-merge: validate + append-merge a drop into the durable archive (rejects malformed; idempotent) | `<archive>/verdict_transitions.json`, `<archive>/logs/pull.log` |
 
 *These are the only scripts retained at project close — the one-shot evidence-generators that produced
 the (now-consolidated) gate docs were removed; their results live permanently in
