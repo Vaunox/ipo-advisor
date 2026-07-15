@@ -239,9 +239,18 @@ class StatusView(BaseModel):
     the UI can show a truthful "last successful pull Xh ago — retrying" when NSE is failing while
     the store is still served. ``live_ingest`` is False when the build has no live feed wired (the
     timestamps are then ``None`` by construction, not a swallowed failure).
+
+    ``records_source`` / ``context_source`` (v3 V3-1) name which path served each store this cycle —
+    ``"vm"`` | ``"local"`` | ``None`` (no VM configured). They let the fallback chip say the honest,
+    per-store truth: on a VM outage records are ``local`` but **fresh** (a real re-scrape) while
+    context is ``local`` but **aging** (the token is on the VM, so it can't be re-fetched) — not one
+    blanket "VM unreachable" implying both are equally degraded. Freshness itself still lives on
+    ``last_successful_ingest`` (records) and the context cache's timestamp; source is only a label.
     """
 
     live_ingest: bool
     last_successful_ingest: datetime | None
     last_attempt: datetime | None
     last_attempt_ok: bool | None
+    records_source: str | None = None
+    context_source: str | None = None

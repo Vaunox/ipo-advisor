@@ -109,6 +109,8 @@ def create_app(
             last_successful_ingest=s.last_success,
             last_attempt=s.last_attempt,
             last_attempt_ok=s.last_attempt_ok,
+            records_source=s.source,
+            context_source=s.context_source,
         )
 
     @app.get("/ipos", response_model=list[Verdict])
