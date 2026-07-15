@@ -187,4 +187,9 @@ export interface StatusView {
   last_successful_ingest: string | null
   last_attempt: string | null
   last_attempt_ok: boolean | null
+  // v3 V3-1: which path served each store — 'vm' | 'local' | null (no VM configured). Lets the sync
+  // chip say the honest per-store truth on a VM outage (records fresh-local vs context last-known-
+  // aging), not a blanket "VM unreachable". null (dark-ship) → no fallback indicator at all.
+  records_source: string | null
+  context_source: string | null
 }

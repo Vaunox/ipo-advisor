@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { IPOListRow } from './api/types'
-import { awaitingLabel } from './status.ts'
+import { awaitingLabel, fallbackStatus } from './status.ts'
 
 function ymd(offsetDays: number): string {
   const d = new Date()
@@ -57,4 +57,26 @@ test('strand mode 2 (listed but never priced): names the missing outcome honestl
   const r = awaitingLabel(row({ listing: -2, overdue: true }))
   assert.equal(r.text, 'listing outcome overdue — price never recorded')
   assert.equal(r.overdue, true)
+})
+
+// v3 V3-1 — the three-state fallback indicator (must never look degraded in normal operation).
+test('dark-ship (no VM configured) → no indicator', () => {
+  assert.equal(fallbackStatus('local', null), null)
+  assert.equal(fallbackStatus(null, null), null)
+})
+
+test('both stores from the VM → no indicator (stays quiet)', () => {
+  assert.equal(fallbackStatus('vm', 'vm'), null)
+})
+
+test('VM down → the honest per-store split (records fresh vs context aging)', () => {
+  const fb = fallbackStatus('local', 'local')
+  assert.equal(fb?.text, 'on local — context aging') // records freshness is the "Updated …" timestamp
+  assert.match(fb?.title ?? '', /re-scraped fresh/) // full per-store detail in the tooltip
+  assert.match(fb?.title ?? '', /aging/)
+})
+
+test('partial fallback names the one store that fell back', () => {
+  assert.equal(fallbackStatus('local', 'vm')?.text, 'records on local')
+  assert.equal(fallbackStatus('vm', 'local')?.text, 'context aging')
 })

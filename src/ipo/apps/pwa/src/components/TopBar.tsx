@@ -1,6 +1,7 @@
 import { useIsFetching } from '@tanstack/react-query'
 import { useHealth, useStatus } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
+import { fallbackStatus } from '../status'
 import { AlertCenter } from './AlertCenter'
 import { Clock } from './Clock'
 import { ThemeToggle } from './ThemeToggle'
@@ -55,6 +56,17 @@ function SyncStatus() {
     state = s?.last_attempt_ok === false ? 'warn' : 'ok'
     text = 'Awaiting first update…'
     title = 'No successful NSE pull yet — fetching'
+  }
+
+  // v3 V3-1: compose the data-plane fallback into THIS one chip (never a second, contradicting chip).
+  // It stays silent unless a store fell back from a configured VM; then it appends the honest
+  // per-store truth (records fresh vs context aging) and turns the dot amber so a local degrade is
+  // never silent. Freshness ("Updated …") already reflects records; this adds only the source state.
+  const fb = s ? fallbackStatus(s.records_source, s.context_source) : null
+  if (fb) {
+    if (state === 'ok') state = 'warn'
+    text = `${text} · ${fb.text}`
+    title = `${title} · ${fb.title}`
   }
 
   const dot = state === 'err' ? 'sync err' : state === 'warn' ? 'sync warn' : state === 'busy' ? 'sync on' : 'sync'
