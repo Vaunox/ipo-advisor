@@ -268,6 +268,32 @@ to pick up newly-opened IPOs; this is the "occasional" cadence, not a live one.
   non-zero exit) and the context cache simply **ages** — records/NSE and every verdict are unaffected,
   nothing crashes. The surface shows context as stale rather than presenting a stale value as current.
 
+### New-IPO onset context trigger (v3, display-only) — live
+
+The 3×/day context baseline above can leave a genuinely new IPO's registrar/RHP/lot-size fields empty
+for hours if it opens mid-interval (e.g. NSE lists it at 09:00, the next context batch isn't until
+13:15). `run_live_ingest.py` (the 30-min records timer) now closes that gap itself: after each
+`refresh_from_nse` upsert, it diffs the post-upsert `ipo_id` set against a pre-upsert snapshot of the
+same store — anything new fires **one** immediate single-symbol context pull via
+`refresh_context.refresh_and_merge_one`, merged into the existing `ipo_context.json` (not a full
+overwrite). The 3×/day baseline is unchanged; this only fills the onset gap for brand-new IPOs.
+
+- **No separate "seen" set.** `ipo_records.parquet` (already the durable records store) IS the
+  seen-state — "new" means "not in the store before this cycle's upsert." A VM restart never
+  re-fires for an already-open IPO: the parquet file already has it, so nothing about it looks new to
+  a freshly-started process.
+- **Merge, not overwrite:** the single-symbol write only touches that one symbol's entry in
+  `ipo_context.json` and deliberately leaves the top-level `refreshed_at` untouched (bumping it would
+  falsely imply every OTHER cached IPO was just rechecked — see `merge_context`'s docstring in
+  `refresh_context.py`). A field that IS found displays immediately regardless; an empty result just
+  waits for the next real 3×/day batch to (correctly) label it, rather than mislabeling it early.
+- **Dark-ships without `UPSTOX_TOKEN`** — same posture as the batch job. `run_live_ingest.py`'s own
+  systemd unit therefore needs `EnvironmentFile=/etc/ipo/context.env` added alongside
+  `ipo-context.service`'s (same token, read by both units) for the trigger to actually fire on the
+  box; without it, new IPOs simply wait for the next 3×/day slot as before (never an error).
+- **One symbol's failure never blocks another's**, and never affects the records ingest — the records
+  write has already completed by the time context pulls fire.
+
 ### Updating VM code — the box is NOT a git repo (sync procedure + divergence risk)
 
 `/opt/ipo` on the VM was set up by **direct file copy, not `git clone`** — there is no remote and no
@@ -292,6 +318,10 @@ source files, with three sharp edges:
 | Durable archive (v3 V3-2 revised) | `vm_archive_snapshot.py` | — |
 | Keepalive / heartbeat | `vm_keepalive.py`, `vm_heartbeat.py` | `vm_health.py`, `heartbeat.py` |
 | Telegram (V3-3) | `vm_telegram_bot.py`, `vm_telegram_digest.py`, `vm_alert_check.py` | `telegram.py`, `telegram_format.py`, `telegram_alerts.py`, `telegram_commands.py`, `vm_status.py`, `oracle_login.py` |
+
+The new-IPO onset trigger (below) touches no new file — it's entirely inside `run_live_ingest.py` +
+`refresh_context.py`, both already itemized in the first row above. Nothing to add to this table for
+it; **do** remember its systemd-unit change (`EnvironmentFile=` for the token) noted below.
 
 The Telegram set includes the `/` command-menu code (`set_my_commands` in `telegram.py`, the
 single-source `COMMANDS` in `telegram_commands.py`, the `setMyCommands` call in `vm_telegram_bot.py`).
@@ -436,7 +466,7 @@ verdict `run_heartbeat` surfaces. No manufactured outage; the VM can be up and s
 | Script | Purpose | Writes |
 |---|---|---|
 | `scripts/run_ingest.py` | Ingestion pipeline (sources → merge → hygiene → store + labels) — the **seed/backfill** pipeline, NOT the live fetch | the record store |
-| `scripts/run_live_ingest.py` | v3 V3-1 — the VM's **records timer**: one LIVE NSE fetch (`refresh_from_nse`, the app's exact path) into `--data-dir`; writes `ipo_records.parquet` + the genuine `ingest_state.json` | `<data_dir>/ipo_records.parquet`, `<data_dir>/ingest_state.json` |
+| `scripts/run_live_ingest.py` | v3 V3-1 — the VM's **records timer**: one LIVE NSE fetch (`refresh_from_nse`, the app's exact path) into `--data-dir`; writes `ipo_records.parquet` + the genuine `ingest_state.json`. **Plus (v3, new-IPO onset trigger):** diffs pre/post-upsert `ipo_id`s and fires one immediate single-symbol context pull per genuinely new id (needs `UPSTOX_TOKEN` in its unit's environment; dark-ships without it) | `<data_dir>/ipo_records.parquet`, `<data_dir>/ingest_state.json`, + a merged `<data_dir>/context/ipo_context.json` entry per new IPO |
 | `scripts/run_backfill.py` | Polite official-NSE backfill of the mainboard sample | `data/backfill/mainboard_ipos.csv` |
 | `scripts/fetch_vix.py` | India VIX daily-close backfill (append-only) | `data/backfill/vix.csv` |
 | `scripts/run_calibrate.py` | **Fit + gate** the calibrator (the recalibration ritual, §2) | `models/calibrator.json`, `docs/CALIBRATION.md` |
@@ -445,7 +475,7 @@ verdict `run_heartbeat` surfaces. No manufactured outage; the VM can be up and s
 | `scripts/run_accuracy_monitor.py` | Drift monitor: recent window vs OOS baseline | nothing (prints; exit 1 on alert) |
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) **+ VM-liveness check** (`--vm-heartbeat`, v3 V3-3) **+ fallback self-test verdict** (`--fallback-selftest`, v3 V3-4) | nothing (prints; exit 1 if a feed is missing, a listing is overdue, the VM heartbeat is stale/degraded, **or** the fallback self-test FAILED/stale) |
-| `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`) | `<data_dir>/context/ipo_context.json` (token-free) |
+| `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`). **Plus (v3, new-IPO onset trigger):** `refresh_one`/`merge_context`/`refresh_and_merge_one` — a single-symbol fetch + merge-write, called by `run_live_ingest.py`; `main()`'s own 3×/day full-batch overwrite is unchanged | `<data_dir>/context/ipo_context.json` (token-free) |
 | `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
 | `scripts/archive_drop.ps1` | **Retired** (v3 V3-2, superseded) — desktop drop is permanently dropped; no longer scheduled | — |
 | `scripts/archive_pull.py` | **Retired** (v3 V3-2, superseded) — left in place, unused; nothing pulls into `ipo-archive` anymore | — |

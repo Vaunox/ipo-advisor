@@ -165,6 +165,56 @@ def _context(token: str, ipo_id: object) -> dict[str, object]:
     return entry
 
 
+def refresh_one(token: str, symbol: str) -> dict[str, object]:
+    """Resolve one symbol's Upstox id (from the open/closed/listed listing) and fetch its context.
+
+    Used for the new-IPO onset trigger: a single symbol detected by the NSE ingest, not the full
+    universe. Still pages the listing once (cheap; no per-IPO detail fetch) to resolve the id, then
+    makes exactly one detail call — the slow part (the ``_DETAIL_PAUSE_S``-paced per-IPO loop) is
+    what this avoids doing for every other already-known symbol.
+    """
+    ids = _list_ids(token)
+    ipo_id = ids.get(symbol.upper())
+    if ipo_id is None:
+        return {}
+    return _context(token, ipo_id)
+
+
+def merge_context(data_dir: Path, symbol: str, entry: dict[str, object]) -> bool:
+    """Merge one symbol's context entry into the cache, leaving every other entry untouched.
+
+    Deliberately does NOT advance the top-level ``refreshed_at`` — that timestamp is the ONE
+    staleness signal every field's ``field_state`` trusts (ipo_context.py). Bumping it here would
+    imply every OTHER cached IPO was just rechecked, which is false and would understate their true
+    staleness. A present field displays correctly regardless of ``refreshed_at`` (only an absent one
+    consults it), so the onset-gap fix works without that timestamp moving. Returns whether the
+    cache was written (``False`` when ``entry`` is empty — nothing to add yet).
+    """
+    if not entry:
+        return False
+    out_path = Path(data_dir) / "context" / "ipo_context.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        existing = json.loads(out_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        existing = {}
+    refreshed_at = existing.get("refreshed_at") if isinstance(existing, dict) else None
+    ipos = existing.get("ipos") if isinstance(existing, dict) else None
+    ipos = dict(ipos) if isinstance(ipos, dict) else {}
+    ipos[symbol.upper()] = entry
+    payload = {"refreshed_at": refreshed_at, "ipos": ipos}
+    tmp = out_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    tmp.replace(out_path)
+    return True
+
+
+def refresh_and_merge_one(token: str, data_dir: Path, symbol: str) -> bool:
+    """The onset-trigger entry point: fetch one symbol's context and merge it. Returns written?"""
+    entry = refresh_one(token, symbol)
+    return merge_context(data_dir, symbol, entry)
+
+
 def main() -> None:
     """Fetch per-IPO context across open+closed+listed mainboard IPOs; write token-free cache."""
     parser = argparse.ArgumentParser(description="Refresh the per-IPO Upstox context cache.")
