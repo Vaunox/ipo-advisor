@@ -54,7 +54,9 @@ html.theme-anim, html.theme-anim * {
 .top { position:sticky; top:0; z-index:6; background:color-mix(in srgb,var(--bg) 88%,transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; padding:15px 26px; }
 .top h1 { font-size:16px; font-weight:600; }
 .top .sub { font-size:12px; color:var(--tx2); margin-top:2px; font-family:'Fira Code'; }
-.controls { display:flex; align-items:center; gap:10px; }
+/* min-width:0 lets this row compress within the header so the sync chip (the one shrinkable item)
+   can ellipsis-truncate instead of pushing Clock/Theme off-screen at the 1040px min window. */
+.controls { display:flex; align-items:center; gap:10px; min-width:0; }
 .clock { display:flex; align-items:center; gap:7px; font-family:'Fira Code'; font-size:12px; color:var(--tx2); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; }
 .clock svg { width:13px; height:13px; stroke:var(--tx3); fill:none; stroke-width:1.7; }
 .clock .t { font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
@@ -390,8 +392,11 @@ body.compact .meter { margin-top:6px; }
 .sync.err { background:var(--skip); opacity:1; animation:syncpulse 1s ease-in-out infinite; }
 .sync.warn { background:var(--marginal); opacity:1; animation:syncpulse 1s ease-in-out infinite; }
 @keyframes syncpulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
-.syncstat { display:flex; align-items:center; gap:7px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; }
-.syncstat-t { font-family:'Fira Code'; font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* min-width:0 lets this one chip absorb any header deficit by ellipsis-truncating its text (full
+   detail always in the title tooltip) instead of shoving Clock/Theme off-screen — the honest
+   worst case "Updated … · retrying · on local — context aging" overflows the 1040px min window. */
+.syncstat { display:flex; align-items:center; gap:7px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; min-width:0; }
+.syncstat-t { font-family:'Fira Code'; font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .syncstat.err { border-color:color-mix(in srgb, var(--skip) 45%, transparent); }
 .syncstat.err .syncstat-t { color:var(--skip); }
 .syncstat.warn { border-color:color-mix(in srgb, var(--marginal) 45%, transparent); }

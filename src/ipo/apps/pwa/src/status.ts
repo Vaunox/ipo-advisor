@@ -63,3 +63,37 @@ export function awaitingLabel(row: IPOListRow): { text: string; overdue: boolean
     overdue: false,
   }
 }
+
+// v3 V3-1 — the data-plane fallback indicator, composed into the ONE sync chip (never a second chip).
+// It speaks ONLY when degraded, and renders the per-store distinction rather than a blanket status:
+//   * no VM configured (context_source === null, "dark-ship") → null: normal operation, no indicator;
+//   * both stores from the VM → null: all good, stay quiet;
+//   * a store fell back to local → the honest split — records fresh (a real NSE re-scrape) vs context
+//     last-known-aging (the Upstox token is on the VM, so context can't refresh until it returns).
+// One shared, tested definition (status.test.ts) so the chip text can't drift from the truth.
+export function fallbackStatus(
+  recordsSource: string | null,
+  contextSource: string | null,
+): { text: string; title: string } | null {
+  if (contextSource == null) return null // dark-ship: no VM — must not look degraded
+  const recLocal = recordsSource === 'local'
+  const ctxLocal = contextSource === 'local'
+  if (!recLocal && !ctxLocal) return null // both served from the VM — stay quiet
+  // Kept short so it composes into the header chip without crowding it (min window 1040px). The
+  // "Updated …" timestamp already carries records freshness; the suffix flags only what the user
+  // can't infer — that we're on local and, distinctly, that context is aging (records aren't flagged,
+  // so they read as fine). The full per-store detail is in the title/tooltip.
+  const text = recLocal && ctxLocal
+    ? 'on local — context aging'
+    : recLocal
+      ? 'records on local'
+      : 'context aging'
+  const title =
+    'VM unreachable — ' +
+    (recLocal ? 'records re-scraped fresh from NSE' : 'records still served from the VM') +
+    '; ' +
+    (ctxLocal
+      ? 'context is last-known and aging (cannot refresh without the VM)'
+      : 'context still served from the VM')
+  return { text, title }
+}
