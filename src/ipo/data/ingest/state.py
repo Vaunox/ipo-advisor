@@ -42,6 +42,13 @@ class IngestState(BaseModel):
     last_attempt: datetime | None = None
     last_attempt_ok: bool | None = None
     last_error: str | None = None
+    # v3 V3-1: which path served each store this cycle — "vm" | "local" | None (no VM configured).
+    # Provenance labels only; freshness still lives on ``last_success`` (records) and the context
+    # cache's own ``refreshed_at`` (one staleness rule, not a second freshness path). They differ in
+    # fallback: records → fresh-local (re-scrape), context → last-known-aging (the Upstox token is
+    # on the VM, so the app cannot self-refresh context — it only keeps serving the last cache).
+    source: str | None = None
+    context_source: str | None = None
 
 
 class IngestStateStore:
@@ -67,12 +74,34 @@ class IngestStateStore:
             except (ValueError, OSError) as exc:  # corrupt/partial file → start clean, don't crash
                 _log.warning("ingest_state_load_failed", extra={"error": str(exc)})
 
-    def record_success(self, when: datetime) -> None:
-        """Advance ``last_success`` + ``last_attempt`` to ``when`` — a confirmed-good NSE pull."""
+    def record_success(self, when: datetime, *, source: str = "local") -> None:
+        """Advance freshness to ``when`` — a good records fetch (``source``: vm | local).
+
+        ``when`` is the served data's own timestamp: the VM's ``refreshed_at`` when the VM served,
+        the local pull time when we scraped — one staleness rule reasons about both paths the same.
+        ``model_copy`` preserves ``context_source`` (recorded separately in the same cycle).
+        """
         with self._lock:
-            self._state = IngestState(
-                last_success=when, last_attempt=when, last_attempt_ok=True, last_error=None
+            self._state = self._state.model_copy(
+                update={
+                    "last_success": when,
+                    "last_attempt": when,
+                    "last_attempt_ok": True,
+                    "last_error": None,
+                    "source": source,
+                }
             )
+            self._flush()
+
+    def record_context_source(self, source: str | None) -> None:
+        """Record which path (vm | local | None) served the context store this cycle.
+
+        Freshness is the context cache's own ``refreshed_at`` (read by ``field_state``), not here.
+        ``None`` clears stale provenance (e.g. a VM was removed) so the chip never claims "from VM"
+        when there is no VM.
+        """
+        with self._lock:
+            self._state = self._state.model_copy(update={"context_source": source})
             self._flush()
 
     def record_failure(self, when: datetime, error: str) -> None:

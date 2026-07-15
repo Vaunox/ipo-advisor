@@ -209,9 +209,13 @@ def _live_refresh(
     if not config.scrape.live_ingest:
         return None
 
+    import os
+
+    from ipo.data.ingest.data_plane import refresh_data_plane
     from ipo.data.ingest.live import refresh_from_nse
     from ipo.data.sources.base import PoliteClient, RawCache
     from ipo.data.sources.nse import NseClient
+    from ipo.vm.client import VmClient
 
     client = PoliteClient(
         user_agent=config.scrape.user_agent,
@@ -222,8 +226,20 @@ def _live_refresh(
     )
     nse = NseClient(client, RawCache(root=data_dir / "raw_cache"))
 
+    # VM-primary when a VM base URL is configured (v3 V3-1). Read from the env, NOT core config: the
+    # URL is deploy state, and an ingest setting must not reach into the protected scoring config
+    # (config.py holds weights). The name avoids the ``IPO_`` prefix on purpose — ``_env_overrides``
+    # maps every ``IPO_*`` var into AppConfig, which forbids unknown fields. Absent → local-only, as
+    # before the VM existed ("ships dark"); deploying the VM later is a config flip, not code.
+    vm_base = os.environ.get("VM_BASE_URL", "").strip()
+    vm_client = VmClient(vm_base) if vm_base else None
+    context_path = data_dir / "context" / "ipo_context.json"
+
     def refresh() -> None:
-        refresh_from_nse(repository, nse, state=ingest_state)
+        if ingest_state is None:  # no freshness store to record source into → plain local scrape
+            refresh_from_nse(repository, nse)
+            return
+        refresh_data_plane(repository, nse, ingest_state, context_path, vm_client=vm_client)
 
     return refresh
 

@@ -18,26 +18,17 @@ Two guarantees are structural, not careful:
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
-from ipo.core.types import IPORecord
 from ipo.data.ingest.state import IngestStateStore
 from ipo.data.store.repository import ParquetRepository
+from ipo.vm.models import RecordsEnvelope
 
 _CONTEXT_REL = ("context", "ipo_context.json")
-
-
-class RecordsEnvelope(BaseModel):
-    """The NSE record store + its freshness (the last confirmed-good ingest)."""
-
-    refreshed_at: datetime | None
-    records: list[IPORecord]
 
 
 def create_vm_app(data_dir: Path) -> FastAPI:
