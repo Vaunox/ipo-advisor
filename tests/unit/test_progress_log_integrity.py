@@ -27,6 +27,7 @@ _SHIPPED = frozenset(
         "BUG 2",
         "BUG 3",
         "V3-1",
+        "V3-2",
         "V3-5",
         "V3-6",
         "V3-7",

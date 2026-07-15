@@ -269,14 +269,15 @@ def test_scoring_path_has_no_direct_context_reference() -> None:
     assert not offenders, "context data must not reach the scoring path: " + "; ".join(offenders)
 
 
-def test_scoring_path_cannot_transitively_reach_the_service_layer() -> None:
-    """The model must be *physically* unable to see any display/context data — via the real graph.
+def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
+    """The model is *physically* unable to see display/context/archive data — via the real graph.
 
     A fresh interpreter imports EVERY module under features/ model/ calibration/ core/ (their whole
-    transitive import closure) and asserts NO ``ipo.service.*`` module lands in ``sys.modules`` —
-    the general invariant behind V3-5/V3-6's boundary (the context store lives in ipo.service.*),
-    and it is stronger + rename-proof: any indirect path from the scoring path into the service
-    layer — where the context cache, the /allotment join, or the RHP join live — fails this test.
+    transitive import closure) and asserts NO ``ipo.service.*`` OR ``ipo.archive.*`` module lands in
+    ``sys.modules`` — the invariant behind V3-5/V3-6's boundary (the context store lives in
+    ipo.service.*) and V3-2's (the durable archive lives in ipo.archive.*). Stronger + rename-proof:
+    any indirect path from the scoring path into the service layer (context cache, /allotment join,
+    RHP join) or the archive fails this test.
 
     Run in a subprocess because the pytest process has already imported the service layer (via the
     API tests), so this process's ``sys.modules`` cannot answer the question.
@@ -291,7 +292,7 @@ def test_scoring_path_cannot_transitively_reach_the_service_layer() -> None:
         "            importlib.import_module(m.name)\n"
         "        except Exception:\n"
         "            pass\n"
-        "leaked = sorted(m for m in sys.modules if m.startswith('ipo.service'))\n"
+        "leaked = sorted(m for m in sys.modules if m.startswith(('ipo.service', 'ipo.archive')))\n"
         "print('LEAK ' + ','.join(leaked) if leaked else 'CLEAN')\n"
     )
     env = {**os.environ, "PYTHONPATH": str(src) + os.pathsep + os.environ.get("PYTHONPATH", "")}
@@ -300,6 +301,6 @@ def test_scoring_path_cannot_transitively_reach_the_service_layer() -> None:
     )
     assert result.returncode == 0, f"probe failed: {result.stderr}"
     assert result.stdout.strip().splitlines()[-1] == "CLEAN", (
-        "the scoring path transitively reaches ipo.service.* — context data could reach the "
-        f"model: {result.stdout} {result.stderr}"
+        "the scoring path transitively reaches ipo.service.* or ipo.archive.* — display/archive "
+        f"data could reach the model: {result.stdout} {result.stderr}"
     )
