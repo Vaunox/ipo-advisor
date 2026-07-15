@@ -268,6 +268,40 @@ to pick up newly-opened IPOs; this is the "occasional" cadence, not a live one.
   non-zero exit) and the context cache simply **ages** — records/NSE and every verdict are unaffected,
   nothing crashes. The surface shows context as stale rather than presenting a stale value as current.
 
+### Updating VM code — the box is NOT a git repo (sync procedure + divergence risk)
+
+`/opt/ipo` on the VM was set up by **direct file copy, not `git clone`** — there is no remote and no
+`.git`, so **you cannot `git pull` to update it.** Code reaches the box only by `scp` of specific
+source files, with three sharp edges:
+
+- **Never `tar`/`scp` the whole `src/ipo` tree.** It carries the bundled electron `release/` / `build`
+  / `node_modules` artifacts — ~**704 MB, ~14k files** (the ones mypy/ruff exclude); `tar src/ipo` will
+  hang the ssh pipe. Copy **only the specific `.py` files** a change touches.
+- **The box runs whatever was LAST scp'd, so desktop `main` and the box can silently diverge. A merge
+  to `main` is NOT a deploy.** After merging you must scp the changed files (and restart the affected
+  unit) for them to take effect; until then the box runs the old code.
+- **Keep the sync file-list tied to the actual module set.** A newly-added telegram/vm module that is
+  not on the list is silently absent on the box (its import fails only when its unit runs). Add new
+  modules here and scp them.
+
+**VM-relevant files (scp targets under `/opt/ipo/`):**
+
+| Area | `scripts/` | `src/ipo/service/` |
+|---|---|---|
+| Records + read-API + context | `run_live_ingest.py`, `run_vm_server.py`, `refresh_context.py` | — |
+| Keepalive / heartbeat | `vm_keepalive.py`, `vm_heartbeat.py` | `vm_health.py`, `heartbeat.py` |
+| Telegram (V3-3) | `vm_telegram_bot.py`, `vm_telegram_digest.py`, `vm_alert_check.py` | `telegram.py`, `telegram_format.py`, `telegram_alerts.py`, `telegram_commands.py`, `vm_status.py`, `oracle_login.py` |
+
+The Telegram set includes the `/` command-menu code (`set_my_commands` in `telegram.py`, the
+single-source `COMMANDS` in `telegram_commands.py`, the `setMyCommands` call in `vm_telegram_bot.py`).
+
+**Procedure:** `scp <files> <vm-user>@<vm>:/opt/ipo/scripts/` (or `/opt/ipo/src/ipo/service/`), then
+`sudo systemctl restart <affected-unit>`, then verify (e.g. the daemon re-registers its menu via
+`getMyCommands`, a timer run posts to the group, or `journalctl -u <unit>`). The `.venv` editable
+install picks up new `.py` files with no reinstall (no dependency changed). To sync several files
+robustly on Windows, `tar` **only the named files** into a small archive and `scp` that (a streaming
+`tar | ssh` pipe can hang in Git Bash).
+
 ### Durable archive (v3 V3-2) — off by default; deploy runbook
 
 The app's `verdict_transitions.json` (the one non-reproducible thing it holds — *when* each verdict
