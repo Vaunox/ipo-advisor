@@ -317,9 +317,18 @@ not a two-source cross-check — the original "compromised VM can't corrupt the 
 depended on the VM holding only a read-only key) is explicitly given up in exchange for the VM being
 able to write. The replacement guarantee is **append-only at the repo level**:
 
-- **Repo is public** (required — GitHub branch protection/rulesets are Pro-only on private repos on
-  this account). The data (NSE subscription/context figures) is not treated as sensitive; this was a
-  deliberate call, not an oversight.
+- **Repo is deliberately public — do not "fix" this back to private.** GitHub branch protection/rulesets
+  are Pro-only for private repos on this account; making the repo private again silently drops the
+  append-only guarantee (force-push/deletion become re-allowed with no error, no warning — the API just
+  quietly stops enforcing). Public was chosen knowingly: the data is KB-scale NSE subscription/context
+  figures, this is a private downstream working copy with no attached app/site (unlike the desktop
+  app's own privacy posture), and append-only durability was judged worth more than repo privacy here.
+  If privacy is ever revisited, either accept losing append-only or pay for GitHub Pro first — never
+  flip visibility without re-checking `branches/main/protection` survived the change.
+- Only two files ever land in this repo — `ipo_records.parquet` and `ipo_context.json`, explicit
+  filenames in `vm_archive_snapshot.py` (`RECORDS_FILENAME`/`CONTEXT_FILENAME`), never a glob or
+  directory copy — so nothing else in the VM's data dir (logs, tokens, markers) can ever ride along
+  even if that dir grows new files later.
 - **Branch protection on `main`**: force-push disabled, deletion disabled (`allow_force_pushes: false`,
   `allow_deletions: false` — applied via Settings → Branches → rule on `main`, or
   `gh api -X PUT repos/Vaunox/ipo-archive/branches/main/protection -F required_status_checks=null -F enforce_admins=true -F required_pull_request_reviews=null -F restrictions=null -F allow_force_pushes=false -F allow_deletions=false`).
