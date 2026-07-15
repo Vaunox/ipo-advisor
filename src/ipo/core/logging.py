@@ -39,8 +39,20 @@ _NOISY_LOGGERS = ("urllib3", "asyncio", "httpcore", "httpx")
 # Keys whose VALUE is a secret regardless of content → dropped whole.
 _SECRET_KEYS = frozenset(
     {
-        "token", "access_token", "refresh_token", "upstox_token", "authorization", "auth",
-        "password", "passwd", "secret", "api_key", "apikey", "x-api-key", "cookie", "set-cookie",
+        "token",
+        "access_token",
+        "refresh_token",
+        "upstox_token",
+        "authorization",
+        "auth",
+        "password",
+        "passwd",
+        "secret",
+        "api_key",
+        "apikey",
+        "x-api-key",
+        "cookie",
+        "set-cookie",
         "pan",
     }
 )
