@@ -37,6 +37,7 @@ interface Prefs {
   alertsSeen: string[]
   notifiedCrossings: string[]
   notifSeeded: boolean
+  awaitingCollapsed: boolean
 }
 
 const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
@@ -67,6 +68,7 @@ function load(): Prefs {
       alertsSeen: Array.isArray(p.alertsSeen) ? p.alertsSeen : [],
       notifiedCrossings: Array.isArray(p.notifiedCrossings) ? p.notifiedCrossings : [],
       notifSeeded: p.notifSeeded === true,
+      awaitingCollapsed: p.awaitingCollapsed === true,
     }
   } catch {
     return {
@@ -80,6 +82,7 @@ function load(): Prefs {
       alertsSeen: [],
       notifiedCrossings: [],
       notifSeeded: false,
+      awaitingCollapsed: false,
     }
   }
 }
@@ -115,6 +118,7 @@ interface UiPrefs {
   costs: Costs
   notifications: NotifPrefs
   pinned: string[]
+  awaitingCollapsed: boolean
 }
 interface DesktopBridge {
   getPrefs?: () => Promise<UiPrefs | null>
@@ -130,6 +134,7 @@ function uiSnapshot(): UiPrefs {
     costs: prefs.costs,
     notifications: prefs.notifications,
     pinned: prefs.pinned,
+    awaitingCollapsed: prefs.awaitingCollapsed,
   }
 }
 
@@ -175,6 +180,7 @@ export async function hydrateFromDesktop(): Promise<void> {
       costs: { ...DEFAULT_COSTS, ...ui.costs },
       notifications: { ...DEFAULT_NOTIF, ...ui.notifications },
       pinned: Array.isArray(ui.pinned) ? ui.pinned : prefs.pinned,
+      awaitingCollapsed: typeof ui.awaitingCollapsed === 'boolean' ? ui.awaitingCollapsed : prefs.awaitingCollapsed,
     }
     try {
       localStorage.setItem(KEY, JSON.stringify(prefs)) // keep the mirror fresh for next cold start
@@ -236,6 +242,15 @@ export function setDensity(density: Density): void {
   prefs = { ...prefs, density }
   save()
   applyDensity(density)
+}
+
+/* ---- "awaiting listing" card collapse (v3 V3-14) — durable so a fold survives restart ---- */
+// Single writer (the History AwaitingList toggle owns both read and write), so the component may
+// cache it in local `useState` per the single-writer caveat above — no reactive hook needed.
+export const getAwaitingCollapsed = (): boolean => prefs.awaitingCollapsed
+export function setAwaitingCollapsed(collapsed: boolean): void {
+  prefs = { ...prefs, awaitingCollapsed: collapsed }
+  save() // durable: localStorage mirror + write-through to the app config file (survives restart)
 }
 
 /* ---- pinned ---- */

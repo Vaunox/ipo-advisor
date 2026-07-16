@@ -156,6 +156,14 @@ html.theme-anim, html.theme-anim * {
 .bigmeter { height:9px; border-radius:6px; background:var(--panel2); overflow:hidden; flex:1; }
 .bigmeter i { display:block; height:100%; border-radius:6px; background:var(--apply); transform-origin:left; animation:grow 1.1s cubic-bezier(.22,1,.36,1) .15s both; }
 h3.sec { font-family:'Fira Code'; font-size:11.5px; letter-spacing:.085em; text-transform:uppercase; color:var(--tx2); margin-bottom:13px; font-weight:600; }
+/* v3 V3-14: breathing room between the "awaiting listing" card and the History search bar below it. */
+.card.awaiting { margin-bottom:20px; }
+/* Collapse control — a section-header-styled toggle button with a rotating disclosure caret. */
+.awaiting-head { display:flex; align-items:center; gap:8px; width:100%; padding:0; text-align:left; cursor:pointer; font-family:'Fira Code'; font-size:11.5px; letter-spacing:.085em; text-transform:uppercase; color:var(--tx2); font-weight:600; margin-bottom:13px; }
+.awaiting-head:hover { color:var(--tx); }
+.awaiting-head[aria-expanded="false"] { margin-bottom:0; } /* collapsed: no body below → no trailing gap */
+.awaiting-head .disc { display:inline-block; font-size:9px; color:var(--tx3); transition:transform .15s ease; }
+.awaiting-head[aria-expanded="true"] .disc { transform:rotate(90deg); } /* ▸ (closed) → ▾ (open) */
 .reason-lead { font-size:15.5px; line-height:1.5; color:var(--tx); font-weight:600; margin-bottom:10px; }
 .reason-body { font-size:12.5px; line-height:1.6; color:var(--tx2); font-family:'Fira Code'; }
 .reason-src { display:inline-block; font-family:'Fira Sans'; font-size:9.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--tx3); background:var(--panel2); border:1px solid var(--line); border-radius:4px; padding:1px 6px; margin-right:8px; vertical-align:1px; }

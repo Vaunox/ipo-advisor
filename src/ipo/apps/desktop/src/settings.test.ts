@@ -30,6 +30,7 @@ test('a changed UI setting survives a simulated restart (write -> reload -> reta
         costs: { stt: 0.2, dp: 22, oth: 0.09 },
         notifications: { native: false, applyCrossing: false, anyChange: true, quiet: false },
         pinned: ['ipo-xyz'],
+        awaitingCollapsed: true, // v3 V3-14: a non-default fold must survive the restart
       }),
     }
     saveSettings(dir, changed)
@@ -43,11 +44,13 @@ test('a changed UI setting survives a simulated restart (write -> reload -> reta
       costs: { stt: 0.2, dp: 22, oth: 0.09 },
       notifications: { native: false, applyCrossing: false, anyChange: true, quiet: false },
       pinned: ['ipo-xyz'],
+      awaitingCollapsed: true,
     })
     // The retained value is genuinely the user's choice, not a default that happens to match.
     assert.notDeepEqual(reopened.ui?.notifications, DEFAULT_NOTIF)
     assert.equal(reopened.ui?.theme, 'light')
     assert.equal(reopened.ui?.costs.dp, 22)
+    assert.equal(reopened.ui?.awaitingCollapsed, true) // the "awaiting" fold survived the reopen
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
@@ -67,6 +70,7 @@ test('a partial / hand-edited config falls back to defaults field-by-field', () 
     assert.equal(s.ui?.costs.dp, 15.34) // missing -> default
     assert.deepEqual(s.ui?.notifications, DEFAULT_NOTIF) // missing -> defaults (nothing on)
     assert.deepEqual(s.ui?.pinned, []) // missing -> empty
+    assert.equal(s.ui?.awaitingCollapsed, false) // missing -> default (expanded)
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }

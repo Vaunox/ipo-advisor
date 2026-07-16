@@ -53,6 +53,9 @@ export interface UiPrefs {
   costs: Costs
   notifications: NotifPrefs
   pinned: string[]
+  // v3 V3-14: whether the History "awaiting listing" card is collapsed. Durable so a fold survives
+  // restart (localStorage under the shell's file:// origin does not reliably persist).
+  awaitingCollapsed: boolean
 }
 
 export const DEFAULT_STARTUP: StartupPrefs = {
@@ -83,6 +86,7 @@ export function normalizeUi(raw: unknown): UiPrefs {
     costs: { ...DEFAULT_COSTS, ...costs },
     notifications: { ...DEFAULT_NOTIF, ...notif },
     pinned: Array.isArray(u.pinned) ? u.pinned.filter((x): x is string => typeof x === 'string') : [],
+    awaitingCollapsed: u.awaitingCollapsed === true,
   }
 }
 
