@@ -40,34 +40,42 @@ def ring_tail(*, since: int, limit: int) -> tuple[list[dict[str, Any]], int]:
     return ring.entries(since=since, limit=limit), ring.latest_seq()
 
 
-def file_history(log_dir: Path, *, limit: int) -> list[dict[str, Any]]:
+def file_history(log_dir: Path, *, limit: int, before: str | None = None) -> list[dict[str, Any]]:
     """The newest ``limit`` parsed JSON log lines from the rotated files (oldest→newest).
 
-    Durable scroll-back history for the console. Reads newest→oldest only until it has ``limit``
-    lines (so it never loads the whole 25 MB when a page is all that's asked for), and skips any
-    unparseable/blank line rather than failing the whole read.
+    Durable scroll-back history for the console's one continuous timeline. When ``before`` (an ISO
+    ``ts``) is given, only entries with ``ts <= before`` are returned — the cursor the front end
+    pages backward with as it scrolls up, so it loads older chunks lazily instead of the whole file.
+    (``<=`` is deliberate: the boundary line overlaps the caller's oldest, which the client
+    de-dupes, so the ring→disk seam has no gap.) ISO timestamps share one IST offset, so a
+    lexicographic string compare is chronological. Reads newest→oldest only until it has ``limit``
+    lines, skipping any unparseable/blank line rather than failing the read.
     """
-    collected: list[str] = []
+    collected: list[dict[str, Any]] = []
     for name in reversed(_ROTATED):  # newest file first
         path = log_dir / name
         if not path.is_file():
             continue
         try:
-            collected = path.read_text(encoding="utf-8").splitlines() + collected
+            lines = path.read_text(encoding="utf-8").splitlines()
         except OSError:
             continue
+        for raw in reversed(lines):  # newest line first within the file
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                continue  # a torn line mid-rotation — skip, don't fail the read
+            if not isinstance(obj, dict):
+                continue
+            if before is not None and str(obj.get("ts", "")) > before:
+                continue  # newer than the scroll cursor — not part of this older page
+            collected.append(obj)
+            if len(collected) >= limit:
+                break
         if len(collected) >= limit:
             break
-
-    out: list[dict[str, Any]] = []
-    for raw in collected[-limit:]:
-        line = raw.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except ValueError:
-            continue  # a torn final line mid-rotation — skip, don't fail the history read
-        if isinstance(obj, dict):
-            out.append(obj)
-    return out
+    collected.reverse()  # newest-first while gathering → back to chronological (oldest→newest)
+    return collected

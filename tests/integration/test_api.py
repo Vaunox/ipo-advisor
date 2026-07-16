@@ -475,6 +475,9 @@ def test_logs_history_reads_the_rotated_files(tmp_path: Path) -> None:
         "scheduler_cycle_start",
         "vm_records_fallback_local",
     ]
+    # the `before` cursor pages older (scroll-back): only entries with ts <= the cursor
+    older = client.get("/logs?history=true&before=2026-07-16T09:42:00&limit=10").json()
+    assert [e["message"] for e in older["entries"]] == ["scheduler_cycle_start"]
 
 
 def test_logs_ring_is_read_only_and_well_formed() -> None:

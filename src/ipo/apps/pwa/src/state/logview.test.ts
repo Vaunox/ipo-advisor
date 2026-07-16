@@ -10,6 +10,7 @@ import {
   formatDetail,
   levelClass,
   levelCode,
+  prependOlder,
   shortTs,
 } from './logview.ts'
 
@@ -86,6 +87,29 @@ test('collapse keeps different ipo_ids distinct even under the same event', () =
 test('shortTs slices HH:MM:SS.mmm out of the ISO timestamp', () => {
   assert.equal(shortTs('2026-07-16T09:42:00.118+05:30'), '09:42:00.118')
   assert.equal(shortTs(undefined), '')
+})
+
+test('prependOlder stitches the ring->disk seam with no duplicate and no gap', () => {
+  // current buffer starts at 10:00 (its oldest is also on disk — the boundary overlaps because the
+  // `before` cursor is inclusive). Older disk page: 08:00, 09:00, and the 10:00 twin.
+  const current = [
+    { ts: '2026-07-16T10:00:00+05:30', logger: 'x', message: 'b', ipo_id: '' },
+    { ts: '2026-07-16T10:05:00+05:30', logger: 'x', message: 'c', ipo_id: '' },
+  ]
+  const older = [
+    { ts: '2026-07-16T08:00:00+05:30', logger: 'x', message: 'z', ipo_id: '' },
+    { ts: '2026-07-16T09:00:00+05:30', logger: 'x', message: 'a', ipo_id: '' },
+    { ts: '2026-07-16T10:00:00+05:30', logger: 'x', message: 'b', ipo_id: '' }, // the boundary twin
+  ]
+  const merged = prependOlder(older, current)
+  assert.deepEqual(
+    merged.map((e) => e.message),
+    ['z', 'a', 'b', 'c'], // z,a prepended; the duplicate 'b' at the seam dropped; nothing lost
+  )
+  // one 'b' only — no double-line at the boundary
+  assert.equal(merged.filter((e) => e.message === 'b').length, 1)
+  // fully-overlapping page (nothing older) → same ref, so the caller knows history is exhausted
+  assert.equal(prependOlder([older[2]], current), current)
 })
 
 test('appendCapped appends new tail lines and keeps only the newest max', () => {

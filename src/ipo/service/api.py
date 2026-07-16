@@ -235,19 +235,28 @@ def create_app(
         )
 
     @app.get("/logs", response_model=LogsView)
-    def logs(since: int = 0, limit: int = 500, history: bool = False) -> LogsView:
-        """The debug console's read (v3 V3-16) — recent structured log entries (read-only).
+    def logs(
+        since: int = 0, limit: int = 500, history: bool = False, before: str | None = None
+    ) -> LogsView:
+        """The debug console's read (v3 V3-16) — structured log entries (read-only).
 
-        Default: the live tail from the in-memory ring buffer — entries with ``seq > since`` (so the
-        client polls only what's new), newest ``limit``; ``last_seq`` is the cursor to send back as
-        ``since``. ``history=true`` reads the rotated log files instead, for scroll-back to older
-        events. Every entry was redacted at write time (``core.logging.redacted_payload``), so no
-        token/PAN/auth-header can appear here. GET-only — reading the log never triggers anything
-        (Invariants 4 & 6); this is a window, not a control surface.
+        The console shows ONE continuous timeline; this endpoint serves its two ends:
+
+        * Live tail (default): the in-memory ring buffer — entries with ``seq > since`` (so the
+          client polls only what's new), newest ``limit``; ``last_seq`` is the cursor to send back.
+        * Older history (``history=true``): the durable rotated files, entries with ``ts <= before``
+          (the scroll-back cursor), newest ``limit`` — the client pages backward with this as it
+          scrolls up, stitching disk onto the ring by timestamp.
+
+        Every entry was redacted at write time (``core.logging.redacted_payload``), so no
+        token/PAN/auth-header can appear. GET-only — reading never triggers anything (Invariants 4 &
+        6); a window, not a control surface.
         """
         capped = clamp_limit(limit)
         if history:
-            entries = file_history(log_dir, limit=capped) if log_dir is not None else []
+            entries = (
+                file_history(log_dir, limit=capped, before=before) if log_dir is not None else []
+            )
             return LogsView(entries=entries, last_seq=0, source="history")
         entries, last_seq = ring_tail(since=since, limit=capped)
         return LogsView(entries=entries, last_seq=last_seq, source="ring")

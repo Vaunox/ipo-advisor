@@ -107,6 +107,24 @@ def test_file_history_empty_when_no_files(tmp_path: Path) -> None:
     assert file_history(tmp_path, limit=10) == []
 
 
+def test_file_history_before_paginates_older_inclusive(tmp_path: Path) -> None:
+    # v3 V3-16 unified stream: scroll-back pages older disk chunks via a `before` ts cursor.
+    (tmp_path / "engine.log").write_text(
+        '{"ts":"2026-07-16T09:00:00+05:30","message":"a"}\n'
+        '{"ts":"2026-07-16T10:00:00+05:30","message":"b"}\n'
+        '{"ts":"2026-07-16T11:00:00+05:30","message":"c"}\n',
+        encoding="utf-8",
+    )
+    # before=10:00 → only entries with ts <= 10:00 (inclusive boundary, so the seam has no gap)
+    out = file_history(tmp_path, limit=10, before="2026-07-16T10:00:00+05:30")
+    assert [e["message"] for e in out] == ["a", "b"]
+    # a tighter limit returns the NEWEST of that older set (chronological order preserved)
+    out2 = file_history(tmp_path, limit=1, before="2026-07-16T10:00:00+05:30")
+    assert [e["message"] for e in out2] == ["b"]
+    # no cursor → the newest `limit` overall
+    assert [e["message"] for e in file_history(tmp_path, limit=2)] == ["b", "c"]
+
+
 def test_expire_deletes_stale_rotations_keeps_fresh_and_live(tmp_path: Path) -> None:
     stale = tmp_path / "engine.log.4"
     stale.write_text("x", encoding="utf-8")

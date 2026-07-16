@@ -96,3 +96,21 @@ export function appendCapped(prev: LogEntry[], next: LogEntry[], max: number): L
   const merged = prev.concat(next)
   return merged.length > max ? merged.slice(merged.length - max) : merged
 }
+
+// Identity used to stitch the ring→disk seam. NOT `seq` — that's ring-only (the same event on disk
+// has no seq), so a ring line and its disk twin would look different. ts+logger+message+ipo_id is
+// effectively unique at microsecond ts resolution, and matches across both sources.
+function entryKey(e: LogEntry): string {
+  return `${e.ts ?? ''}|${e.logger ?? ''}|${e.message ?? ''}|${e.ipo_id ?? ''}`
+}
+
+// Scroll-back stitch: prepend an older disk page ahead of the current buffer, dropping any entry
+// already shown (the boundary line overlaps because the `before` cursor is inclusive). So the one
+// continuous timeline — ring flowing into disk — has NO duplicate and NO gap at the seam. Returns
+// the same array reference when nothing new is older (lets the caller detect "history exhausted").
+export function prependOlder(older: LogEntry[], current: LogEntry[]): LogEntry[] {
+  if (older.length === 0) return current
+  const seen = new Set(current.map(entryKey))
+  const fresh = older.filter((e) => !seen.has(entryKey(e)))
+  return fresh.length === 0 ? current : fresh.concat(current)
+}
