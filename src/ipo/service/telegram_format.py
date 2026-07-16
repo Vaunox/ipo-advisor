@@ -79,7 +79,7 @@ def _row_line(row: FeedHealth, note: str) -> str:
 def format_digest(
     status: VmStatus, *, since_by_key: Mapping[str, tuple[int, datetime]] | None = None
 ) -> str:
-    """Render the twice-daily digest / ``/status`` snapshot (HTML, aligned monospace body).
+    """Render the periodic digest / ``/status`` snapshot (HTML, aligned monospace body).
 
     ``since_by_key`` annotates a still-broken row with ``N consecutive since HH:MM`` (from the alert
     state), so an ongoing failure shows its count + start time; healthy rows carry no note.
