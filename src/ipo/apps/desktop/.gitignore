@@ -2,3 +2,7 @@ node_modules/
 dist/
 release/
 *.tsbuildinfo
+
+# Local VM read-API address — baked into the .exe at build, never committed (the VM IP was
+# scrubbed from the public repo; only vm-config.example.json ships, showing the shape).
+vm-config.json

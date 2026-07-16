@@ -29,7 +29,8 @@
     "files": [
       "dist/**/*",
       "!dist/**/*.test.js",
-      "splash.html"
+      "splash.html",
+      "vm-config.json"
     ],
     "extraResources": [
       { "from": "../pwa/dist", "to": "pwa" },

@@ -44,13 +44,41 @@ export function findRepoRoot(start: string): string {
   return start
 }
 
+/** Resolve the VM read-API base URL to hand the engine, in priority order:
+ *    1. `VM_BASE_URL` in the environment — a runtime override (dev, and the reversibility escape hatch:
+ *       set it empty to force local-only without a rebuild);
+ *    2. `vm-config.json` beside the app — GITIGNORED; the operator's local build supplies the real URL
+ *       and electron-builder bakes the file into the .exe. Never committed (the VM IP was scrubbed
+ *       from the public repo; only `vm-config.example.json` ships, showing the shape).
+ *    3. `''` → the engine runs LOCAL-ONLY. This is the fail-safe: an absent or still-placeholder config
+ *       degrades to direct NSE scraping (the pre-VM behaviour), never a silently-broken URL.
+ *  `__dirname` is `<app>/dist` in dev and inside `app.asar/dist` in prod, so `../vm-config.json`
+ *  resolves in both (the file is bundled at the app root via the `files` list). */
+export function resolveVmBaseUrl(): string {
+  const fromEnv = (process.env.VM_BASE_URL ?? '').trim()
+  if (fromEnv) return fromEnv
+  try {
+    const raw = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', 'vm-config.json'), 'utf8'),
+    ) as { vmBaseUrl?: unknown }
+    const url = typeof raw.vmBaseUrl === 'string' ? raw.vmBaseUrl.trim() : ''
+    return url && !url.includes('<') ? url : '' // ignore the placeholder shape (http://<VM_IP>:8000)
+  } catch {
+    return '' // absent / unreadable / malformed → local-only
+  }
+}
+
 /** Spawn the engine on `port`. Dev runs the module from source with the venv python; prod runs the
  *  bundled PyInstaller binary. stdout/stderr are piped so the shell can log/observe the engine;
  *  stdin is piped so the shell can ask the engine to run a real NSE pull on window open/focus (v3
  *  BUG 1 / Defect 1). stdin is a parent-only channel — the renderer cannot reach it, so the HTTP API
- *  stays GET-only and the UI stays incapable of making the engine act (Inviolable Rule 6). */
+ *  stays GET-only and the UI stays incapable of making the engine act (Inviolable Rule 6).
+ *
+ *  `VM_BASE_URL` is baked into the engine's env here (v3 V3-1 flip): with a configured VM the engine
+ *  is VM-primary with honest local fallback; with none it is local-only, exactly as before. */
 export function spawnEngine(port: number, opts: SpawnOpts): ChildProcess {
   const dataDirArgs = opts.dataDir ? ['--data-dir', opts.dataDir] : []
+  const vmBaseUrl = resolveVmBaseUrl()
   if (opts.dev) {
     const py =
       process.platform === 'win32'
@@ -58,12 +86,18 @@ export function spawnEngine(port: number, opts: SpawnOpts): ChildProcess {
         : path.join(opts.repoRoot, '.venv', 'bin', 'python')
     return spawn(py, ['-m', 'ipo.service.runner', '--port', String(port), ...dataDirArgs], {
       cwd: opts.repoRoot,
-      env: { ...process.env, PYTHONPATH: path.join(opts.repoRoot, 'src'), PYTHONUNBUFFERED: '1' },
+      env: {
+        ...process.env,
+        PYTHONPATH: path.join(opts.repoRoot, 'src'),
+        PYTHONUNBUFFERED: '1',
+        VM_BASE_URL: vmBaseUrl,
+      },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
   }
   if (!opts.enginePath) throw new Error('enginePath is required in production')
   return spawn(opts.enginePath, ['--port', String(port), ...dataDirArgs], {
+    env: { ...process.env, VM_BASE_URL: vmBaseUrl },
     stdio: ['pipe', 'pipe', 'pipe'],
   })
 }
