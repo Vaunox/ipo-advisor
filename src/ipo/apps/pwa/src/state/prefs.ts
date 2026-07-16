@@ -38,6 +38,7 @@ interface Prefs {
   notifiedCrossings: string[]
   notifSeeded: boolean
   awaitingCollapsed: boolean
+  devConsole: boolean
 }
 
 const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
@@ -69,6 +70,7 @@ function load(): Prefs {
       notifiedCrossings: Array.isArray(p.notifiedCrossings) ? p.notifiedCrossings : [],
       notifSeeded: p.notifSeeded === true,
       awaitingCollapsed: p.awaitingCollapsed === true,
+      devConsole: p.devConsole === true, // v3 V3-16: default OFF — a fresh install ships it off
     }
   } catch {
     return {
@@ -83,6 +85,7 @@ function load(): Prefs {
       notifiedCrossings: [],
       notifSeeded: false,
       awaitingCollapsed: false,
+      devConsole: false,
     }
   }
 }
@@ -119,6 +122,7 @@ interface UiPrefs {
   notifications: NotifPrefs
   pinned: string[]
   awaitingCollapsed: boolean
+  devConsole: boolean
 }
 interface DesktopBridge {
   getPrefs?: () => Promise<UiPrefs | null>
@@ -135,6 +139,7 @@ function uiSnapshot(): UiPrefs {
     notifications: prefs.notifications,
     pinned: prefs.pinned,
     awaitingCollapsed: prefs.awaitingCollapsed,
+    devConsole: prefs.devConsole,
   }
 }
 
@@ -181,6 +186,7 @@ export async function hydrateFromDesktop(): Promise<void> {
       notifications: { ...DEFAULT_NOTIF, ...ui.notifications },
       pinned: Array.isArray(ui.pinned) ? ui.pinned : prefs.pinned,
       awaitingCollapsed: typeof ui.awaitingCollapsed === 'boolean' ? ui.awaitingCollapsed : prefs.awaitingCollapsed,
+      devConsole: typeof ui.devConsole === 'boolean' ? ui.devConsole : prefs.devConsole,
     }
     try {
       localStorage.setItem(KEY, JSON.stringify(prefs)) // keep the mirror fresh for next cold start
@@ -251,6 +257,21 @@ export const getAwaitingCollapsed = (): boolean => prefs.awaitingCollapsed
 export function setAwaitingCollapsed(collapsed: boolean): void {
   prefs = { ...prefs, awaitingCollapsed: collapsed }
   save() // durable: localStorage mirror + write-through to the app config file (survives restart)
+}
+
+/* ---- dev console (v3 V3-16) — durable on/off, default OFF; the ` key toggles it open when ON ---- */
+// Read REACTIVELY (like theme, not the single-writer caches above): the Settings toggle writes it,
+// but App also reads it and must react to Settings' write — close the console + deaden the ` key
+// the instant it's turned off. The console-OPEN state is separate ephemeral React state in App and
+// is deliberately NOT persisted (a dev affordance is closed on restart). `getDevConsole` is a
+// primitive snapshot, so useSyncExternalStore re-renders only when the flag actually flips.
+export const getDevConsole = (): boolean => prefs.devConsole
+export function setDevConsole(on: boolean): void {
+  prefs = { ...prefs, devConsole: on }
+  save() // durable: localStorage mirror + write-through to the app config file (survives restart)
+}
+export function useDevConsole(): boolean {
+  return useSyncExternalStore(subscribe, getDevConsole, getDevConsole)
 }
 
 /* ---- pinned ---- */

@@ -74,3 +74,17 @@ test('resolveTheme maps system via matchMedia (light in this env)', () => {
   assert.equal(P.resolveTheme('dark'), 'dark')
   assert.equal(P.resolveTheme('light'), 'light')
 })
+
+test('devConsole is OFF by default and setDevConsole persists + notifies (v3 V3-16)', () => {
+  assert.equal(P.getDevConsole(), false) // a fresh install ships the console OFF
+  let hits = 0
+  const unsub = P.subscribe(() => {
+    hits++
+  })
+  P.setDevConsole(true)
+  assert.equal(P.getDevConsole(), true) // read through the store (backs useDevConsole) — no cache
+  assert.ok(hits >= 1, 'a write notifies subscribers, so App reacts when Settings flips it')
+  P.setDevConsole(false)
+  assert.equal(P.getDevConsole(), false)
+  unsub()
+})

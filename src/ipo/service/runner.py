@@ -187,6 +187,7 @@ def build_service(
     refresh: Callable[[], None] | None = None,
     ingest_state: IngestStateStore | None = None,
     context_store: ContextStore | None = None,
+    log_dir: Path | None = None,
     clock: Callable[[], datetime] = now_ist,
 ) -> Service:
     """Wire the layers into a running service (composition only — no new logic).
@@ -239,6 +240,7 @@ def build_service(
             calibration_report_path=calibration_report_path,
             ingest_state=ingest_state,
             context_store=context_store,
+            log_dir=log_dir,
         ),
     )
 
@@ -373,6 +375,7 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         refresh=_live_refresh(config, repository, data_dir, ingest_state),
         ingest_state=ingest_state,
         context_store=context_store,
+        log_dir=data_dir / "logs",  # v3 V3-16: GET /logs reads the rotated files here for history
         # A logging transport so a 'push' notify channel never crashes for lack of one (the
         # user-facing alerts are the renderer's native toasts; this just journals crossings).
         push_transport=lambda message: log.info("notify_crossing", extra={"message": message}),

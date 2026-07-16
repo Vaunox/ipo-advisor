@@ -83,3 +83,7 @@ export const useTransitionsFor = (id: string | null) =>
     queryFn: () => apiGet<VerdictTransition[]>(`/transitions/${id}`),
     enabled: !!id,
   })
+
+// v3 V3-16: the debug console's live tail is NOT a react-query read — it accumulates lines across
+// `since`-cursor polls (a stateful tail, not a cache-replace), so ConsoleLog polls apiGet('/logs')
+// directly. No hook here on purpose.

@@ -35,6 +35,7 @@ from ipo.data.ingest.state import IngestStateStore
 from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
 from ipo.service.ipo_context import ContextStore, build_allotment_view, build_ipo_context
+from ipo.service.logs import clamp_limit, file_history, ring_tail
 from ipo.service.views import (
     AllotmentView,
     CalibrationView,
@@ -42,6 +43,7 @@ from ipo.service.views import (
     IpoContextView,
     IPODetail,
     IPOListRow,
+    LogsView,
     StatusView,
     VerdictTransitionView,
 )
@@ -53,6 +55,7 @@ def create_app(
     calibration_report_path: Path | None = None,
     ingest_state: IngestStateStore | None = None,
     context_store: ContextStore | None = None,
+    log_dir: Path | None = None,
 ) -> FastAPI:
     """Build the read-only advisory API over a composed ``VerdictEngine``.
 
@@ -230,5 +233,32 @@ def create_app(
             version=engine.calibrator_version,
             gate_passed=engine.calibrator_gate_passed,
         )
+
+    @app.get("/logs", response_model=LogsView)
+    def logs(
+        since: int = 0, limit: int = 500, history: bool = False, before: str | None = None
+    ) -> LogsView:
+        """The debug console's read (v3 V3-16) — structured log entries (read-only).
+
+        The console shows ONE continuous timeline; this endpoint serves its two ends:
+
+        * Live tail (default): the in-memory ring buffer — entries with ``seq > since`` (so the
+          client polls only what's new), newest ``limit``; ``last_seq`` is the cursor to send back.
+        * Older history (``history=true``): the durable rotated files, entries with ``ts <= before``
+          (the scroll-back cursor), newest ``limit`` — the client pages backward with this as it
+          scrolls up, stitching disk onto the ring by timestamp.
+
+        Every entry was redacted at write time (``core.logging.redacted_payload``), so no
+        token/PAN/auth-header can appear. GET-only — reading never triggers anything (Invariants 4 &
+        6); a window, not a control surface.
+        """
+        capped = clamp_limit(limit)
+        if history:
+            entries = (
+                file_history(log_dir, limit=capped, before=before) if log_dir is not None else []
+            )
+            return LogsView(entries=entries, last_seq=0, source="history")
+        entries, last_seq = ring_tail(since=since, limit=capped)
+        return LogsView(entries=entries, last_seq=last_seq, source="ring")
 
     return app

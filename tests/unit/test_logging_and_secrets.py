@@ -122,29 +122,37 @@ def test_redaction_recurses_into_nested_extras() -> None:
     assert "[REDACTED]" in line
 
 
-def test_every_configured_handler_uses_a_redacting_formatter(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Structural guarantee: configure_logging wires a redacting formatter onto EVERY sink.
+def test_every_configured_sink_redacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Structural guarantee: configure_logging wires redaction onto EVERY sink.
 
-    Redaction can't be bypassed by a new log call because it lives in the formatter each handler
-    runs — and both the stderr and the rotating-file handler get one.
+    The stderr and rotating-file handlers redact via their formatter (redaction lives in the
+    formatter each runs, so a new log call can't bypass it); the debug-console ring buffer (V3-16)
+    redacts at store time via ``redacted_payload``. No sink the file or the console can read is left
+    un-redacted.
     """
     import ipo.core.logging as logging_module
 
     root = logging.getLogger()
     saved = root.handlers[:]
+    saved_ring = logging_module._RING
     monkeypatch.setattr(logging_module, "_CONFIGURED", False)
     try:
         configure_logging("INFO", file_path=tmp_path / "logs" / "engine.log")
         handlers = root.handlers
-        assert len(handlers) == 2  # stderr + rotating file
-        for handler in handlers:
+        assert len(handlers) == 3  # stderr + ring buffer + rotating file
+        text_sinks = [h for h in handlers if not isinstance(h, logging_module.RingBufferHandler)]
+        assert len(text_sinks) == 2  # stderr + rotating each carry a redacting formatter
+        for handler in text_sinks:
             assert isinstance(
                 handler.formatter,
                 (JsonFormatter, logging_module._RedactingTextFormatter),
             )
+        rings = [h for h in handlers if isinstance(h, logging_module.RingBufferHandler)]
+        assert len(rings) == 1  # the console's live-tail sink
+        rings[0].emit(_record("x", token="s3cr3t"))  # redacts at store time, not via a formatter
+        assert rings[0].entries()[-1]["token"] == "[REDACTED]"
     finally:
         for handler in root.handlers:
             handler.close()
         root.handlers = saved
+        logging_module._RING = saved_ring
