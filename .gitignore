@@ -12,6 +12,11 @@ raw_cache/
 # Build / packaging
 dist/
 build/
+# v3 V3-12: the desktop electron icon-source assets (icon.ico + appx tiles) live under a `build/`
+# dir that the broad rule above over-matches. They are SOURCE assets the build needs (not output),
+# so re-include that specific tree — the app logo must be version-controlled + reproducible.
+!src/ipo/apps/desktop/build/
+!src/ipo/apps/desktop/build/**
 release/
 store-assets/
 *.spec.bak
