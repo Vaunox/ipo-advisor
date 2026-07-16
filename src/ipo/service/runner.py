@@ -15,6 +15,7 @@ inherited and re-proven end-to-end at GATE 6:
 from __future__ import annotations
 
 import sys
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -39,6 +40,8 @@ from ipo.service.scheduler import CycleResult, ScoringScheduler
 from ipo.service.transitions import TransitionStore
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+
+_log = get_logger("ipo.service.runner")
 
 # Bump whenever the bundled seed store changes so an *update* refreshes a user's data dir instead of
 # keeping stale records forever (provisioning otherwise never overwrites). v2 dropped the fabricated
@@ -122,6 +125,32 @@ class Service:
         cycle = self.scheduler.run_cycle()
         alerted = notify_crossings(cycle, self.notifier, self.config)
         return cycle, alerted
+
+
+# After an *unexpected* cycle exception, back off this long, then run the next cycle. ``run_cycle``
+# is contracted to degrade rather than raise (``refresh_from_nse`` never raises), but that is not
+# airtight — a disk-full parquet write, a torn ``ingest_state`` flush, or any unforeseen error could
+# still surface. Letting it propagate out of the daemon-thread loop would kill the scheduler
+# SILENTLY: uvicorn keeps ``/health`` green and the UI renders, while no cycle ever runs again and
+# verdicts freeze forever (the healthy-looking-corpse this pass exists to prevent). Catch + log +
+# retry is the fix; the short backoff avoids hammering a genuine fault while never wedging.
+_FAILSAFE_CADENCE_MIN = 5
+
+
+def _run_cycle_guarded(service: Service, cycle_lock: threading.Lock) -> int:
+    """Run one scheduler cycle under the lock and return the next cadence — never raising (v3 B1).
+
+    On success returns the scheduler's windowed cadence. On ANY exception it logs
+    ``scheduler_cycle_failed`` (ERROR, with the traceback) and returns a short failsafe cadence, so
+    the driving loop sleeps briefly and runs the *next* cycle instead of the thread dying silently.
+    """
+    try:
+        with cycle_lock:
+            service.run_cycle()
+        return service.scheduler.next_cadence_minutes()
+    except Exception as exc:  # noqa: BLE001 — one bad cycle must never kill the scheduler thread
+        _log.error("scheduler_cycle_failed", exc_info=exc, extra={"error": str(exc)})
+        return _FAILSAFE_CADENCE_MIN
 
 
 def build_service(
@@ -251,7 +280,6 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     a hardcoded port that could collide). Bound to 127.0.0.1 by default — the sidecar is local only.
     """
     import argparse
-    import threading
     import time
 
     import uvicorn
@@ -336,10 +364,9 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         ingest_state.set_next_refresh(now_ist() + timedelta(minutes=cadence_min) if clean else None)
 
     def loop() -> None:
+        _log.info("scheduler_loop_started")
         while True:
-            with cycle_lock:
-                service.run_cycle()
-            cadence = service.scheduler.next_cadence_minutes()
+            cadence = _run_cycle_guarded(service, cycle_lock)
             record_next_refresh(cadence)
             time.sleep(cadence * 60)
 
@@ -363,8 +390,11 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
                     log.info("stdin_refresh_debounced", extra={"age_sec": round(age, 1)})
                     continue
             log.info("stdin_refresh_triggered")
-            with cycle_lock:
-                service.run_cycle()
+            try:
+                with cycle_lock:
+                    service.run_cycle()
+            except Exception as exc:  # noqa: BLE001 — a failed on-open pull must not end the loop
+                log.error("stdin_refresh_failed", exc_info=exc, extra={"error": str(exc)})
             if ingest_state is not None:
                 ingest_state.set_next_refresh(
                     None
