@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useBoard, useCalibration, useHistory } from '../api/hooks'
 import type { CalibrationView, HistoryRow, IPOListRow, VerdictType } from '../api/types'
 import { Loading } from '../components/Loading'
-import { getCosts } from '../state/prefs'
+import { getAwaitingCollapsed, getCosts, setAwaitingCollapsed } from '../state/prefs'
 import { awaitingLabel, isListed, midnight, today } from '../status'
 import { VMETA } from '../verdict'
 
@@ -187,14 +187,29 @@ function ReliabilityDiagram({ cal }: { cal: CalibrationView }) {
 // and the listing price backfills. This surfaces those in-between IPOs so a closed / just-listed
 // call never silently vanishes between Live and the outcome table below.
 function AwaitingList({ rows, onOpen }: { rows: IPOListRow[]; onOpen: (id: string) => void }) {
+  // Single-writer local cache is safe here (this toggle is the only reader+writer of the pref).
+  const [collapsed, setCollapsed] = useState(() => getAwaitingCollapsed())
   if (!rows.length) return null
   const overdue = rows.filter((r) => r.listing_overdue).length
+  const toggle = () => {
+    const next = !collapsed
+    setCollapsed(next)
+    setAwaitingCollapsed(next) // durable persist (survives restart)
+  }
+  const header = (
+    <button className="sec awaiting-head" aria-expanded={!collapsed} onClick={toggle}>
+      <span className="disc" aria-hidden="true">
+        ▸
+      </span>
+      Awaiting listing outcome ({rows.length})
+      {overdue > 0 && <span className="strand-tag"> · {overdue} overdue</span>}
+    </button>
+  )
+  // Collapsed: render the header only, so the body is genuinely gone and the room is reclaimed.
+  if (collapsed) return <div className="card awaiting">{header}</div>
   return (
-    <div className="card">
-      <h3 className="sec">
-        Awaiting listing outcome ({rows.length})
-        {overdue > 0 && <span className="strand-tag"> · {overdue} overdue</span>}
-      </h3>
+    <div className="card awaiting">
+      {header}
       <div className="rows">
         {rows.map((r) => {
           const m = VMETA[r.verdict]
