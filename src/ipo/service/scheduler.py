@@ -20,13 +20,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol, runtime_checkable
 
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig
 from ipo.core.logging import get_logger
 from ipo.core.types import IPORecord, Verdict, VerdictType
+from ipo.service.lifecycle import listing_overdue_state
 from ipo.service.transitions import VerdictTransition
 
 _log = get_logger("ipo.service.scheduler")
@@ -78,6 +79,9 @@ class ScoringScheduler:
         self._on_transition = on_transition
         self._clock = clock
         self._last_verdict: dict[str, VerdictType] = dict(initial_last or {})
+        # finding-④: ipo_id -> last overdue-listing state, so a strand is logged once when it
+        # crosses into overdue (or changes mode), never re-logged while it stays overdue.
+        self._overdue_state: dict[str, str] = {}
 
     def run_cycle(self) -> CycleResult:
         """Refresh (if wired), score, and emit the APPLY crossings since the last cycle.
@@ -129,6 +133,7 @@ class ScoringScheduler:
                         )
                     )
             self._last_verdict[verdict.ipo_id] = verdict.verdict
+        self._log_overdue_crossings(when.date())
         _log.info(
             "scheduler_cycle_done",
             extra={
@@ -138,6 +143,26 @@ class ScoringScheduler:
             },
         )
         return CycleResult(asof=when, verdicts=verdicts, became_apply=became_apply)
+
+    def _log_overdue_crossings(self, today: date) -> None:
+        """Log ``overdue_listing_detected`` (WARN) when an IPO crosses INTO a listing strand.
+
+        finding-④: the console shows the strand live — not only when the operator runs the heartbeat
+        ritual. Crossing-only: an IPO that stays overdue is not re-logged every cycle; a mode change
+        (``unresolved`` → ``unpriced``) is. Reuses the same prior-state diff as verdict transitions,
+        the same mechanism applied twice, not new bespoke state.
+        """
+        current: dict[str, str] = {}
+        for record in self._source.records():
+            state = listing_overdue_state(record, today)
+            if state is None:
+                continue  # on track (open, within the listing window, or fully resolved)
+            current[record.ipo_id] = state
+            if self._overdue_state.get(record.ipo_id) != state:  # new strand, or a changed mode
+                _log.warning(
+                    "overdue_listing_detected", extra={"ipo_id": record.ipo_id, "state": state}
+                )
+        self._overdue_state = current  # drop resolved strands so a later re-strand logs afresh
 
     def next_cadence_minutes(self) -> int:
         """30 min while any subscription book is open (verdicts move), else the default ~6h."""

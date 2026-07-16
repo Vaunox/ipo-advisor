@@ -174,6 +174,27 @@ def test_cycle_brackets_and_verdict_transition_are_logged(
     assert done.__dict__["became_apply"] == 1
 
 
+def test_overdue_listing_crossing_is_logged_once(caplog: pytest.LogCaptureFixture) -> None:
+    # finding-④: a listing strand shows on the console live (once, on the crossing) — not only when
+    # the operator runs the heartbeat ritual — and is NOT re-logged every cycle while it persists.
+    config = load_config(env="dev", environ={})
+    stranded = _record(open_d=date(2026, 1, 1), close_d=date(2026, 1, 3))  # closed, never listed
+    clock = lambda: datetime(2026, 6, 15, 12, tzinfo=IST)  # noqa: E731 — well past close + grace
+    source = _FakeSource([], [stranded])
+    scheduler = ScoringScheduler(source=source, config=config, clock=clock)
+    with caplog.at_level(logging.WARNING, logger="ipo.service.scheduler"):
+        scheduler.run_cycle()  # crosses INTO overdue → logged once
+        first = [r for r in caplog.records if r.getMessage() == "overdue_listing_detected"]
+        caplog.clear()
+        scheduler.run_cycle()  # still overdue, unchanged → silent
+        second = [r for r in caplog.records if r.getMessage() == "overdue_listing_detected"]
+
+    assert len(first) == 1
+    assert first[0].__dict__["ipo_id"] == stranded.ipo_id
+    assert first[0].__dict__["state"] == "unresolved"  # Mode 1: closed but never resolved
+    assert second == []  # crossing-only: not re-logged while it stays overdue
+
+
 def test_cadence_is_windowed() -> None:
     config = load_config(env="dev", environ={})
     clock = lambda: datetime(2026, 6, 15, 12, tzinfo=IST)  # noqa: E731
