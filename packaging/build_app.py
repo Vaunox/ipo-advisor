@@ -2,13 +2,17 @@
 
 Runs every prerequisite then invokes electron-builder:
 
-    1. make_icon.py        -> desktop/build/icon.ico
-    2. build_engine.py     -> packaging/dist/ipo-engine/ (frozen sidecar + bundled seed)
-    3. pwa `npm run build` -> pwa/dist/ (the React dashboard)
-    4. desktop `npm run dist` (electron-builder) -> desktop/release/IPO-Advisor-Setup-*.exe
+    1. build_engine.py     -> packaging/dist/ipo-engine/ (frozen sidecar + bundled seed)
+    2. pwa `npm run build` -> pwa/dist/ (the React dashboard)
+    3. desktop `npm run dist` (electron-builder) -> desktop/release/IPO-Advisor-Setup-*.exe
 
 The engine binary and the PWA dist are pulled in as electron-builder extraResources, so the
 installer is fully self-contained. Requires Node/npm on PATH and the venv Python running this.
+
+The desktop app icon (build/icon.ico) and the MSIX tiles (build/appx/*) are curated, committed
+assets (the V3-12 "vertex-jewel" logo) — not generated as part of this build. There is no
+regenerable source for them in this repo, so nothing here touches them; replace the files
+directly if the branding ever changes.
 
     python packaging/build_app.py [--skip-install]
 """
@@ -30,11 +34,10 @@ def _run(cmd: list[str], cwd: Path, *, shell: bool = False) -> None:
 
 
 def main() -> int:
-    """Run icon → engine → pwa → installer in sequence."""
+    """Run engine → pwa → installer in sequence."""
     skip_install = "--skip-install" in sys.argv
     npm = "npm.cmd" if sys.platform == "win32" else "npm"
 
-    _run([sys.executable, "packaging/make_icon.py"], _ROOT)
     _run([sys.executable, "packaging/build_engine.py"], _ROOT)
     if not skip_install:
         _run([npm, "install"], _PWA)
