@@ -254,3 +254,8 @@ class StatusView(BaseModel):
     last_attempt_ok: bool | None
     records_source: str | None = None
     context_source: str | None = None
+    # v3 QoL: when the next scheduled refresh fires — a tooltip-only hint. ``None`` whenever it
+    # can't be honestly predicted (failing feed, VM fallback, or just after a manual refresh), so
+    # the UI shows nothing rather than a guess. Never presented as freshness — that stays on
+    # ``last_successful_ingest``.
+    next_refresh_at: datetime | None = None

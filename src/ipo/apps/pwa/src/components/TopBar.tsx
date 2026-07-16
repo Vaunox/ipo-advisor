@@ -118,6 +118,13 @@ function SyncStatus() {
     title = `${title} · ${fb.title}`
   }
 
+  // v3 QoL: append the next scheduled refresh to the TOOLTIP only (never the visible chip). The
+  // engine sends `next_refresh_at` only when it can be honestly predicted (it's null on a failing
+  // feed, a fallback, or just after a manual refresh) — so we simply show it when present, never a
+  // guessed time. It reflects the engine's own windowed cadence (~30 min while a book is open, ~6h
+  // otherwise), i.e. when NSE data actually gets newer — not the 5s UI poll that only re-reads.
+  if (s?.next_refresh_at) title = `${title} · next refresh ~${istTimeOf(s.next_refresh_at)} IST`
+
   const dot = state === 'err' ? 'sync err' : state === 'warn' ? 'sync warn' : state === 'busy' ? 'sync on' : 'sync'
   return (
     <div className={`syncstat ${state}`} role="status" aria-live="polite" title={title}>

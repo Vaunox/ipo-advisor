@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -317,11 +317,31 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     # serializes them so two cycles never overlap on the store (v3 BUG 1 / Defect 1).
     cycle_lock = threading.Lock()
 
+    # v3 QoL: publish when the next refresh fires, but ONLY when it's honestly predictable.
+    # The cadence is windowed (~30 min while a book is open, ~6 h otherwise); the 5 s UI poll only
+    # re-reads the local store and is NOT when NSE data gets newer. Record the next tick after a
+    # CLEAN cycle (fresh pull from the VM, or a local scrape when no VM is set); clear it — tooltip
+    # shows nothing — on a failing feed, a VM fallback, or a manual refresh.
+    import os
+
+    vm_configured = bool(os.environ.get("VM_BASE_URL", "").strip())
+
+    def record_next_refresh(cadence_min: int) -> None:
+        if ingest_state is None:
+            return
+        s = ingest_state.current()
+        clean = s.last_attempt_ok is True and (
+            s.source == "vm" or (s.source == "local" and not vm_configured)
+        )
+        ingest_state.set_next_refresh(now_ist() + timedelta(minutes=cadence_min) if clean else None)
+
     def loop() -> None:
         while True:
             with cycle_lock:
                 service.run_cycle()
-            time.sleep(service.scheduler.next_cadence_minutes() * 60)
+            cadence = service.scheduler.next_cadence_minutes()
+            record_next_refresh(cadence)
+            time.sleep(cadence * 60)
 
     def stdin_refresh_loop() -> None:
         """Run a real refresh cycle when the desktop shell writes 'refresh' to our stdin.
@@ -345,6 +365,10 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
             log.info("stdin_refresh_triggered")
             with cycle_lock:
                 service.run_cycle()
+            if ingest_state is not None:
+                ingest_state.set_next_refresh(
+                    None
+                )  # a manual pull perturbs the schedule → hide next
 
     threading.Thread(target=loop, daemon=True).start()
     threading.Thread(target=stdin_refresh_loop, daemon=True).start()
