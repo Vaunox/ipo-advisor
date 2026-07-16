@@ -87,3 +87,12 @@ export function shortTs(ts: string | undefined): string {
   const t = ts.slice(11, 23)
   return t.length >= 8 ? t : ts
 }
+
+// The live tail's accumulation step: append the newly-polled lines (fetched via the `since` cursor,
+// so no overlap) and keep only the newest `max` — a constant-memory client buffer that never grows
+// unbounded no matter how long the console stays open. Empty `next` leaves the buffer untouched.
+export function appendCapped(prev: LogEntry[], next: LogEntry[], max: number): LogEntry[] {
+  if (next.length === 0) return prev
+  const merged = prev.concat(next)
+  return merged.length > max ? merged.slice(merged.length - max) : merged
+}

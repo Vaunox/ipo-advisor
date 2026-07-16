@@ -10,7 +10,6 @@ import type {
   IPODetail,
   IPOListRow,
   IpoContextView,
-  LogsResponse,
   StatusView,
   Verdict,
   VerdictTransition,
@@ -85,18 +84,6 @@ export const useTransitionsFor = (id: string | null) =>
     enabled: !!id,
   })
 
-// v3 V3-16: the read-only debug console's log. `enabled` gates the fetch on the console being open,
-// so it costs nothing until the console is shown. No auto-poll (a static read the operator refreshes
-// or reopens); `history` reads the durable rotated files for scroll-back instead of the live ring.
-export const useLogs = (enabled: boolean, opts?: { history?: boolean; limit?: number }) =>
-  useQuery({
-    queryKey: ['logs', opts?.history ?? false, opts?.limit ?? 500],
-    queryFn: () => {
-      const p = new URLSearchParams()
-      if (opts?.history) p.set('history', 'true')
-      if (opts?.limit) p.set('limit', String(opts.limit))
-      const qs = p.toString()
-      return apiGet<LogsResponse>(`/logs${qs ? `?${qs}` : ''}`)
-    },
-    enabled,
-  })
+// v3 V3-16: the debug console's live tail is NOT a react-query read — it accumulates lines across
+// `since`-cursor polls (a stateful tail, not a cache-replace), so ConsoleLog polls apiGet('/logs')
+// directly. No hook here on purpose.

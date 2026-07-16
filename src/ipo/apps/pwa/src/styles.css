@@ -422,7 +422,15 @@ body.compact .meter { margin-top:6px; }
 
 /* debug console log (v3 V3-16) — read-only terminal window; follows the app theme via the tokens */
 .cl-overlay { position:fixed; inset:0; background:rgba(3,6,10,.62); backdrop-filter:blur(3px); z-index:55; display:flex; align-items:center; justify-content:center; padding:5vh 20px; }
-.cl { width:min(1000px, 96vw); height:min(78vh, 760px); display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line2); border-radius:12px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.5); }
+/* ALWAYS DARK: a dev tool, and the level colours are calibrated for a dark ground — so the console
+   redefines the tokens locally (fixed dark values) instead of inheriting the app's light/dark theme.
+   Every var(--…) below this point resolves to these, in either app theme. */
+.cl {
+  --bg:#0a0d12; --panel:#0f141b; --panel2:#141b24; --line:#1e2732; --line2:#28323f;
+  --tx:#e6ecf3; --tx2:#a6b3c4; --tx3:#7f8ea3; --accent:#5aa2ff;
+  --apply:#3ddc84; --marginal:#f5c451; --skip:#ff5d63;
+  --apply-bg:#0e2b1c; --marginal-bg:#2e2610; --skip-bg:#2e1113;
+  width:min(1000px, 96vw); height:min(78vh, 760px); display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line2); border-radius:12px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.5); }
 .cl-top { display:flex; align-items:center; gap:10px; padding:10px 13px; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--bg) 55%, var(--panel)); flex-wrap:wrap; }
 .cl-title { font-family:'Fira Code', ui-monospace, monospace; font-size:12px; font-weight:600; letter-spacing:.03em; color:var(--tx2); }
 .cl-filters { display:flex; gap:5px; }

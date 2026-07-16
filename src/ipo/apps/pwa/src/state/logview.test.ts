@@ -3,7 +3,15 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { collapse, filterEntries, formatDetail, levelClass, levelCode, shortTs } from './logview.ts'
+import {
+  appendCapped,
+  collapse,
+  filterEntries,
+  formatDetail,
+  levelClass,
+  levelCode,
+  shortTs,
+} from './logview.ts'
 
 test('levelClass buckets names into info/warn/err and never drops one', () => {
   assert.equal(levelClass('INFO'), 'info')
@@ -78,4 +86,17 @@ test('collapse keeps different ipo_ids distinct even under the same event', () =
 test('shortTs slices HH:MM:SS.mmm out of the ISO timestamp', () => {
   assert.equal(shortTs('2026-07-16T09:42:00.118+05:30'), '09:42:00.118')
   assert.equal(shortTs(undefined), '')
+})
+
+test('appendCapped appends new tail lines and keeps only the newest max', () => {
+  const prev = [{ message: 'a' }, { message: 'b' }]
+  assert.equal(appendCapped(prev, [], 10), prev) // empty poll → same buffer, no churn
+  assert.deepEqual(
+    appendCapped(prev, [{ message: 'c' }], 10).map((e) => e.message),
+    ['a', 'b', 'c'], // appended in order
+  )
+  assert.deepEqual(
+    appendCapped(prev, [{ message: 'c' }, { message: 'd' }], 3).map((e) => e.message),
+    ['b', 'c', 'd'], // capped to newest 3 (oldest dropped) — constant memory
+  )
 })
