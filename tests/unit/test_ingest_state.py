@@ -78,3 +78,27 @@ def test_corrupt_file_starts_clean(tmp_path: Path) -> None:
     path.write_text("{ not valid json", encoding="utf-8")
     # A partial/corrupt file must not crash the engine — start clean rather than raise.
     assert IngestStateStore(path).current() == IngestState()
+
+
+def test_next_refresh_defaults_none_and_round_trips(tmp_path: Path) -> None:
+    store = IngestStateStore(tmp_path / "ingest_state.json")
+    assert (
+        store.next_refresh() is None
+    )  # honest default — no prediction until a clean cycle sets one
+    t = datetime(2026, 7, 14, 9, 30)
+    store.set_next_refresh(t)
+    assert store.next_refresh() == t
+    store.set_next_refresh(None)  # a manual refresh / fallback clears it → tooltip shows nothing
+    assert store.next_refresh() is None
+
+
+def test_next_refresh_is_in_memory_only_not_persisted(tmp_path: Path) -> None:
+    # The next-refresh time is a live schedule fact that must NOT survive a restart (a reboot
+    # perturbs the cadence). A fresh store from the same file must not resurrect a stale value.
+    path = tmp_path / "ingest_state.json"
+    store = IngestStateStore(path)
+    store.record_success(datetime(2026, 7, 14, 9, 0))  # persisted freshness
+    store.set_next_refresh(datetime(2026, 7, 14, 9, 30))  # in-memory only
+    reloaded = IngestStateStore(path)
+    assert reloaded.current().last_success == datetime(2026, 7, 14, 9, 0)  # freshness survived
+    assert reloaded.next_refresh() is None  # the next-refresh prediction did NOT (correct)

@@ -66,6 +66,11 @@ class IngestStateStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._state = IngestState()
+        # v3 QoL: when the next scheduled refresh fires. IN-MEMORY ONLY (never persisted) — a live
+        # schedule fact that must not survive a restart (a reboot perturbs the cadence), and is None
+        # whenever the next tick can't be honestly predicted (failing feed, fallback, or right after
+        # a manual refresh) so the UI shows nothing rather than a guess.
+        self._next_refresh: datetime | None = None
         if self._path.is_file():
             try:
                 self._state = IngestState.model_validate_json(
@@ -120,6 +125,20 @@ class IngestStateStore:
         """The current freshness snapshot (a copy — safe to serialize on the API thread)."""
         with self._lock:
             return self._state.model_copy()
+
+    def set_next_refresh(self, when: datetime | None) -> None:
+        """Record when the next scheduled refresh fires, or ``None`` when it can't be honestly set.
+
+        In-memory only (not flushed): a live schedule fact, not persisted freshness. ``None`` is the
+        honest default — a next-refresh hint shows only when a clean, regular cadence holds.
+        """
+        with self._lock:
+            self._next_refresh = when
+
+    def next_refresh(self) -> datetime | None:
+        """The next scheduled refresh time, or ``None`` if it can't be honestly predicted."""
+        with self._lock:
+            return self._next_refresh
 
     def _flush(self) -> None:
         tmp = self._path.with_suffix(self._path.suffix + ".tmp")

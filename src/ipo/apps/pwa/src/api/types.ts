@@ -192,4 +192,7 @@ export interface StatusView {
   // aging), not a blanket "VM unreachable". null (dark-ship) → no fallback indicator at all.
   records_source: string | null
   context_source: string | null
+  // v3 QoL: when the next scheduled refresh fires — tooltip-only hint. null whenever it can't be
+  // honestly predicted (failing feed, VM fallback, or just after a manual refresh) → show nothing.
+  next_refresh_at: string | null
 }

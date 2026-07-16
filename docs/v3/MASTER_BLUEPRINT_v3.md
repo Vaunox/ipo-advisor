@@ -37,7 +37,9 @@ v3 has four parts, and they are ordered by risk, not by excitement:
 - **DROPPED, with reasons:** V3-7 (`mandate_end_date` — changes nothing; it is not a close-day cutoff at all), V3-10 (anchor list — redundant with QIB, and superseded at the decision clock), plus `cut_off_price` / `status`-as-display within V3-11.
 - **DEFERRED: V3-9 (subscription trend graph)** — needs the VM to first accumulate **forward interval time-series** (its persistence prerequisite was itself dropped). A genuine future option; **not started**.
 
-**Cosmetic (Part V) — NOT STARTED:** V3-12 (logo), V3-13 (header refresh button), V3-14 (awaiting-listing placement), V3-15 (readability pass) — the next block in build order, untouched.
+**Cosmetic (Part V) — DONE:** V3-12 (logo), V3-13 (header refresh button), V3-14 (awaiting-listing collapse), V3-15 (readability pass) all shipped.
+
+**V3-16 (read-only debug console) — the LAST open build item of v3.** Deliberately sequenced after the cosmetics; spec locked, run as its own task. **v3 is not complete until it lands.** (The code already anticipates it — e.g. `core/logging.py`'s ring-buffer / DEBUG-to-disk notes reference "the debug console, V3-16, which consumes them". This item was missing from the original plan's Part V list; recorded here so the remaining state is honest.)
 
 **Open / deferred (tracked so they are not lost):**
 - **V3-9** — deferred (forward interval data; see above).
