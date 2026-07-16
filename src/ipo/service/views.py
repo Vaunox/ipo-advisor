@@ -10,6 +10,7 @@ path. Every field is verbatim engine output — the ``verdict`` here is byte-for
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -259,3 +260,19 @@ class StatusView(BaseModel):
     # the UI shows nothing rather than a guess. Never presented as freshness — that stays on
     # ``last_successful_ingest``.
     next_refresh_at: datetime | None = None
+
+
+class LogsView(BaseModel):
+    """The debug console's read (v3 V3-16) — recent structured log entries, already redacted.
+
+    ``entries`` are ``{ts, level, message, …}`` dicts verbatim from the engine's own log (the ring
+    buffer for the live tail, the rotated files for history); every value was redacted at write time
+    (``core.logging.redacted_payload``), so no secret rides through. Heterogeneous by design — the
+    ``extra`` fields differ per event — so each is an open dict, not a fixed schema. ``last_seq`` is
+    the highest ring seq returned; the client passes it back as ``since`` to poll only what's new.
+    ``source`` is ``"ring"`` (live tail) or ``"history"`` (rotated files).
+    """
+
+    entries: list[dict[str, Any]]
+    last_seq: int
+    source: str

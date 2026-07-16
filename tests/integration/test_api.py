@@ -68,7 +68,10 @@ class _ListRepo:
 
 
 def _client(
-    calibrator: Calibrator, *, calibration_report_path: Path | None = None
+    calibrator: Calibrator,
+    *,
+    calibration_report_path: Path | None = None,
+    log_dir: Path | None = None,
 ) -> tuple[TestClient, list[IPORecord]]:
     config = load_config(env="dev", environ={})
     records = load_records_from_csv(_CSV)
@@ -79,7 +82,7 @@ def _client(
         config=config,
         regime=NiftyRegime(_NIFTY),
     )
-    app = create_app(engine, calibration_report_path=calibration_report_path)
+    app = create_app(engine, calibration_report_path=calibration_report_path, log_dir=log_dir)
     return TestClient(app), records
 
 
@@ -452,3 +455,36 @@ def test_board_flags_overdue_listing_strand() -> None:
     by_id = {r.ipo_id: r for r in engine.board()}
     assert by_id[stranded.ipo_id].listing_overdue is True
     assert by_id[resolved.ipo_id].listing_overdue is False  # fully resolved → no false alarm
+
+
+def test_logs_history_reads_the_rotated_files(tmp_path: Path) -> None:
+    # v3 V3-16: GET /logs?history reads the durable rotated files (scroll-back), newest-limit.
+    logdir = tmp_path / "logs"
+    logdir.mkdir()
+    (logdir / "engine.log").write_text(
+        '{"ts":"2026-07-16T09:42:00","level":"INFO","message":"scheduler_cycle_start"}\n'
+        '{"ts":"2026-07-16T09:42:01","level":"WARN","message":"vm_records_fallback_local"}\n',
+        encoding="utf-8",
+    )
+    client, _ = _client(load_calibrator(_CAL), log_dir=logdir)
+    resp = client.get("/logs?history=true&limit=10")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "history"
+    assert [e["message"] for e in body["entries"]] == [
+        "scheduler_cycle_start",
+        "vm_records_fallback_local",
+    ]
+
+
+def test_logs_ring_is_read_only_and_well_formed() -> None:
+    # The default (ring) read is a well-formed LogsView; the endpoint is GET-only (a window, not a
+    # control surface) — no mutation verb exists.
+    client, _ = _client(load_calibrator(_CAL))
+    resp = client.get("/logs")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "ring"
+    assert isinstance(body["entries"], list)
+    assert isinstance(body["last_seq"], int)
+    assert client.post("/logs").status_code in (404, 405)  # read-only: no POST route
