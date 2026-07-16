@@ -81,10 +81,11 @@ function refField(value: string | null, state: IpoContextView['isin_state']): st
 }
 
 // v3 V3-11 — ISIN + industry: plain display metadata from the per-IPO Upstox context cache (never a
-// model input, no source named). Only rendered once a context cache exists; each field degrades
-// honestly via its own state. Grouped as one small card next to the filed documents.
+// model input, no source named). The card itself always renders (same layout on every Detail page,
+// regardless of IPO) — only the field text degrades, via refField's own per-field state. Grouped as
+// one small card next to the filed documents.
 function ContextRef({ ctx }: { ctx: IpoContextView | undefined }) {
-  if (!ctx || !ctx.available) return null // no cache loaded → nothing to show (not an empty scaffold)
+  if (!ctx) return null // don't flash while the context query is still loading
   return (
     <div className="card">
       <h3 className="sec">Reference</h3>
