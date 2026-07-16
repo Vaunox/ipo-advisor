@@ -1,7 +1,7 @@
 {
   "name": "ipo-advisor-pwa",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "description": "IPO Advisor dashboard (PWA/React) — the front end of the Windows .exe. Read-only view over the advisory engine's GET API.",
   "scripts": {
