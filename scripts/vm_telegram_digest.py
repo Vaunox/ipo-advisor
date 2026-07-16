@@ -1,8 +1,9 @@
-"""VM Telegram digest — the twice-daily health digest (v3 V3-3). Dark-ships without creds.
+"""VM Telegram digest — the periodic health digest (v3 V3-3). Dark-ships without creds.
 
-Runs on a systemd timer (00:00 & 18:00 IST). Builds the VmStatus snapshot, renders the digest (with
-the alert-check's "N consecutive since" notes), and sends it UNCONDITIONALLY (OK or DEGRADED) —
-the periodic reconciler, distinct from the transition-only alert-check.
+Runs on a systemd timer (4×/day: 00:00 / 06:00 / 12:00 / 18:00 IST). Builds the VmStatus snapshot,
+renders the digest (with the alert-check's "N consecutive since" notes), and sends it
+UNCONDITIONALLY (OK or DEGRADED) — the periodic reconciler, distinct from the transition-only
+alert-check.
 
 SINGLE WRITER: the digest writes NOTHING — pure build -> render -> send. It only reads
 (ingest_state, markers, context, oracle_login, alert_state). Unconfigured -> a no-op that sends
@@ -47,7 +48,7 @@ def run_digest(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Send the twice-daily VM health digest.")
+    parser = argparse.ArgumentParser(description="Send the periodic VM health digest.")
     parser.add_argument("--data-dir", required=True)
     args = parser.parse_args()
     data_dir = Path(args.data_dir)

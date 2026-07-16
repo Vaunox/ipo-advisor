@@ -3,7 +3,7 @@
 ``build_status`` gathers the live facts (ingest state, disk, keepalive + bot markers, context
 freshness, a real read-API probe, the Oracle-login record, the token expiry) and runs the shared
 ``vm_health`` judges over them into one ``VmStatus``. It is side-effect-free: ``/status`` and the
-twice-daily digest both render from a ``VmStatus``, so they are byte-identical by construction — the
+periodic digest both render from a ``VmStatus``, so they are byte-identical by construction — the
 only writer in the Telegram path is ``/login`` (``oracle_login.record_oracle_login``), never here.
 """
 
