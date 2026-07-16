@@ -54,3 +54,10 @@ export const IconAlert = () => (
     <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
   </svg>
 )
+// Refresh/reload (circular arrow). Takes a className so the header button can spin it while in-flight.
+export const IconRefresh = ({ className }: { className?: string } = {}) => (
+  <svg viewBox="0 0 24 24" className={className}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+    <path d="M21 4v5h-5" />
+  </svg>
+)
