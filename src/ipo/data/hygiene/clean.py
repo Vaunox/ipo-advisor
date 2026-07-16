@@ -101,6 +101,18 @@ def merge_partials(
                 conflicts.append(
                     f"{key}: {provenance[key]}={merged[key]!r} vs {partial.source}={value!r}"
                 )
+                # Name each disagreement, not just the count — a cross-source conflict on a
+                # backtest-critical field is a data-quality event worth seeing individually.
+                _log.warning(
+                    "source_conflict",
+                    extra={
+                        "field": key,
+                        "kept_source": provenance[key],
+                        "kept_value": merged[key],
+                        "other_source": partial.source,
+                        "other_value": value,
+                    },
+                )
     return MergeResult(fields=merged, conflicts=conflicts)
 
 

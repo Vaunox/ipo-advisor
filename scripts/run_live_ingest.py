@@ -94,14 +94,15 @@ def fire_new_ipo_context_pulls(
     data_dir: Path,
     new_ids: set[str],
     *,
-    refresh_fn: Callable[[str, Path, str], bool] | None = None,
+    refresh_fn: Callable[[str, Path, str], str] | None = None,
 ) -> int:
     """For each newly-seen ``ipo_id``, fire one immediate single-symbol context pull.
 
     Dark-ships without ``UPSTOX_TOKEN`` (same posture as ``refresh_context.py`` itself — no token,
     no fetch, not an error). A single symbol's failure is logged and skipped; it never aborts the
-    others or affects the records ingest that already completed. ``refresh_fn`` is injected so tests
-    drive a canned pull instead of the real Upstox call. Returns how many pulls succeeded.
+    others or affects the records ingest that already completed. ``refresh_fn`` (injected for tests)
+    returns a status — ``written`` / ``no_fields`` / ``symbol_not_listed`` — so each pull is logged
+    with its cause, not a single ambiguous "empty". Returns how many pulls actually wrote context.
     """
     if not new_ids:
         return 0
@@ -114,13 +115,17 @@ def fire_new_ipo_context_pulls(
     for ipo_id in sorted(new_ids):
         symbol = ipo_id.upper()
         try:
-            if fn(token, data_dir, symbol):
-                fired += 1
-                _log.info("new_ipo_context_pulled", extra={"symbol": symbol})
-            else:
-                _log.info("new_ipo_context_pull_empty", extra={"symbol": symbol})
+            status = fn(token, data_dir, symbol)
         except Exception as exc:  # noqa: BLE001 — one symbol's failure must never abort the rest
             _log.warning("new_ipo_context_pull_failed", extra={"symbol": symbol, "error": str(exc)})
+            continue
+        if status == "written":
+            fired += 1
+            _log.info("new_ipo_context_pulled", extra={"symbol": symbol})
+        elif status == "symbol_not_listed":
+            _log.info("new_ipo_context_pull_symbol_not_listed", extra={"symbol": symbol})
+        else:  # "no_fields" — resolved but the IPO carries no context fields yet
+            _log.info("new_ipo_context_pull_no_fields", extra={"symbol": symbol})
     return fired
 
 

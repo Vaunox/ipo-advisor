@@ -134,13 +134,20 @@ def _list_ids(token: str) -> dict[str, object]:
 
 
 def _context(token: str, ipo_id: object) -> dict[str, object]:
-    """GET /v2/ipos/{id} and pull the per-IPO context fields (registrar + rhp_url)."""
+    """GET /v2/ipos/{id} and pull the per-IPO context fields (registrar + rhp_url).
+
+    A fetch FAILURE (non-200 / malformed body) prints to stderr before returning ``{}`` — otherwise
+    it is indistinguishable from an IPO that genuinely has no registrar/RHP yet. Package-free
+    script, so stderr → journald is the honest channel (matching ``_list_ids``).
+    """
     resp = _get(f"/v2/ipos/{ipo_id}", token)
     if resp.status_code != 200:
+        print(f"[context id={ipo_id}] HTTP {resp.status_code}: {resp.text[:200]}", file=sys.stderr)
         return {}
     data = resp.json().get("data")
     obj = data if isinstance(data, dict) else (data[0] if isinstance(data, list) and data else None)
     if not isinstance(obj, dict):
+        print(f"[context id={ipo_id}] malformed detail body (no data object)", file=sys.stderr)
         return {}
     entry: dict[str, object] = {}
     ri = obj.get("registrar_info")
@@ -165,6 +172,21 @@ def _context(token: str, ipo_id: object) -> dict[str, object]:
     return entry
 
 
+def _resolve_and_fetch(token: str, symbol: str) -> tuple[str, dict[str, object]]:
+    """Resolve one symbol's Upstox id and fetch its context, distinguishing WHY nothing came back.
+
+    Returns ``(status, entry)`` where status is ``"symbol_not_listed"`` (no such symbol in Upstox's
+    open/closed/listed listing yet) or ``"ok"`` (resolved; ``entry`` may still be empty if the IPO
+    genuinely carries no context fields). The onset trigger uses this split so the log can name the
+    cause instead of a single ambiguous "empty".
+    """
+    ids = _list_ids(token)
+    ipo_id = ids.get(symbol.upper())
+    if ipo_id is None:
+        return "symbol_not_listed", {}
+    return "ok", _context(token, ipo_id)
+
+
 def refresh_one(token: str, symbol: str) -> dict[str, object]:
     """Resolve one symbol's Upstox id (from the open/closed/listed listing) and fetch its context.
 
@@ -173,11 +195,7 @@ def refresh_one(token: str, symbol: str) -> dict[str, object]:
     makes exactly one detail call — the slow part (the ``_DETAIL_PAUSE_S``-paced per-IPO loop) is
     what this avoids doing for every other already-known symbol.
     """
-    ids = _list_ids(token)
-    ipo_id = ids.get(symbol.upper())
-    if ipo_id is None:
-        return {}
-    return _context(token, ipo_id)
+    return _resolve_and_fetch(token, symbol)[1]
 
 
 def merge_context(data_dir: Path, symbol: str, entry: dict[str, object]) -> bool:
@@ -194,9 +212,18 @@ def merge_context(data_dir: Path, symbol: str, entry: dict[str, object]) -> bool
         return False
     out_path = Path(data_dir) / "context" / "ipo_context.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        existing = json.loads(out_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    if out_path.is_file():
+        try:
+            existing = json.loads(out_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            # An existing cache that won't parse: do NOT reset it to a single entry (that would
+            # wipe every OTHER IPO's context). Refuse the merge and leave the file for inspection.
+            print(
+                f"[merge {symbol}] existing cache unreadable — refusing to overwrite: {exc}",
+                file=sys.stderr,
+            )
+            return False
+    else:
         existing = {}
     refreshed_at = existing.get("refreshed_at") if isinstance(existing, dict) else None
     ipos = existing.get("ipos") if isinstance(existing, dict) else None
@@ -209,10 +236,18 @@ def merge_context(data_dir: Path, symbol: str, entry: dict[str, object]) -> bool
     return True
 
 
-def refresh_and_merge_one(token: str, data_dir: Path, symbol: str) -> bool:
-    """The onset-trigger entry point: fetch one symbol's context and merge it. Returns written?"""
-    entry = refresh_one(token, symbol)
-    return merge_context(data_dir, symbol, entry)
+def refresh_and_merge_one(token: str, data_dir: Path, symbol: str) -> str:
+    """The onset-trigger entry point: fetch one symbol's context and merge it.
+
+    Returns a status naming the outcome — ``"written"`` (merged into the cache), ``"no_fields"``
+    (resolved, but the IPO carries no context yet), or ``"symbol_not_listed"`` (Upstox's listing has
+    no such symbol yet) — so the caller can log WHY an onset pull produced nothing, not merely that
+    it did.
+    """
+    status, entry = _resolve_and_fetch(token, symbol)
+    if status == "symbol_not_listed":
+        return "symbol_not_listed"
+    return "written" if merge_context(data_dir, symbol, entry) else "no_fields"
 
 
 def main() -> None:
@@ -244,7 +279,9 @@ def main() -> None:
     n_reg = sum(1 for e in ipos.values() if e.get("registrar"))
     n_rhp = sum(1 for e in ipos.values() if e.get("rhp_url"))
     n_lot = sum(1 for e in ipos.values() if e.get("lot_size"))
-    print(f"\nWrote {len(ipos)} IPO context entries to {out_path} (token-free).")
+    # N of M — a gap between resolved ids and written entries flags failures/empties; the per-IPO
+    # stderr lines above (``[context …] HTTP …``) distinguish a failed fetch from a genuine absence.
+    print(f"\nWrote {len(ipos)} of {len(ids)} IPO context entries to {out_path} (token-free).")
     print(f"  with registrar: {n_reg}   with rhp_url: {n_rhp}   with lot_size: {n_lot}")
     for sym in list(ipos)[:8]:
         raw = ipos[sym].get("registrar")

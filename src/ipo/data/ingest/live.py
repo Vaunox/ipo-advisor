@@ -101,8 +101,9 @@ def build_live_records(
     issues = client.current_issues()
     try:
         upcoming = client.upcoming_issues()
-    except SourceError:
+    except SourceError as exc:
         upcoming = []  # forthcoming feed is best-effort; current issues still ingest
+        _log.warning("live_upcoming_feed_degraded", extra={"error": str(exc)})
 
     # Dedupe by symbol; the current-issue entry (iterated last) wins over the forthcoming one.
     merged: dict[str, NseCurrentIssue] = {}
@@ -211,8 +212,19 @@ def resolve_listings(
         if record.listing_open is None:
             try:
                 prices = client.listing_prices(issue.symbol, issue.listing_date)
-            except SourceError:
+            except SourceError as exc:
                 prices = None
+                # Stamped as listed but the price fetch failed — retried within PRICE_BACKFILL_DAYS,
+                # and a persistent failure escalates to the OVERDUE_UNPRICED strand (finding-④). Log
+                # each attempt so a flaky archive host isn't mistaken for "not listed yet".
+                _log.warning(
+                    "listing_price_backfill_failed",
+                    extra={
+                        "symbol": issue.symbol,
+                        "listing_date": issue.listing_date.isoformat(),
+                        "error": str(exc),
+                    },
+                )
             if prices is not None:
                 update["listing_open"], update["listing_close"] = prices
         if not update:
