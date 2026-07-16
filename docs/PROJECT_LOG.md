@@ -737,6 +737,10 @@ sidecar + a React/PWA front end. As of the live-ingestion cutover (2026-07-03) i
   subscription incl. sNII/bNII → `IPORecord`s → store), wired as the scheduler `refresh` in
   `runner.main()`. Never raises — a data hiccup degrades to the last store. Live-only build: **no demo
   seed ships**; a fresh install fills purely from live NSE ingestion (stale data self-heals on update).
+  *[Superseded post-close (v3, 2026-07-16): the shipped app is now **VM-primary** — it reads records/
+  context from the VM read-API first and uses this local NSE scrape as the honest fallback. This
+  section is the 2026-07-05 close snapshot and is left as-is; see `operations/README.md` for the
+  current data-plane wiring.]*
 - **Read-only API + UI** — the UI reads engine output verbatim (all five invariants hold); cost
   overrides recompute net-of-cost History; verdict-transition log + alert center render; A3 allotment
   odds + graded cold caveats render on Detail.

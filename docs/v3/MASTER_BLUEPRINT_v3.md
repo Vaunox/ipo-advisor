@@ -19,6 +19,35 @@ v3 has four parts, and they are ordered by risk, not by excitement:
 
 ---
 
+# RECONCILIATION STATUS (2026-07-16) — read this before the plan below
+
+*This document is the original v3 **plan**. The build diverged from it — in scope and in specifics — with much of the infrastructure decided emergently in operation rather than here. This block squares the plan with what actually shipped; the per-item ledger (merge SHAs, live-verified vs. merged-but-unproven) lives in [`V3_PROGRESS.md`](./V3_PROGRESS.md). The plan text below is left intact (with two inline spec corrections) so the original intent stays legible — **do not read the sections below as current status.***
+
+**Infrastructure (Part II) — built, with changes:**
+- **V3-1 (VM data plane)** — DONE, and **flipped to VM-primary-by-default in the shipped build** (`454632d`) — the plan left this as a future "enable by setting `VM_BASE_URL`". The VM IP is kept out of the public repo via build-time injection.
+- **V3-2 (durable archive)** — DONE, but the **mechanism changed**: the planned/first-built desktop-drop→VM-pull was **dropped and revived as a VM-write snapshot** (`5fc1870`) — the VM pushes `parquet`+context to `ipo-archive` (deploy key flipped read→write; append-only via branch protection; repo made public). Full lineage + reasoning in `V3_PROGRESS.md`.
+- **V3-3 (monitoring)** — DONE; the plan's one-line "email/Telegram/etc" alerting became a full **Telegram subsystem** (`d44ac7c`: 4×/day digest, immediate alerts, `/status` + `/login`, `/` menu). Keepalive **tuned 120→240s** against the corrected reclaim rule (above).
+- **V3-4 (fallback + self-test)** — DONE (`6f393f0`).
+- **Emergent (not in this plan):** the new-IPO onset context trigger (`f658948`), the two-repo/two-key split (`be53dde`), the IP-scrub / public-repo move (`cb840f5`).
+
+**Bugs (Part III):** BUG 1 / 2 / 3 all fixed; Finding-④ (listing-strand detector) added. See `V3_PROGRESS.md`.
+
+**Features (Part IV):**
+- **DONE:** V3-5 (RHP links), V3-6 (Allotment tab), V3-8 (`lot_size`), V3-11 (`isin`/`industry`).
+- **DROPPED, with reasons:** V3-7 (`mandate_end_date` — changes nothing; it is not a close-day cutoff at all), V3-10 (anchor list — redundant with QIB, and superseded at the decision clock), plus `cut_off_price` / `status`-as-display within V3-11.
+- **DEFERRED: V3-9 (subscription trend graph)** — needs the VM to first accumulate **forward interval time-series** (its persistence prerequisite was itself dropped). A genuine future option; **not started**.
+
+**Cosmetic (Part V) — NOT STARTED:** V3-12 (logo), V3-13 (header refresh button), V3-14 (awaiting-listing placement), V3-15 (readability pass) — the next block in build order, untouched.
+
+**Open / deferred (tracked so they are not lost):**
+- **V3-9** — deferred (forward interval data; see above).
+- **mypy pin** (`mypy>=1.9,<2`) — a deliberate cap until a 2.x cutover is done on purpose.
+- **HTTP→HTTPS domain + TLS** — a someday upgrade surfaced by the VM-primary flip: put a domain + cert in front of the VM, encrypt the currently plain-HTTP fetch, and re-point DNS without a rebuild.
+- **Intraday close-day emission** — ⚠️ **parked, needs fresh diagnosis.** A concern about how close-day verdict emission is timed/anchored (possibly related to `book_closed` / close-day timing) that **could affect an emitted probability** — the **only** parked item that is **not display-safe**. Do **not** assume the mechanism; diagnose from the code before any fix. Distinct from V3-7's `_CLOSE_EOD_HOUR` date-anchoring finding — cross-reference, do **not** conflate.
+- **Standing (unchanged):** the SEBI Investment-Adviser question, the shelved total-only model, and B1 (subscription trajectory as a score feature) — see the Appendix.
+
+---
+
 # PART I — INVIOLABLE RULES (carried forward, unchanged)
 
 Every rule from v1/v2 still applies. The three that v3 work is most likely to brush against:
@@ -41,7 +70,7 @@ Every rule from v1/v2 still applies. The three that v3 work is most likely to br
 - **VM is PRIMARY.** The app fetches from the VM first.
 - **Local scraping (the current pipeline) is the FALLBACK.** It is never removed. If the VM is unreachable, the app scrapes/refreshes directly, exactly as it does today. This holds for **every** store the VM serves, not only NSE.
 - **The Upstox token lives on the VM** (as an env var there), so `refresh_context.py` runs on the VM. The token is **never** in the packaged app and **never** committed. (`refresh_context.py` was built VM-runnable from day one — pure Python, env token, `--data-dir`, no desktop assumptions — so it adopts as-is, no rewrite.)
-- **Spec:** Oracle Always Free, 1 vCPU / 1 GB, Mumbai region.
+- **Spec:** Oracle Always Free, **`VM.Standard.E2.1.Micro` = 1 OCPU = 2 vCPU** / 1 GB, Mumbai region. *(Reconciled 2026-07-16: the original "1 vCPU" was wrong — the shape presents **2 vCPUs**, which is load-bearing for the keepalive math, since a single-thread burn then reads ~51% instance CPU, not 100%.)*
 
 ## V3-1. VM setup and the data plane — NSE ingestion + Upstox context + read API
 
@@ -79,7 +108,7 @@ The VM runs unattended and is now the *primary* source. It therefore needs:
 - **Scrape-failure alerting** — if a scheduled fetch fails, returns an unexpected schema, or starts getting blocked, the operator is alerted (email/Telegram/etc.), not left blind.
 - **Resource/health checks** — disk filling from accumulating archives, memory availability (1 GB is comfortable for scrape+store, but confirm swap is configured so an unlucky spike can't OOM-kill the process).
 
-**The Oracle idle-reclamation trap (researched, real, current for 2026):** Oracle reclaims Always Free instances that fall below roughly **15% CPU/network utilization**, and *separately* deems accounts abandoned after **30+ days with no console login**. A VM doing light periodic scraping can look "idle" by these thresholds *while working perfectly*. Two cheap preventions, both in scope:
+**The Oracle idle-reclamation trap (researched, real, current for 2026):** *(Reconciled 2026-07-16 — the "~15%" below was imprecise.)* Oracle reclaims an Always-Free VM only when, over a **rolling 7-day window**, **CPU 95th-percentile < 20% AND network < 20%** both hold (a memory <20% third condition applies to **A1 shapes only**, N/A on our E2) — so clearing **either** dimension keeps the instance, and **CPU is the controllable lever**. Oracle *separately* deems accounts abandoned after **30+ days with no console login**. A VM doing light periodic scraping can look "idle" by these thresholds *while working perfectly*. Two cheap preventions, both in scope:
 1. A trivial **keepalive** job to keep utilization above the reclaim threshold.
 2. A standing reminder (in the operations manual) to **log into the Oracle console at least monthly**.
 
