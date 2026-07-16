@@ -216,7 +216,13 @@ class PoliteClient:
                 return resp.content
             except requests.RequestException as exc:
                 last_exc = exc
-                self._sleep(self._backoff * (2**attempt))
+                delay = self._backoff * (2**attempt)
+                # Match ``fetch``'s retry visibility — a struggling bhavcopy host was silent here.
+                _log.warning(
+                    "fetch_retry",
+                    extra={"source": "bytes", "url": url, "attempt": attempt + 1, "delay": delay},
+                )
+                self._sleep(delay)
         raise SourceError(
             f"failed to fetch bytes {url} after {self._max_retries} attempts"
         ) from last_exc

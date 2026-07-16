@@ -38,13 +38,26 @@ def _copy_if_present(source: Path, dest: Path) -> bool:
 
 
 def sync_snapshot(data_dir: Path, archive_dir: Path) -> list[str]:
-    """Mirror the records store + context cache into the archive clone. Returns files copied."""
+    """Mirror the records store + context cache into the archive clone. Returns files copied.
+
+    A source that is expected but ABSENT is logged (WARN) rather than silently omitted, so an empty
+    snapshot (e.g. the records store was never written) is loud instead of an innocent-looking
+    ``copied=[]`` that reads like a healthy no-change sync.
+    """
     archive_dir.mkdir(parents=True, exist_ok=True)
-    copied = []
-    if _copy_if_present(data_dir / RECORDS_FILENAME, archive_dir / RECORDS_FILENAME):
-        copied.append(RECORDS_FILENAME)
-    if _copy_if_present(data_dir / "context" / CONTEXT_FILENAME, archive_dir / CONTEXT_FILENAME):
-        copied.append(CONTEXT_FILENAME)
+    sources = {
+        RECORDS_FILENAME: data_dir / RECORDS_FILENAME,
+        CONTEXT_FILENAME: data_dir / "context" / CONTEXT_FILENAME,
+    }
+    copied: list[str] = []
+    missing: list[str] = []
+    for name, src in sources.items():
+        if _copy_if_present(src, archive_dir / name):
+            copied.append(name)
+        else:
+            missing.append(name)
+    if missing:
+        _log.warning("archive_snapshot_source_missing", extra={"missing": missing})
     return copied
 
 

@@ -24,9 +24,12 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ipo.core.logging import get_logger
 from ipo.data.ingest.state import IngestStateStore
 from ipo.data.store.repository import ParquetRepository
 from ipo.vm.models import RecordsEnvelope
+
+_log = get_logger("ipo.vm.server")
 
 _CONTEXT_REL = ("context", "ipo_context.json")
 
@@ -69,11 +72,17 @@ def create_vm_app(data_dir: Path) -> FastAPI:
         """
         path = data_dir.joinpath(*_CONTEXT_REL)
         if not path.is_file():
-            return {"refreshed_at": None, "ipos": {}}
+            return {"refreshed_at": None, "ipos": {}}  # normal dark-ship state (no cache yet)
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, OSError):
+        except (ValueError, OSError) as exc:
+            # A CORRUPT cache served as "empty" is a failure disguised as genuine absence — name it,
+            # so a VM-side context problem isn't indistinguishable from "no registrar/RHP yet".
+            _log.warning("vm_context_read_failed", extra={"error": str(exc)})
             return {"refreshed_at": None, "ipos": {}}
-        return payload if isinstance(payload, dict) else {"refreshed_at": None, "ipos": {}}
+        if not isinstance(payload, dict):
+            _log.warning("vm_context_malformed", extra={"type": type(payload).__name__})
+            return {"refreshed_at": None, "ipos": {}}
+        return payload
 
     return app

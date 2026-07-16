@@ -95,6 +95,26 @@ def test_live_only_clears_stale_without_seed(tmp_path: Path) -> None:
     assert (data_dir / "seed_version").read_text(encoding="utf-8") == _SEED_VERSION
 
 
+def test_clearing_the_store_on_a_version_bump_is_logged(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # A4: a version bump DELETES the store + history — it must not do so silently.
+    res = tmp_path / "bundle"
+    _make_seed(res)
+    data_dir = tmp_path / "userdata"
+    data_dir.mkdir()
+    (data_dir / "ipo_records.parquet").write_bytes(b"OLD-DEMO")  # user/demo data about to be wiped
+
+    with caplog.at_level(logging.WARNING, logger="ipo.service.runner"):
+        _provision_data_dir(data_dir, res, manage=True)
+
+    cleared = [
+        r for r in caplog.records if r.getMessage() == "data_store_cleared_on_version_change"
+    ]
+    assert len(cleared) == 1
+    assert "ipo_records.parquet" in cleared[0].__dict__["cleared"]
+
+
 # --- B1/B2: the scheduler loop survives a raising cycle instead of dying silently ----------------
 
 

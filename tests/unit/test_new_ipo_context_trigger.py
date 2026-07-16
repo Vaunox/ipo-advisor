@@ -115,9 +115,9 @@ def test_fires_exactly_one_pull_per_new_id(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("UPSTOX_TOKEN", "tok")
     calls: list[tuple[str, Path, str]] = []
 
-    def fake_refresh(token: str, data_dir: Path, symbol: str) -> bool:
+    def fake_refresh(token: str, data_dir: Path, symbol: str) -> str:
         calls.append((token, data_dir, symbol))
-        return True
+        return "written"
 
     fired = script.fire_new_ipo_context_pulls(tmp_path, {"alphaco"}, refresh_fn=fake_refresh)
     assert fired == 1
@@ -129,9 +129,9 @@ def test_no_new_ids_fires_nothing(tmp_path: Path, monkeypatch) -> None:  # type:
     monkeypatch.setenv("UPSTOX_TOKEN", "tok")
     calls: list[object] = []
 
-    def record(token: str, data_dir: Path, symbol: str) -> bool:
+    def record(token: str, data_dir: Path, symbol: str) -> str:
         calls.append((token, data_dir, symbol))
-        return True
+        return "written"
 
     script.fire_new_ipo_context_pulls(tmp_path, set(), refresh_fn=record)
     assert calls == []
@@ -142,9 +142,9 @@ def test_darkships_without_a_token(tmp_path: Path, monkeypatch) -> None:  # type
     monkeypatch.delenv("UPSTOX_TOKEN", raising=False)
     calls: list[object] = []
 
-    def record(token: str, data_dir: Path, symbol: str) -> bool:
+    def record(token: str, data_dir: Path, symbol: str) -> str:
         calls.append((token, data_dir, symbol))
-        return True
+        return "written"
 
     fired = script.fire_new_ipo_context_pulls(tmp_path, {"alphaco"}, refresh_fn=record)
     assert fired == 0
@@ -155,10 +155,10 @@ def test_one_symbols_failure_does_not_abort_the_others(tmp_path: Path, monkeypat
     script = _load_script("run_live_ingest")
     monkeypatch.setenv("UPSTOX_TOKEN", "tok")
 
-    def flaky(token: str, data_dir: Path, symbol: str) -> bool:
+    def flaky(token: str, data_dir: Path, symbol: str) -> str:
         if symbol == "ALPHACO":
             raise RuntimeError("upstox blew up")
-        return True
+        return "written"
 
     fired = script.fire_new_ipo_context_pulls(tmp_path, {"alphaco", "betaco"}, refresh_fn=flaky)
     assert fired == 1  # betaco still fired despite alphaco's failure
@@ -218,3 +218,46 @@ def test_refresh_one_returns_empty_when_the_symbol_is_unresolvable(monkeypatch) 
     refresh_context = _load_script("refresh_context")
     monkeypatch.setattr(refresh_context, "_list_ids", lambda token: {})
     assert refresh_context.refresh_one("tok", "ghostco") == {}
+
+
+# --- A8: the onset pull names WHY it produced nothing (not one ambiguous "empty") ----------------
+
+
+def test_refresh_and_merge_one_reports_symbol_not_listed(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    refresh_context = _load_script("refresh_context")
+    monkeypatch.setattr(refresh_context, "_list_ids", lambda token: {})  # Upstox doesn't list it
+    assert (
+        refresh_context.refresh_and_merge_one("tok", Path("/x"), "ghostco") == "symbol_not_listed"
+    )
+
+
+def test_refresh_and_merge_one_reports_no_fields(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    refresh_context = _load_script("refresh_context")
+    monkeypatch.setattr(refresh_context, "_list_ids", lambda token: {"ALPHACO": 4242})
+    monkeypatch.setattr(
+        refresh_context, "_context", lambda token, ipo_id: {}
+    )  # resolved, no fields
+    assert refresh_context.refresh_and_merge_one("tok", tmp_path, "alphaco") == "no_fields"
+
+
+def test_refresh_and_merge_one_reports_written(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    refresh_context = _load_script("refresh_context")
+    monkeypatch.setattr(refresh_context, "_list_ids", lambda token: {"ALPHACO": 4242})
+    monkeypatch.setattr(refresh_context, "_context", lambda token, ipo_id: {"lot_size": 50})
+    assert refresh_context.refresh_and_merge_one("tok", tmp_path, "alphaco") == "written"
+
+
+# --- A13: a corrupt existing cache must NOT be wiped down to a single entry -----------------------
+
+
+def test_merge_refuses_to_overwrite_a_corrupt_cache(tmp_path: Path) -> None:
+    refresh_context = _load_script("refresh_context")
+    ctx = tmp_path / "context"
+    ctx.mkdir()
+    corrupt = ctx / "ipo_context.json"
+    corrupt.write_text("{not valid json — truncated…", encoding="utf-8")
+
+    written = refresh_context.merge_context(tmp_path, "alphaco", {"rhp_url": "https://example/rhp"})
+
+    assert written is False  # refused — better to keep the (bad) file for inspection than wipe it
+    assert corrupt.read_text(encoding="utf-8") == "{not valid json — truncated…"  # untouched

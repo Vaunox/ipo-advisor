@@ -25,8 +25,11 @@ from typing import Protocol, runtime_checkable
 
 from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig
+from ipo.core.logging import get_logger
 from ipo.core.types import IPORecord, Verdict, VerdictType
 from ipo.service.transitions import VerdictTransition
+
+_log = get_logger("ipo.service.scheduler")
 
 
 @runtime_checkable
@@ -85,10 +88,12 @@ class ScoringScheduler:
         the steady state, so the durable log inherits the same no-duplicate guarantee.
         """
         when = self._clock()
+        _log.info("scheduler_cycle_start", extra={"asof": when.isoformat()})
         if self._refresh is not None:
             self._refresh()
         verdicts = self._source.verdicts()
         became_apply: list[str] = []
+        n_transitions = 0
         for verdict in verdicts:
             prior = self._last_verdict.get(verdict.ipo_id)
             crossed = verdict.verdict is VerdictType.APPLY and prior is not VerdictType.APPLY
@@ -98,18 +103,40 @@ class ScoringScheduler:
             # meaningful change — starting to watch an open book is not an event to log.
             first_abstention = prior is None and verdict.verdict is VerdictType.INSUFFICIENT_SIGNAL
             changed = prior != verdict.verdict and not first_abstention
-            if changed and self._on_transition is not None:
-                self._on_transition(
-                    VerdictTransition(
-                        ipo_id=verdict.ipo_id,
-                        asof=when,
-                        from_verdict=prior,
-                        to_verdict=verdict.verdict,
-                        probability=verdict.probability,
-                        crossed_into_apply=crossed,
-                    )
+            if changed:
+                # The verdict-emission narrative: a genuine change, logged INDEPENDENTLY of the
+                # notify channel (which may be off) so the console always shows what the engine did.
+                n_transitions += 1
+                _log.info(
+                    "verdict_transition",
+                    extra={
+                        "ipo_id": verdict.ipo_id,
+                        "from_verdict": prior.value if prior is not None else None,
+                        "to_verdict": verdict.verdict.value,
+                        "probability": verdict.probability,
+                        "crossed_into_apply": crossed,
+                    },
                 )
+                if self._on_transition is not None:
+                    self._on_transition(
+                        VerdictTransition(
+                            ipo_id=verdict.ipo_id,
+                            asof=when,
+                            from_verdict=prior,
+                            to_verdict=verdict.verdict,
+                            probability=verdict.probability,
+                            crossed_into_apply=crossed,
+                        )
+                    )
             self._last_verdict[verdict.ipo_id] = verdict.verdict
+        _log.info(
+            "scheduler_cycle_done",
+            extra={
+                "scored": len(verdicts),
+                "transitions": n_transitions,
+                "became_apply": len(became_apply),
+            },
+        )
         return CycleResult(asof=when, verdicts=verdicts, became_apply=became_apply)
 
     def next_cadence_minutes(self) -> int:

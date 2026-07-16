@@ -95,14 +95,35 @@ def _provision_data_dir(data_dir: Path, resource_root: Path, *, manage: bool) ->
     marker = data_dir / "seed_version"
     stored = marker.read_text(encoding="utf-8").strip() if marker.is_file() else ""
     if stored != _SEED_VERSION:
+        # A version bump DELETES the record store + verdict history. Narrate it loudly (only when
+        # something real was actually removed) so an empty board / lost history after an update has
+        # an answer in the log instead of being a silent mystery.
+        cleared = [
+            name
+            for name in ("ipo_records.parquet", "verdict_transitions.json")
+            if (data_dir / name).is_file()
+        ]
         for name in ("ipo_records.parquet", "verdict_transitions.json"):
             (data_dir / name).unlink(missing_ok=True)
+        if cleared:
+            _log.warning(
+                "data_store_cleared_on_version_change",
+                extra={
+                    "old_version": stored or None,
+                    "new_version": _SEED_VERSION,
+                    "cleared": cleared,
+                },
+            )
     seed = resource_root / "_seed"
     if seed.is_dir():
+        copied = []
         for name in ("ipo_records.parquet", "verdict_transitions.json"):
             src, dst = seed / name, data_dir / name
             if src.is_file() and not dst.exists():
                 shutil.copyfile(src, dst)
+                copied.append(name)
+        if copied:
+            _log.info("data_store_seeded", extra={"copied": copied})
     marker.write_text(_SEED_VERSION, encoding="utf-8")
 
 
@@ -302,16 +323,32 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     frozen = getattr(sys, "_MEIPASS", None) is not None  # packaged app vs dev-from-source
     config = load_config(config_dir=res / "config")
     data_dir = Path(args.data_dir) if args.data_dir else Path(config.storage.data_dir)
-    _provision_data_dir(data_dir, res, manage=frozen)
     # Turn the structured logger ON in the live engine (v3 A) — it exists but was only wired in the
     # batch scripts, so INFO was dropped and WARN escaped as unstructured lastResort text. Full
     # detail goes to a size-capped rotating file in the data dir (durable + greppable, esp. once the
-    # VM lands); stderr stays at WARN so the desktop shell's console isn't flooded.
+    # VM lands); stderr stays at WARN so the desktop shell's console isn't flooded. Configured BEFORE
+    # provisioning so a store-clear on a version bump is actually recorded (not lost pre-logging).
     configure_logging(
         config.logging.level,
         json_output=config.logging.json_output,
         file_path=data_dir / "logs" / "engine.log",
     )
+    import os
+
+    # Boot banner — the one line that names the engine's mode, so "why isn't it refreshing?"
+    # (live_ingest off, or no VM configured) has an answer at the top of the log, not a mystery.
+    vm_configured = bool(os.environ.get("VM_BASE_URL", "").strip())
+    _log.info(
+        "engine_starting",
+        extra={
+            "data_dir": str(data_dir),
+            "live_ingest": config.scrape.live_ingest,
+            "vm_configured": vm_configured,
+            "log_level": config.logging.level,
+            "frozen": frozen,
+        },
+    )
+    _provision_data_dir(data_dir, res, manage=frozen)
     repository = ParquetRepository(data_dir)
     log = get_logger("ipo.service.runner")
     # One shared freshness store: the refresh path writes it, /status reads it (v3 BUG 1/Defect 2).
@@ -349,11 +386,8 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     # The cadence is windowed (~30 min while a book is open, ~6 h otherwise); the 5 s UI poll only
     # re-reads the local store and is NOT when NSE data gets newer. Record the next tick after a
     # CLEAN cycle (fresh pull from the VM, or a local scrape when no VM is set); clear it — tooltip
-    # shows nothing — on a failing feed, a VM fallback, or a manual refresh.
-    import os
-
-    vm_configured = bool(os.environ.get("VM_BASE_URL", "").strip())
-
+    # shows nothing — on a failing feed, a VM fallback, or a manual refresh. ``vm_configured`` was
+    # computed above for the boot banner and is reused here.
     def record_next_refresh(cadence_min: int) -> None:
         if ingest_state is None:
             return
