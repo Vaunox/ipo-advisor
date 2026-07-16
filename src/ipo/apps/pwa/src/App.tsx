@@ -8,12 +8,13 @@ import type { View } from './nav'
 import { useCrossingNotifications } from './notifications'
 import { recalibrationCount } from './recalib'
 import { Allotment } from './screens/Allotment'
+import { ConsoleLog } from './screens/ConsoleLog'
 import { Detail } from './screens/Detail'
 import { History } from './screens/History'
 import { Live } from './screens/Live'
 import { Settings } from './screens/Settings'
 import { Upcoming } from './screens/Upcoming'
-import { setThemeMode } from './state/prefs'
+import { getDevConsole, setThemeMode, useDevConsole } from './state/prefs'
 import { Toaster } from './components/Toaster'
 
 const TITLES: Record<View, [string, string]> = {
@@ -52,7 +53,7 @@ const UncalBanner = () => (
   </div>
 )
 
-const HelpOverlay = ({ onClose }: { onClose: () => void }) => (
+const HelpOverlay = ({ onClose, devConsole }: { onClose: () => void; devConsole: boolean }) => (
   <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
     <div className="help-card">
       <div className="hh">Keyboard shortcuts</div>
@@ -61,6 +62,9 @@ const HelpOverlay = ({ onClose }: { onClose: () => void }) => (
         <div className="hk"><span>Go to Live · Upcoming</span><span><kbd>g l</kbd><kbd>g u</kbd></span></div>
         <div className="hk"><span>Go to History · Settings</span><span><kbd>g h</kbd><kbd>g s</kbd></span></div>
         <div className="hk"><span>Toggle light / dark</span><kbd>t</kbd></div>
+        {devConsole && (
+          <div className="hk"><span>Toggle console log</span><kbd>`</kbd></div>
+        )}
         <div className="hk"><span>Close · back</span><kbd>Esc</kbd></div>
         <div className="hk"><span>This help</span><kbd>?</kbd></div>
       </div>
@@ -73,6 +77,11 @@ export function App() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  // v3 V3-16: the debug console. `devConsole` is the durable enable pref (Settings); `consoleOpen`
+  // is ephemeral view-state toggled by the ` key. Reading devConsole reactively means turning it
+  // OFF in Settings closes an open console (and deadens the key) at once.
+  const [consoleOpen, setConsoleOpen] = useState(false)
+  const devConsole = useDevConsole()
   const health = useHealth()
   const board = useBoard()
   const calibration = useCalibration()
@@ -138,6 +147,10 @@ export function App() {
         gTimer = window.setTimeout(() => (gPending = false), 900)
       } else if (e.key === 't') {
         setThemeMode(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light')
+      } else if (e.key === '`' && getDevConsole()) {
+        // v3 V3-16: backtick toggles the console open/closed — but only when enabled in Settings
+        // (getDevConsole() is read live, so a fresh install / disabled state leaves the key dead).
+        setConsoleOpen((o) => !o)
       } else if (e.key === '/') {
         e.preventDefault()
         setPaletteOpen(true)
@@ -146,12 +159,18 @@ export function App() {
       } else if (e.key === 'Escape') {
         setPaletteOpen(false)
         setHelpOpen(false)
+        setConsoleOpen(false)
         setDetailId((d) => (d ? null : d))
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
+
+  // Disabling the console in Settings closes it if it's open (the ` key is already dead by then).
+  useEffect(() => {
+    if (!devConsole) setConsoleOpen(false)
+  }, [devConsole])
 
   const [title, sub] = detailId ? ['Verdict detail', 'read-only · engine output verbatim'] : TITLES[view]
 
@@ -200,7 +219,8 @@ export function App() {
           onClose={() => setPaletteOpen(false)}
         />
       )}
-      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} devConsole={devConsole} />}
+      {consoleOpen && devConsole && <ConsoleLog onClose={() => setConsoleOpen(false)} />}
       <Toaster />
     </div>
   )

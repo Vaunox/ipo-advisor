@@ -10,6 +10,7 @@ import type {
   IPODetail,
   IPOListRow,
   IpoContextView,
+  LogsResponse,
   StatusView,
   Verdict,
   VerdictTransition,
@@ -82,4 +83,20 @@ export const useTransitionsFor = (id: string | null) =>
     queryKey: ['transitions', id],
     queryFn: () => apiGet<VerdictTransition[]>(`/transitions/${id}`),
     enabled: !!id,
+  })
+
+// v3 V3-16: the read-only debug console's log. `enabled` gates the fetch on the console being open,
+// so it costs nothing until the console is shown. No auto-poll (a static read the operator refreshes
+// or reopens); `history` reads the durable rotated files for scroll-back instead of the live ring.
+export const useLogs = (enabled: boolean, opts?: { history?: boolean; limit?: number }) =>
+  useQuery({
+    queryKey: ['logs', opts?.history ?? false, opts?.limit ?? 500],
+    queryFn: () => {
+      const p = new URLSearchParams()
+      if (opts?.history) p.set('history', 'true')
+      if (opts?.limit) p.set('limit', String(opts.limit))
+      const qs = p.toString()
+      return apiGet<LogsResponse>(`/logs${qs ? `?${qs}` : ''}`)
+    },
+    enabled,
   })

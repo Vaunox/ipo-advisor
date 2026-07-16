@@ -196,3 +196,21 @@ export interface StatusView {
   // honestly predicted (failing feed, VM fallback, or just after a manual refresh) → show nothing.
   next_refresh_at: string | null
 }
+
+// v3 V3-16: the read-only debug console's log entries. Heterogeneous by design — every event has
+// {ts, level, message} plus per-event `extra` fields (ipo_id, count, error, outcome, …), so the
+// entry is an open record. Every value was redacted at write time (engine-side); no secret here.
+export interface LogEntry {
+  ts?: string
+  level?: string
+  message?: string
+  logger?: string
+  ipo_id?: string
+  seq?: number
+  [key: string]: unknown
+}
+export interface LogsResponse {
+  entries: LogEntry[]
+  last_seq: number
+  source: string
+}

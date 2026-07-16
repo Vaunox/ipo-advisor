@@ -15,9 +15,11 @@ import {
   getStartup,
   setCosts,
   setDensity,
+  setDevConsole,
   setNotifications,
   setStartup,
   setThemeMode,
+  useDevConsole,
   useThemeMode,
 } from '../state/prefs'
 
@@ -58,6 +60,7 @@ export function Settings() {
     : null
   const feedFailing = !!st && st.live_ingest && st.last_attempt_ok === false
   const theme = useThemeMode() // reactive read from the shared store (v3 BUG 3) — no local cache
+  const devConsole = useDevConsole() // reactive (v3 V3-16): App reacts when this flips — no cache
   const [density, setDens] = useState<Density>(getDensity())
   const [notif, setNotifState] = useState<NotifPrefs>(getNotifications())
   const [costs, setCostsState] = useState<Costs>(getCosts())
@@ -212,6 +215,20 @@ export function Settings() {
         <div className="set-row">
           <div className="k">Scope</div>
           <div className="pending">applied by the desktop shell</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 className="sec">Developer</h3>
+        <div className="set-row">
+          <div className="k">
+            Debug console log
+            <small>
+              a read-only view of the engine's structured log. When on, press <kbd>`</kbd> to open
+              or close it. Off by default.
+            </small>
+          </div>
+          <Switch on={devConsole} onToggle={() => setDevConsole(!devConsole)} />
         </div>
       </div>
 

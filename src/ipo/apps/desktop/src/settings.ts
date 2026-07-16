@@ -56,6 +56,9 @@ export interface UiPrefs {
   // v3 V3-14: whether the History "awaiting listing" card is collapsed. Durable so a fold survives
   // restart (localStorage under the shell's file:// origin does not reliably persist).
   awaitingCollapsed: boolean
+  // v3 V3-16: whether the read-only debug console is enabled (the ` key toggles it when on). A dev
+  // affordance, default OFF, durable so a fresh install ships off and the setting survives restart.
+  devConsole: boolean
 }
 
 export const DEFAULT_STARTUP: StartupPrefs = {
@@ -87,6 +90,7 @@ export function normalizeUi(raw: unknown): UiPrefs {
     notifications: { ...DEFAULT_NOTIF, ...notif },
     pinned: Array.isArray(u.pinned) ? u.pinned.filter((x): x is string => typeof x === 'string') : [],
     awaitingCollapsed: u.awaitingCollapsed === true,
+    devConsole: u.devConsole === true,
   }
 }
 
