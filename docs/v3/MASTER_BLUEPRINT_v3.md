@@ -39,7 +39,7 @@ v3 has four parts, and they are ordered by risk, not by excitement:
 
 **Cosmetic (Part V) — DONE:** V3-12 (logo), V3-13 (header refresh button), V3-14 (awaiting-listing collapse), V3-15 (readability pass) all shipped.
 
-**V3-16 (read-only debug console) — the LAST open build item of v3.** Deliberately sequenced after the cosmetics; spec locked, run as its own task. **v3 is not complete until it lands.** (The code already anticipates it — e.g. `core/logging.py`'s ring-buffer / DEBUG-to-disk notes reference "the debug console, V3-16, which consumes them". This item was missing from the original plan's Part V list; recorded here so the remaining state is honest.)
+**V3-16 (read-only debug console) — DONE, the last v3 build item; v3 is now BUILD-COMPLETE.** Built in two stages: **Stage 1**, the honest-logging audit that made every operational path narrate its outcome (merged `ca6a6ee`); **Stage 2**, the screen itself — a ring buffer + `RotatingFileHandler`/expiry + GET-only `/logs` on the engine, and an Option-A terminal overlay ("Console log") armed by a persistent, default-off `UiPrefs` toggle + the backtick key on the front end. Reads the log the engine already writes (no second path); redacted at the sink on both the file and the ring; read-only, GET-only; `MAX|Δprob|=0.0`. Gated + `/logs` live-proven against the real engine (branch `feat/v3-16-console`, pending review + the shipped-`.exe` visual proof). See `V3_PROGRESS.md`.
 
 **Open / deferred (tracked so they are not lost):**
 - **V3-9** — deferred (forward interval data; see above).
