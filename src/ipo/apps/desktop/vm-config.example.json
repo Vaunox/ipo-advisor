@@ -1,0 +1,4 @@
+{
+  "_comment": "Template only. Copy to vm-config.json (gitignored) and set the real VM read-API base URL. The desktop build bakes vm-config.json into the shipped .exe; this example shows the shape with a placeholder and carries no real address. Absent or placeholder value -> the app runs local-only (direct NSE scrape).",
+  "vmBaseUrl": "http://<VM_IP>:8000"
+}

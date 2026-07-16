@@ -222,19 +222,28 @@ python scripts/refresh_context.py --data-dir <the app's data dir>
   Part-II VM data layer lands it adopts this script unchanged as the VM-primary refresher, with
   local execution as the fallback — the same VM-primary/local-fallback discipline as every feed.
 
-### The VM data plane (v3 V3-1) — off by default (ships dark)
+### The VM data plane (v3 V3-1) — VM-primary by default in the build, honest local fallback
 
-The app can read its two data stores (the NSE record store and the Upstox context cache) from a **VM
-read-API** instead of scraping locally — VM-primary, with an **honest local fallback**. It is **off by
-default**: with no `VM_BASE_URL` set the engine runs exactly as before the VM existed (pure local
-scrape, no indicator), so every build ships dark until you deploy the VM.
+The app reads its two data stores (the NSE record store and the Upstox context cache) from a **VM
+read-API** — **VM-primary, with an honest local fallback**. As of the V3-1 flip (2026-07-16) the
+**shipped `.exe` defaults to VM-primary**: the desktop build bakes the VM read-API base URL into the
+binary, so a normal launch fetches from the VM first and only falls back to direct NSE scraping if the
+VM is unreachable. The engine mechanism is unchanged and still **fails safe** — no URL configured, it
+runs exactly as before the VM existed (pure local scrape).
 
-- **Enable it** by setting one variable in the engine's environment:
-  ```
-  VM_BASE_URL=http://<vm-host>:<port>   # the VM read-API base — GET-only: /health, /records, /context
-  ```
-  Read directly by the runner, deliberately **not** an `IPO_*` key, so VM wiring can never leak into
-  the model config.
+- **How the URL is supplied (build-time, no IP in the public repo).** The runner reads `VM_BASE_URL`
+  from its environment (`runner.py`, deliberately **not** an `IPO_*` key, so VM wiring can never leak
+  into the model config). The desktop shell (`sidecar.ts` → `resolveVmBaseUrl`) sets it at engine
+  spawn from, in priority order:
+  1. a `VM_BASE_URL` already in the environment — runtime override / the **reversibility escape hatch**
+     (set it empty to force local-only without a rebuild);
+  2. **`src/ipo/apps/desktop/vm-config.json`** — GITIGNORED; holds the real URL (`http://<VM_IP>:8000`),
+     and electron-builder bakes it into the `.exe` (it's on the `build.files` list). The VM IP was
+     scrubbed from this public repo, so the real address lives **only** in this local file + the shipped
+     binary; only **`vm-config.example.json`** is committed, showing the shape with a `<VM_IP>`
+     placeholder. **To build a VM-primary `.exe`:** copy the example to `vm-config.json`, set the real
+     URL, then `npm run dist`. Absent or still-placeholder value → the build ships **local-only**
+     (fail-safe — never a silently-broken URL). GET-only base: `/health`, `/records`, `/context`.
 - **Behavior:** each refresh pulls both stores from the VM; on any failure (unreachable, non-200,
   malformed/truncated envelope, timeout — 10s × 2 retries) that store falls back to local and the
   header sync chip says so honestly — **records** re-scrape fresh from NSE (still current), **context**
