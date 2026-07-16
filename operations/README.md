@@ -464,6 +464,58 @@ alerting stack. No `HC_PING_URL` → no ping (dark).
 6. **HARD calendar item — Oracle console login every ≤30 days.** No script can prevent *account*-level
    reclaim; this is a manual recurring reminder you set. It is load-bearing, not optional.
 
+### Telegram alerting & control (v3 V3-3) — off by default (dark-ships without creds); deploy runbook
+
+The operator-facing surface of VM monitoring: it turns the `heartbeat.json` / `VmStatus` health facts
+into **push alerts + interactive commands** on Telegram. Three roles, all reading the same `VmStatus`
+snapshot (`vm_status.build_status`) so what you see is consistent, and **all dark-ship** — with no
+`/etc/ipo/telegram.env` they are silent no-ops:
+
+- **Health digest** — `ipo-telegram-digest.timer` → `vm_telegram_digest.py`, **4×/day at 00:00 / 06:00
+  / 12:00 / 18:00 IST** (`Persistent=true`). The periodic reconciler: sends the full health snapshot
+  **unconditionally** (OK *or* DEGRADED), with the alert-check's "N consecutive since HH:MM" notes.
+- **State-change alerts** — `ipo-alert-check.timer` → `vm_alert_check.py`, **every 20 min**
+  (`OnBootSec=3min`, `OnUnitActiveSec=20min`). The transition detector: **one** alert when a condition
+  first breaks (or escalates, e.g. the Oracle-login tier), **one** when it recovers, and **nothing**
+  while it stays broken (no cry-wolf; the count + since accrue for the digest). It is the **single
+  writer** of `alert_state.json`; the digest only reads it.
+- **Owner-only command bot** — `ipo-telegram-bot.service` → `vm_telegram_bot.py`, a **long-poll daemon**
+  (`Restart=always`). Answers **`/status`** (the VM health snapshot on demand) and **`/login`** (record
+  that you did the ≤30-day Oracle console login — feeds the login-staleness dimension). Commands are
+  **owner-only** (chat-id checked). On start it registers the **`/` command menu** via `setMyCommands`
+  (single-source `COMMANDS` in `telegram_commands.py`), so the menu appears when you type "/".
+
+**Deploy (you provision):**
+
+1. **Create the bot + find your chat id.** Talk to `@BotFather` → `/newbot` → copy the **bot token**.
+   Message your new bot once, then read your numeric **chat id** (e.g. via `@userinfobot`, or the
+   `getUpdates` API). The bot only ever talks to this one chat.
+2. **Credentials file** — `/etc/ipo/telegram.env` (owner `root:root`, mode `600`, outside `/opt/ipo`,
+   never committed), two lines:
+   ```
+   TELEGRAM_BOT_TOKEN=…
+   TELEGRAM_CHAT_ID=…
+   ```
+3. **Three systemd units**, each with `EnvironmentFile=/etc/ipo/telegram.env` and
+   `User=ubuntu`, `WorkingDirectory=/opt/ipo`:
+   - `ipo-telegram-digest.service` (`oneshot`) + `.timer` (the four `OnCalendar=… Asia/Kolkata` lines
+     above, `Persistent=true`);
+   - `ipo-alert-check.service` (`oneshot`) + `.timer` (`OnBootSec=3min`, `OnUnitActiveSec=20min`,
+     `Persistent=true`);
+   - `ipo-telegram-bot.service` (long-running, `Restart=always`), `ExecStart=…/python
+     …/scripts/vm_telegram_bot.py --data-dir /opt/ipo/data`.
+   Enable the two timers + the bot service (`systemctl enable --now …`). `OnFailure=` on the oneshots
+   points at the alert path, so a failed digest/alert-check itself pings you.
+4. **Verify:** `systemctl start ipo-telegram-digest.service` → a digest arrives; type `/status` in the
+   chat → the health snapshot replies; type "/" → the command menu shows. A digest sends silently on
+   HTTP 200 (a non-200/error logs a WARNING to the journal — that's how you tell a real send from a
+   dark-ship).
+
+**Redeploy after a code change:** scp the Telegram files (the `scripts/` entry points + the
+`src/ipo/service/` modules on the sync list above), then restart the affected unit(s). The `/` menu
+re-registers on the next `ipo-telegram-bot` restart (`getMyCommands` to confirm). **Dark-ship:** remove
+or blank `telegram.env` and all three go inert — no messages, no errors.
+
 ### Weekly fallback self-test (v3 V3-4) — off by default; deploy runbook
 
 V3-1's local fallback only runs when the VM is down, so it can rot undiscovered until the day you need
