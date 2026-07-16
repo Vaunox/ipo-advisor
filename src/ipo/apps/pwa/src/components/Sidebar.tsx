@@ -28,7 +28,20 @@ export function Sidebar({
   return (
     <aside className="side">
       <div className="brand">
-        <div className="mark mono">◆</div>
+        {/* v3 V3-12: the brand jewel as a clean inline vector (diamond-in-diamond) — no background
+            box, so it stays light inline beside the wordmark and matches the terminal aesthetic. */}
+        <div className="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <defs>
+              <linearGradient id="brandmark" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#3ddc84" />
+                <stop offset="1" stopColor="#1f9d55" />
+              </linearGradient>
+            </defs>
+            <path d="M12 1 L23 12 L12 23 L1 12 Z" fill="url(#brandmark)" />
+            <path d="M12 6.6 L17.4 12 L12 17.4 L6.6 12 Z" fill="#06170d" />
+          </svg>
+        </div>
         <div>
           <b>IPO Advisor</b>
           <span>Terminal</span>

@@ -35,7 +35,8 @@ html.theme-anim, html.theme-anim * {
 /* sidebar */
 .side { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; padding:16px 11px; }
 .brand { display:flex; align-items:center; gap:10px; padding:6px 8px 20px; }
-.brand .mark { width:28px; height:28px; border-radius:7px; background:linear-gradient(135deg,var(--apply),#1f9d55); display:grid; place-items:center; color:#04120a; font-weight:800; }
+.brand .mark { width:28px; height:28px; display:grid; place-items:center; } /* v3 V3-12: boxless vector jewel */
+.brand .mark svg { width:26px; height:26px; display:block; }
 .brand b { font-size:14px; letter-spacing:.01em; }
 .brand span { display:block; font-size:10px; color:var(--tx3); letter-spacing:.14em; text-transform:uppercase; }
 .nav { display:flex; flex-direction:column; gap:2px; margin-top:6px; }
