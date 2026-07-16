@@ -8,14 +8,16 @@ retail (+ sNII/bNII/overall). Anchor quality, valuation and OFS have no official
 stay ``None`` — the engine still scores (``qib_sub`` is the only critical feature), just with less
 context, and abstains until the book closes.
 
-Robustness: a network/parse failure of one issue is skipped; a failure of the whole fetch returns 0
-and is logged — a live-data hiccup must never crash the sidecar (it degrades to the last store).
+Robustness: a per-issue subscription-fetch failure preserves the last-known book (or abstains
+honestly when it can't be trusted), always logged — never a silent all-None that would change a
+verdict; a per-issue validation failure is skipped; a failure of the whole fetch returns 0 and is
+logged — a live-data hiccup must never crash the sidecar (it degrades to the last store).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import datetime
+from collections.abc import Callable, Mapping
+from datetime import date, datetime
 
 from pydantic import ValidationError
 
@@ -31,8 +33,56 @@ from ipo.data.sources.nse import NseClient, NseCurrentIssue, NseSubscription
 _log = get_logger("ipo.data.ingest.live")
 
 
+def _degrade_subscription(
+    prior: IPORecord | None, close_date: date, now: datetime
+) -> tuple[NseSubscription, datetime, str, bool]:
+    """Decide what a *failed* per-IPO subscription fetch yields (v3 correctness fix).
+
+    The old behavior silently substituted an all-None subscription: once the book is closed that
+    made ``qib_sub`` None -> ``INSUFFICIENT_SIGNAL``, indistinguishable from an absent book,
+    and ``upsert_many`` then CLOBBERED the last-known good value with None. Instead:
+
+    * **Preserve** the prior subscription — carrying its ``captured_at`` so that timestamp keeps
+      marking the last *successful* pull and the staleness clock stays honest — when we hold a real
+      prior book (``prior.qib_sub`` is not None) AND either the book is still open (the value isn't
+      scored yet, so keep it alive to survive to the close) OR the prior value was captured on/after
+      the close date. Subscriptions build to the close-day peak, so a value from the close day
+      or later is a conservative floor (it can only *understate* demand) or the final figure — a
+      trustworthy proxy for the closing book.
+    * **Abstain** (all-None -> INSUFFICIENT_SIGNAL) when there is no prior book, or the only prior
+      value predates the close date. A pre-close-day figure can miss the close-day demand surge (QIB
+      front-loads late), so scoring a confident verdict on it is the exact failure mode this guard
+      exists to prevent — better to abstain honestly (the caller logs it) than to score stale data.
+
+    Returns ``(subscription, captured_at, outcome, preserved)``; ``outcome`` is a slug for the
+    structured log (and the future V3-16 console).
+    """
+    none_sub = NseSubscription(qib=None, nii=None, retail=None, total=None)
+    if prior is None or prior.qib_sub is None:
+        return none_sub, now, "abstained_no_prior_book", False
+    book_open = now.date() < close_date
+    # captured_at is stamped from now_ist() (IST-aware), so .date() is the IST calendar date — the
+    # same basis as close_date (an NSE IST date).
+    fresh_for_close = prior.captured_at.date() >= close_date
+    if book_open or fresh_for_close:
+        preserved_sub = NseSubscription(
+            qib=prior.qib_sub,
+            nii=prior.nii_sub,
+            retail=prior.retail_sub,
+            total=prior.overall_sub,
+            nii_small=prior.nii_small_sub,
+            nii_big=prior.nii_big_sub,
+        )
+        outcome = "preserved_awaiting_close" if book_open else "scored_on_preserved"
+        return preserved_sub, prior.captured_at, outcome, True
+    return none_sub, now, "abstained_stale_prior", False
+
+
 def build_live_records(
-    client: NseClient, *, clock: Callable[[], datetime] = now_ist
+    client: NseClient,
+    *,
+    clock: Callable[[], datetime] = now_ist,
+    existing: Mapping[str, IPORecord] | None = None,
 ) -> list[IPORecord]:
     """Fetch current + forthcoming mainboard issues + subscription and build ``IPORecord``s.
 
@@ -40,8 +90,13 @@ def build_live_records(
     (forthcoming) so an IPO reaches the Upcoming calendar as soon as NSE lists it with a price band
     — not only once it opens. For a symbol in both feeds the current-issue entry wins (fresher,
     subscription-eligible). Raises ``SourceError`` only if the current-issues fetch itself fails; a
-    forthcoming-feed failure degrades to current-only; a per-issue subscription or validation
-    failure is skipped. SME issues are excluded.
+    forthcoming-feed failure degrades to current-only; a per-issue validation failure is skipped.
+
+    A per-issue *subscription* fetch failure no longer silently zeroes the book: given ``existing``
+    (the current store keyed by ``ipo_id``), the last-known subscription is preserved when it's a
+    trustworthy proxy for the closing book, else the issue abstains honestly — always logged (see
+    ``_degrade_subscription``). ``existing`` defaults to empty (no preserve, all-None on failure) so
+    the happy path and direct callers are unaffected. SME issues are excluded.
     """
     issues = client.current_issues()
     try:
@@ -54,16 +109,32 @@ def build_live_records(
     for issue in (*upcoming, *issues):
         merged[issue.symbol.upper()] = issue
 
+    prior_by_id = existing or {}
     records: list[IPORecord] = []
     for issue in merged.values():
         if issue.segment != SEGMENT_MAINBOARD:
             continue  # SME excluded (Locked decision)
         if issue.price_band_high is None or issue.open_date is None or issue.close_date is None:
             continue  # not enough to build a valid record yet
+        now = clock()
         try:
             sub = client.subscription(issue.symbol, force=True)
-        except SourceError:
-            sub = NseSubscription(qib=None, nii=None, retail=None, total=None)
+            captured = now
+        except SourceError as exc:
+            # A transient sub-fetch failure must not silently zero (and clobber) the book. Preserve
+            # last-known when it's a trustworthy proxy, else abstain honestly — but never silently.
+            sub, captured, outcome, preserved = _degrade_subscription(
+                prior_by_id.get(issue.symbol.lower()), issue.close_date, now
+            )
+            _log.warning(
+                "live_subscription_fetch_failed",
+                extra={
+                    "symbol": issue.symbol,
+                    "error": str(exc),
+                    "preserved": preserved,
+                    "outcome": outcome,
+                },
+            )
         try:
             records.append(
                 IPORecord(
@@ -80,7 +151,7 @@ def build_live_records(
                     nii_small_sub=sub.nii_small,
                     nii_big_sub=sub.nii_big,
                     overall_sub=sub.total,
-                    captured_at=clock(),
+                    captured_at=captured,
                 )
             )
         except (ValidationError, ValueError) as exc:
@@ -180,8 +251,11 @@ def refresh_from_nse(
     attempt = clock()
     ok = True
     error: str | None = None
+    # Snapshot the store so a failed per-issue subscription fetch can preserve last-known values
+    # instead of clobbering them with None (see build_live_records / _degrade_subscription).
+    existing = {r.ipo_id: r for r in repo.list_all()}
     try:
-        records = build_live_records(client, clock=clock)
+        records = build_live_records(client, clock=clock, existing=existing)
     except SourceError as exc:
         _log.warning("live_refresh_failed", extra={"error": str(exc)})
         records = []
