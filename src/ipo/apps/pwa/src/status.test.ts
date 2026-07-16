@@ -72,7 +72,7 @@ test('both stores from the VM → no indicator (stays quiet)', () => {
 test('VM down → the honest per-store split (records fresh vs context aging)', () => {
   const fb = fallbackStatus('local', 'local')
   assert.equal(fb?.text, 'on local — context aging') // records freshness is the "Updated …" timestamp
-  assert.match(fb?.title ?? '', /re-scraped fresh/) // full per-store detail in the tooltip
+  assert.match(fb?.title ?? '', /records fresh from NSE/) // full per-store detail in the tooltip
   assert.match(fb?.title ?? '', /aging/)
 })
 

@@ -90,7 +90,7 @@ export function fallbackStatus(
       : 'context aging'
   const title =
     'VM unreachable — ' +
-    (recLocal ? 'records re-scraped fresh from NSE' : 'records still served from the VM') +
+    (recLocal ? 'records fresh from NSE' : 'records still served from the VM') +
     '; ' +
     (ctxLocal
       ? 'context is last-known and aging (cannot refresh without the VM)'
