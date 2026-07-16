@@ -436,11 +436,20 @@ alerting stack. No `HC_PING_URL` → no ping (dark).
    `ExecStart=…/python …/scripts/vm_heartbeat.py --data-dir /opt/ipo/data --beat /opt/hb/heartbeat.json`;
    then `ExecStart=/usr/bin/git -C /opt/hb commit -am beat` and `ExecStart=/usr/bin/git -C /opt/hb push`
    (the write key is scoped to the heartbeat repo only).
-4. **VM systemd — keepalive** (`nice`d timer, e.g. every 30 min): `ExecStart=…/python
-   …/scripts/vm_keepalive.py --data-dir /opt/ipo/data --seconds 120`. **Tune + verify:** after a day,
-   check the Oracle console CPU metric sits **above the reclaim bar over the window** (it averages, so
-   a brief spike is not enough) — raise `--seconds`/frequency until it does. Steady genuine fetch load
-   does most of the work; this is the top-up.
+4. **VM systemd — keepalive** (`nice`d timer, every 30 min): `ExecStart=…/python
+   …/scripts/vm_keepalive.py --data-dir /opt/ipo/data --seconds 240`. The single busy-loop pegs ONE
+   vCPU; the shape is **E2.1.Micro = 1 OCPU = 2 vCPU**, so that reads **~51%** instance CPU, not 100%.
+   A 240s burn every 30 min = **13.3% duty**, keeping the console CPU **p95 well over the 20% reclaim
+   bar** (robust even under 5-min aggregation, ~41%/bucket). Was `--seconds 120` until 2026-07-16
+   (marginal — ~20.5% under 5-min averaging); raised to 240s for margin. **Verify** on the Oracle
+   console: metric `oci_computeagent/CpuUtilization`, **Statistic = P95, Interval = 1 minute, 7-day
+   window** — must read ≥ 20%, with the ~50% spikes recurring every 30 min. **The reclaim rule is CPU
+   p95 < 20% over 7 days** (below 20% for ~95% of the time), so periodic bursts covering ≥5% of the
+   window (~8.4 h/wk) clear it — a single brief spike does not, and Mean is *not* the number to read.
+   **Network is a non-lever** here (the box transmits ~0% of its ~480 Mbps cap; CPU is the only
+   controllable dimension — Memory is A1-only). OCI Monitoring retains metrics **90 days**, so the full
+   rolling 7-day window is always inspectable. Steady genuine fetch load does most of the work; this
+   is the top-up.
 5. **Desktop** — before the heartbeat ritual, `git -C <hb-clone> pull`, then
    `run_heartbeat --vm-heartbeat <hb-clone>/heartbeat.json`.
 6. **HARD calendar item — Oracle console login every ≤30 days.** No script can prevent *account*-level

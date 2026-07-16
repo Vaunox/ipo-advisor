@@ -7,7 +7,7 @@ the reclaim bar, and touches a marker the heartbeat checks — so a dead keepali
 before reclamation. Genuinely-useful activity (the fetch cadence) does most of the work; this is
 the top-up, tuned deploy-side against the Oracle console metric (see the runbook).
 
-    python scripts/vm_keepalive.py --data-dir <vm-data> --seconds 120
+    python scripts/vm_keepalive.py --data-dir <vm-data> --seconds 240
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def touch_marker(data_dir: Path) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bounded CPU keepalive + marker touch.")
     parser.add_argument("--data-dir", required=True, help="where to touch the keepalive marker")
-    parser.add_argument("--seconds", type=float, default=120.0, help="burn duration (bounded)")
+    parser.add_argument("--seconds", type=float, default=240.0, help="burn duration (bounded)")
     args = parser.parse_args()
     burn(args.seconds)
     touch_marker(Path(args.data_dir))
