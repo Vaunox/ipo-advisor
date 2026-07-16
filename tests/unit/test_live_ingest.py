@@ -7,14 +7,19 @@ failure degrades to zero records rather than raising (the sidecar must never cra
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from typing import cast
+
+import pytest
 
 from ipo.core.interfaces import Repository
 from ipo.core.types import IPORecord, ListingLabel, Segment
 from ipo.data.ingest.live import build_live_records, refresh_from_nse, resolve_listings
 from ipo.data.sources.base import SourceError
 from ipo.data.sources.nse import NseClient, NseCurrentIssue, NsePastIssue, NseSubscription
+from ipo.features.build import build_features
+from ipo.model.verdict import missing_critical
 
 
 class _StubClient:
@@ -27,12 +32,16 @@ class _StubClient:
         past: list[NsePastIssue] | None = None,
         prices: dict[str, tuple[float, float] | None] | None = None,
         upcoming: list[NseCurrentIssue] | None = None,
+        sub_errors: set[str] | None = None,
     ) -> None:
         self._issues = issues
         self._subs = subs or {}
         self._past = past
         self._prices = prices or {}
         self._upcoming = upcoming or []
+        self._sub_errors = (
+            sub_errors or set()
+        )  # symbols whose subscription fetch raises SourceError
 
     def current_issues(self) -> list[NseCurrentIssue]:
         if self._issues is None:
@@ -43,6 +52,8 @@ class _StubClient:
         return self._upcoming
 
     def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
+        if symbol in self._sub_errors:
+            raise SourceError(f"nse: subscription fetch failed for {symbol}")
         return self._subs.get(symbol, NseSubscription(qib=None, nii=None, retail=None, total=None))
 
     def past_issues(self, *, force: bool = False) -> list[NsePastIssue]:
@@ -92,8 +103,9 @@ def _client(
     past: list[NsePastIssue] | None = None,
     prices: dict[str, tuple[float, float] | None] | None = None,
     upcoming: list[NseCurrentIssue] | None = None,
+    sub_errors: set[str] | None = None,
 ) -> NseClient:
-    return cast(NseClient, _StubClient(issues, subs, past, prices, upcoming))
+    return cast(NseClient, _StubClient(issues, subs, past, prices, upcoming, sub_errors))
 
 
 _KNACK = NseCurrentIssue(
@@ -409,3 +421,149 @@ def test_refresh_resolves_after_upsert() -> None:
     assert repo.get("knack") is not None  # live upsert
     resolved = repo.get("oldco")
     assert resolved is not None and resolved.listing_date == date(2026, 7, 8)  # lifecycle completed
+
+
+# --- silent subscription-fetch degradation (v3 correctness fix) ----------------------------------
+# A per-IPO subscription fetch can fail transiently (SourceError after the client's retries, or a
+# parse/source-drift). It must never silently become an all-None book that (once closed) flips the
+# verdict to INSUFFICIENT_SIGNAL and CLOBBERS the last-known value. The freshness guard preserves a
+# trustworthy last-known book but abstains (honestly, logged) on a stale one. See
+# build_live_records / _degrade_subscription. KNACK opens 2026-07-01, closes 2026-07-03.
+
+_AFTER_CLOSE = lambda: datetime(2026, 7, 4, 10, 0)  # noqa: E731 — book closed
+_DURING_BOOK = lambda: datetime(2026, 7, 2, 10, 0)  # noqa: E731 — book still open
+
+
+def _stored_knack(qib: float | None, captured_at: datetime) -> IPORecord:
+    """A stored KNACK record with a chosen subscription + capture time (the 'last-known' book)."""
+    return IPORecord(
+        ipo_id="knack",
+        name="Knack Packaging Limited",
+        segment=Segment("mainboard"),
+        price_band_low=161.0,
+        price_band_high=170.0,
+        open_date=date(2026, 7, 1),
+        close_date=date(2026, 7, 3),
+        qib_sub=qib,
+        nii_sub=19.22,
+        retail_sub=4.23,
+        nii_small_sub=17.13,
+        nii_big_sub=20.27,
+        overall_sub=7.21,
+        captured_at=captured_at,
+    )
+
+
+def _sub_failure_logs(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if r.getMessage() == "live_subscription_fetch_failed"]
+
+
+def _extra(rec: logging.LogRecord, key: str) -> object:
+    """Read a structured ``extra=`` field promoted onto the record (typed, no dynamic attr)."""
+    return rec.__dict__[key]
+
+
+def test_sub_fetch_failure_preserves_fresh_last_known_and_scores(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # last-known captured ON the close day → a trustworthy close-book proxy → preserve AND score.
+    prior = _stored_knack(qib=45.0, captured_at=datetime(2026, 7, 3, 15, 0))
+    with caplog.at_level(logging.WARNING):
+        recs = build_live_records(
+            _client([_KNACK], sub_errors={"KNACK"}), clock=_AFTER_CLOSE, existing={"knack": prior}
+        )
+    r = recs[0]
+    # the good book survived the failed fetch, values intact (no all-None clobber)…
+    assert (r.qib_sub, r.nii_sub, r.retail_sub, r.overall_sub) == (45.0, 19.22, 4.23, 7.21)
+    assert (r.nii_small_sub, r.nii_big_sub) == (17.13, 20.27)
+    assert r.captured_at == datetime(2026, 7, 3, 15, 0)  # frozen → the staleness clock stays honest
+    # …and because qib_sub is present, the engine scores a REAL verdict (not INSUFFICIENT for qib).
+    feats = build_features(r, datetime(2026, 7, 4, 17, 0))
+    assert missing_critical(feats, ["qib_sub"]) == []
+    logs = _sub_failure_logs(caplog)
+    assert len(logs) == 1
+    assert _extra(logs[0], "outcome") == "scored_on_preserved"
+    assert _extra(logs[0], "preserved") is True
+    assert _extra(logs[0], "symbol") == "KNACK"
+
+
+def test_sub_fetch_failure_stale_last_known_abstains_and_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # last-known captured BEFORE the close day → could miss the close-day surge → abstain honestly.
+    prior = _stored_knack(qib=10.0, captured_at=datetime(2026, 7, 1, 15, 0))
+    with caplog.at_level(logging.WARNING):
+        recs = build_live_records(
+            _client([_KNACK], sub_errors={"KNACK"}), clock=_AFTER_CLOSE, existing={"knack": prior}
+        )
+    r = recs[0]
+    assert r.qib_sub is None  # not scored on a day-old book — honest INSUFFICIENT downstream
+    feats = build_features(r, datetime(2026, 7, 4, 17, 0))
+    assert missing_critical(feats, ["qib_sub"]) == ["qib_sub"]
+    logs = _sub_failure_logs(caplog)
+    assert len(logs) == 1
+    assert _extra(logs[0], "outcome") == "abstained_stale_prior"
+    assert _extra(logs[0], "preserved") is False
+
+
+def test_sub_fetch_failure_no_prior_abstains_and_logs(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        recs = build_live_records(_client([_KNACK], sub_errors={"KNACK"}), clock=_AFTER_CLOSE)
+    assert recs[0].qib_sub is None  # nothing to preserve → honest absence (now logged, not silent)
+    logs = _sub_failure_logs(caplog)
+    assert len(logs) == 1
+    assert _extra(logs[0], "outcome") == "abstained_no_prior_book"
+    assert _extra(logs[0], "preserved") is False
+
+
+def test_sub_fetch_failure_open_book_keeps_value_alive(caplog: pytest.LogCaptureFixture) -> None:
+    # while the book is open the value isn't scored anyway — preserve it so it survives to the
+    # close (the anti-clobber guarantee during the book-open window).
+    prior = _stored_knack(qib=10.0, captured_at=datetime(2026, 7, 1, 15, 0))
+    with caplog.at_level(logging.WARNING):
+        recs = build_live_records(
+            _client([_KNACK], sub_errors={"KNACK"}), clock=_DURING_BOOK, existing={"knack": prior}
+        )
+    r = recs[0]
+    assert r.qib_sub == 10.0  # kept alive across the blip
+    assert r.captured_at == datetime(2026, 7, 1, 15, 0)  # frozen
+    assert _extra(_sub_failure_logs(caplog)[0], "outcome") == "preserved_awaiting_close"
+
+
+def test_refresh_does_not_clobber_last_known_on_sub_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Headline regression: an end-to-end refresh whose sub-fetch blips keeps the stored book."""
+    repo = _Repo([_stored_knack(qib=45.0, captured_at=datetime(2026, 7, 3, 15, 0))])
+    with caplog.at_level(logging.WARNING):
+        n = refresh_from_nse(
+            cast(Repository, repo), _client([_KNACK], sub_errors={"KNACK"}), clock=_AFTER_CLOSE
+        )
+    assert n == 1
+    assert _require(repo, "knack").qib_sub == 45.0  # NOT overwritten with None (the pre-fix bug)
+
+
+def test_genuine_absence_still_insufficient_unchanged(caplog: pytest.LogCaptureFixture) -> None:
+    # NSE returns a VALID response with no QIB figure (not an error). Behavior must be UNCHANGED:
+    # qib_sub stays None, the prior book is NOT preserved, and NO failure log fires (this path
+    # never enters the except branch) — only a real fetch failure impersonating absence is fixed.
+    prior = _stored_knack(qib=45.0, captured_at=datetime(2026, 7, 3, 15, 0))
+    with caplog.at_level(logging.WARNING):
+        recs = build_live_records(
+            _client([_KNACK]), clock=_AFTER_CLOSE, existing={"knack": prior}
+        )  # default subscription() returns all-None, does NOT raise
+    assert recs[0].qib_sub is None  # genuine absence respected (not preserved) — as before the fix
+    assert _sub_failure_logs(caplog) == []  # (c) is not a failure → no log, by design
+
+
+def test_happy_path_is_byte_identical_regardless_of_existing() -> None:
+    """On a SUCCESSFUL fetch, existing is inert — records are field-for-field identical (proof)."""
+    subs = {"KNACK": NseSubscription(qib=3.48, nii=19.22, retail=4.23, total=7.21)}
+    fixed = lambda: datetime(2026, 7, 3, 12, 0)  # noqa: E731
+    # a DIFFERENT prior book — if the happy path ever read `existing`, the outputs would diverge.
+    stale_prior = {"knack": _stored_knack(qib=99.0, captured_at=datetime(2026, 7, 1, 9, 0))}
+    without = build_live_records(_client([_KNACK], subs), clock=fixed)
+    with_existing = build_live_records(_client([_KNACK], subs), clock=fixed, existing=stale_prior)
+    assert without == with_existing  # existing had zero effect on the fetched (happy) path
+    assert without[0].qib_sub == 3.48
+    assert without[0].captured_at == datetime(2026, 7, 3, 12, 0)
