@@ -326,8 +326,8 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
     # Turn the structured logger ON in the live engine (v3 A) — it exists but was only wired in the
     # batch scripts, so INFO was dropped and WARN escaped as unstructured lastResort text. Full
     # detail goes to a size-capped rotating file in the data dir (durable + greppable, esp. once the
-    # VM lands); stderr stays at WARN so the desktop shell's console isn't flooded. Configured BEFORE
-    # provisioning so a store-clear on a version bump is actually recorded (not lost pre-logging).
+    # VM lands); stderr stays at WARN so the desktop shell's console isn't flooded. Configured
+    # BEFORE provisioning so a store-clear on a version bump is recorded (not lost pre-logging).
     configure_logging(
         config.logging.level,
         json_output=config.logging.json_output,

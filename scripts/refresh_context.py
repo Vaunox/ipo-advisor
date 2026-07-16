@@ -137,8 +137,8 @@ def _context(token: str, ipo_id: object) -> dict[str, object]:
     """GET /v2/ipos/{id} and pull the per-IPO context fields (registrar + rhp_url).
 
     A fetch FAILURE (non-200 / malformed body) prints to stderr before returning ``{}`` — otherwise
-    it is indistinguishable from an IPO that genuinely has no registrar/RHP yet (package-free script,
-    so stderr → journald is the honest channel, matching ``_list_ids``).
+    it is indistinguishable from an IPO that genuinely has no registrar/RHP yet. Package-free
+    script, so stderr → journald is the honest channel (matching ``_list_ids``).
     """
     resp = _get(f"/v2/ipos/{ipo_id}", token)
     if resp.status_code != 200:
@@ -216,8 +216,8 @@ def merge_context(data_dir: Path, symbol: str, entry: dict[str, object]) -> bool
         try:
             existing = json.loads(out_path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
-            # An existing cache that won't parse: do NOT reset it to a single entry — that would wipe
-            # every OTHER IPO's context. Refuse the merge and leave the file for inspection.
+            # An existing cache that won't parse: do NOT reset it to a single entry (that would
+            # wipe every OTHER IPO's context). Refuse the merge and leave the file for inspection.
             print(
                 f"[merge {symbol}] existing cache unreadable — refusing to overwrite: {exc}",
                 file=sys.stderr,
