@@ -1,10 +1,59 @@
-import { useIsFetching } from '@tanstack/react-query'
+import { useIsFetching, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
 import { useHealth, useStatus } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { fallbackStatus } from '../status'
 import { AlertCenter } from './AlertCenter'
 import { Clock } from './Clock'
+import { IconRefresh } from './Icons'
 import { ThemeToggle } from './ThemeToggle'
+
+// v3 V3-13: a header Refresh control beside the alert bell. On click it asks the engine for a REAL
+// data pull — the same VM-primary→fallback cycle the app runs automatically (via the shell's
+// privileged stdin channel, `window.ipoDesktop.refresh`), NOT a cosmetic spinner or timestamp bump.
+// The "Updated" chip (SyncStatus) advances on its own once the genuine pull lands. In-flight state:
+// disabled + spinning while a pull is outstanding, cleared when a newer successful pull lands (the
+// `/status` timestamp advances) or after a bounded timeout so a coalesced/failed/VM-unreachable pull
+// can't hang the spinner. Overlapping fetches are impossible anyway — the engine coalesces triggers
+// within a 15s debounce (`_STDIN_REFRESH_DEBOUNCE_SEC`), so a mid-cycle press never stacks a pull.
+function RefreshButton() {
+  const qc = useQueryClient()
+  const status = useStatus()
+  const updatedAt = status.data?.last_successful_ingest ?? null
+  const [busy, setBusy] = useState(false)
+  const baseline = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!busy) return
+    if (updatedAt !== baseline.current) {
+      setBusy(false) // a genuinely-newer successful pull landed
+      return
+    }
+    const t = window.setTimeout(() => setBusy(false), 20_000) // bounded: coalesced / failed / VM-down
+    return () => window.clearTimeout(t)
+  }, [busy, updatedAt])
+
+  const onClick = () => {
+    if (busy) return
+    baseline.current = updatedAt
+    setBusy(true)
+    const api = (window as unknown as { ipoDesktop?: { refresh?: () => Promise<boolean> } }).ipoDesktop
+    if (api?.refresh) void api.refresh()
+    else void qc.invalidateQueries() // browser/dev without the shell: re-read the engine, no live pull
+  }
+
+  return (
+    <button
+      className="refreshbtn"
+      onClick={onClick}
+      disabled={busy}
+      aria-label="Refresh now"
+      title="Refresh now — pull the latest from the live feed"
+    >
+      <IconRefresh className={busy ? 'spin' : undefined} />
+    </button>
+  )
+}
 
 const istTimeOf = (iso: string): string =>
   new Date(iso).toLocaleTimeString('en-US', {
@@ -45,11 +94,11 @@ function SyncStatus() {
   } else if (updated && s?.last_attempt_ok === false) {
     // Store still served, but the latest NSE pull failed — stale + retrying, shown honestly.
     state = 'warn'
-    text = `Updated ${updated} IST · retrying`
+    text = `Updated ${updated} · retrying`
     title = `Last successful NSE pull ${updated} IST — a newer pull failed; retrying automatically`
   } else if (updated) {
     state = 'ok'
-    text = `Updated ${updated} IST`
+    text = `Updated ${updated}`
     title = `Last successful NSE pull ${updated} IST`
   } else {
     // Never completed a successful pull yet (fresh install mid-first-fetch, or feed down at boot).
@@ -99,6 +148,7 @@ export function TopBar({
       </div>
       <div className="controls">
         <AlertCenter board={board} onOpenIpo={onOpenIpo} />
+        <RefreshButton />
         <button className="kbtn" onClick={onSearch}>
           Search <kbd>Ctrl K</kbd>
         </button>
