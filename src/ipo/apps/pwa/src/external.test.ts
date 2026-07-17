@@ -8,7 +8,7 @@ import { isAllowedExternalUrl, isAllowedRhpUrl, registrarAllotmentUrl } from './
 
 test('isAllowedExternalUrl allows only the pinned registrar hosts', () => {
   assert.equal(isAllowedExternalUrl('https://kfintech.com/'), true)
-  assert.equal(isAllowedExternalUrl('https://ris.kfintech.com/ipostatus/'), true)
+  assert.equal(isAllowedExternalUrl('https://ipostatus.kfintech.com/'), true)
   assert.equal(isAllowedExternalUrl('https://www.sebi.gov.in/x'), false) // document host, not registrar
   assert.equal(isAllowedExternalUrl('https://evil.example.com/'), false)
   assert.equal(isAllowedExternalUrl(null), false)
@@ -24,7 +24,7 @@ test('isAllowedRhpUrl allows any https URL, issuer-hosted included', () => {
 test('registrarAllotmentUrl resolves every pinned registrar to its curated check-allotment page', () => {
   const cases: [string, string][] = [
     ['https://www.linkintime.co.in/', 'https://linkintime.co.in/initial_offer/public-issues.html'],
-    ['https://kfintech.com/', 'https://ris.kfintech.com/ipostatus/'],
+    ['https://kfintech.com/', 'https://ipostatus.kfintech.com/'],
     ['https://www.bigshareonline.com/', 'https://www.bigshareonline.com/ipo_allotment.html'],
     ['https://in.mpms.mufg.com/', 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html'],
     ['https://maashitla.com/', 'https://maashitla.com/allotment-status/public-issues'],
@@ -41,7 +41,7 @@ test('registrarAllotmentUrl ignores the cached URL path — only the host select
   // Even if the cache happened to already carry a deep path, we substitute our own curated one.
   assert.equal(
     registrarAllotmentUrl('https://kfintech.com/some/other/page'),
-    'https://ris.kfintech.com/ipostatus/',
+    'https://ipostatus.kfintech.com/',
   )
 })
 

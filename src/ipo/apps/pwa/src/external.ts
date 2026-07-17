@@ -48,7 +48,7 @@ export function isAllowedRhpUrl(url: string | null): url is string {
 // REGISTRAR_HOSTS, so a resolved URL always also passes isAllowedExternalUrl.
 const REGISTRAR_ALLOTMENT_URL: Record<string, string> = {
   'linkintime.co.in': 'https://linkintime.co.in/initial_offer/public-issues.html',
-  'kfintech.com': 'https://ris.kfintech.com/ipostatus/',
+  'kfintech.com': 'https://ipostatus.kfintech.com/',
   'bigshareonline.com': 'https://www.bigshareonline.com/ipo_allotment.html',
   'mpms.mufg.com': 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html',
   'maashitla.com': 'https://maashitla.com/allotment-status/public-issues',
