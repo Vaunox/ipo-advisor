@@ -225,7 +225,7 @@ export function Settings() {
         <div className="set-row"><div className="k">Go to History · Settings</div><span><kbd>g h</kbd><kbd>g s</kbd></span></div>
         <div className="set-row"><div className="k">Toggle light / dark</div><kbd>t</kbd></div>
         {devConsole && (
-          <div className="set-row"><div className="k">Toggle console log</div><kbd>`</kbd></div>
+          <div className="set-row"><div className="k">Console log · hold to peek</div><kbd>`</kbd></div>
         )}
         <div className="set-row"><div className="k">Show all shortcuts</div><kbd>?</kbd></div>
       </div>
@@ -301,8 +301,8 @@ export function Settings() {
         <h3 className="sec">Console log</h3>
         <div className="set-row">
           <div className="k" style={{ maxWidth: 250 }}>
-            A read-only view of the engine's structured log. Press <kbd>`</kbd> to open or
-            close it. Off by default.
+            A read-only view of the engine's structured log. Tap <kbd>`</kbd> to toggle it, or
+            hold <kbd>`</kbd> to peek while held. Off by default.
           </div>
           <Switch on={devConsole} onToggle={() => setDevConsole(!devConsole)} />
         </div>
