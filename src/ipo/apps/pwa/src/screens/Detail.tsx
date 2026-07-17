@@ -3,7 +3,7 @@ import { useIpo, useIpoContext, useTransitionsFor } from '../api/hooks'
 import type { IPODetail, IPOFeatures, IpoContextView, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { Loading } from '../components/Loading'
-import { isAllowedExternalUrl, openExternalUrl } from '../external'
+import { isAllowedRhpUrl, openExternalUrl } from '../external'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
 
@@ -115,23 +115,24 @@ function ContextRef({ ctx }: { ctx: IpoContextView | undefined }) {
 
 // v3 V3-5 — the filed RHP link. Display/routing only (from the per-IPO Upstox context cache, never a
 // model input). Labelled the *Red Herring Prospectus* explicitly — the final offer document, never a
-// generic "prospectus" and never the draft (DRHP was dropped as unusable). Opens the official SEBI
-// filing one-click (allowlisted); an issuer-hosted RHP renders as inert copyable text (we can't vouch
-// for arbitrary issuer domains). A missing link distinguishes "not filed yet" from "cache is stale".
+// generic "prospectus" and never the draft (DRHP was dropped as unusable). Opens one-click for any
+// https RHP — a public regulatory filing, not a PAN-entry surface, so every RHP gets the same button
+// regardless of whether SEBI or the issuer hosts it. A missing link distinguishes "not filed yet"
+// from "cache is stale".
 function RhpLink({ ctx }: { ctx: IpoContextView | undefined }) {
   if (!ctx) return null // don't flash while loading
   const { rhp_url, rhp_state, refreshed_at } = ctx
   return (
     <div className="card">
       <h3 className="sec">Filed documents</h3>
-      {rhp_state === 'present' && isAllowedExternalUrl(rhp_url) ? (
-        <button className="btn al-check" onClick={() => openExternalUrl(rhp_url as string)}>
+      {rhp_state === 'present' && isAllowedRhpUrl(rhp_url) ? (
+        <button className="btn al-check" onClick={() => openExternalUrl(rhp_url as string, 'rhp')}>
           Red Herring Prospectus (RHP) ↗
         </button>
       ) : rhp_state === 'present' && rhp_url ? (
         <div className="rhp-inert">
           <span className="rhp-lab">Red Herring Prospectus (RHP)</span>
-          <span className="al-nolink" title="Unrecognized document host — open it manually">
+          <span className="al-nolink" title="Not a valid https link — open it manually">
             open manually · <span className="mono al-url">{rhp_url}</span>
           </span>
         </div>

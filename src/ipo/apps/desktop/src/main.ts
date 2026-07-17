@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { type ChildProcess } from 'node:child_process'
 import path from 'node:path'
-import { isAllowedExternalUrl } from './external'
+import { isAllowedExternalUrl, isAllowedRhpUrl } from './external'
 import {
   findRepoRoot,
   freePort,
@@ -239,12 +239,15 @@ ipcMain.handle('engine:restart', (): Promise<boolean> => restartEngine())
 ipcMain.handle('engine:refresh', (): boolean => triggerEngineRefresh(child))
 
 // v3 V3-5/V3-6: open a registrar's allotment page or an RHP document in the user's real browser. The
-// URL comes from the per-IPO context cache (a data-plane value), so an https check is not enough — it
-// must be a PINNED host (isAllowedExternalUrl: registrar portals + the SEBI filing host). An unknown/
-// poisoned/issuer host is refused here, structurally, so the app can never open an attacker-chosen
-// page the user is primed to trust. Nothing is navigated inside the app.
-ipcMain.handle('shell:openExternal', (_e, url: unknown): boolean => {
-  if (typeof url !== 'string' || !isAllowedExternalUrl(url)) return false
+// URL comes from the per-IPO context cache (a data-plane value), so the check depends on `kind`:
+// 'registrar' (a PAN-entry surface) must be a PINNED host (isAllowedExternalUrl) — an unknown or
+// poisoned registrar host is refused, structurally, so the app can never open an attacker-chosen page
+// the user is primed to trust with a PAN. 'rhp' (a public regulatory filing, no PAN entry) only needs
+// isAllowedRhpUrl (any https URL). Nothing is navigated inside the app.
+ipcMain.handle('shell:openExternal', (_e, url: unknown, kind: unknown): boolean => {
+  if (typeof url !== 'string') return false
+  const allowed = kind === 'rhp' ? isAllowedRhpUrl(url) : isAllowedExternalUrl(url)
+  if (!allowed) return false
   void shell.openExternal(url)
   return true
 })

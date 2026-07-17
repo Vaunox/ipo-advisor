@@ -28,7 +28,9 @@ contextBridge.exposeInMainWorld('ipoDesktop', {
   // Ask the engine for a real NSE pull (v3 BUG 1 / Defect 1). The renderer stays read-only: this is
   // a request routed through the trusted shell, not a mutating call to the engine's GET-only API.
   refresh: (): Promise<boolean> => ipcRenderer.invoke('engine:refresh'),
-  // Open a URL in the user's real browser (v3 V3-6, Allotment deep-link). The main process
-  // validates it is https before opening; nothing is navigated inside the app (no in-app webview).
-  openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),
+  // Open a URL in the user's real browser (v3 V3-6, Allotment deep-link + RHP). The main process
+  // validates it against `kind`'s rule before opening (a pinned host for 'registrar', any https for
+  // 'rhp'); nothing is navigated inside the app (no in-app webview).
+  openExternal: (url: string, kind: 'registrar' | 'rhp'): Promise<boolean> =>
+    ipcRenderer.invoke('shell:openExternal', url, kind),
 })

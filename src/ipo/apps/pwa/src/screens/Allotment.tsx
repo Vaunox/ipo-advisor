@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAllotment } from '../api/hooks'
 import type { AllotmentRow, RegistrarInfo } from '../api/types'
 import { Loading } from '../components/Loading'
-import { isAllowedExternalUrl, openExternalUrl } from '../external'
+import { openExternalUrl, registrarAllotmentUrl } from '../external'
 
 // v3 V3-6 — the Allotment tab. Routing convenience only: for each IPO past its close, show the
 // registrar and DEEP-LINK OUT to the registrar's own allotment-check page. We never collect a PAN
@@ -78,8 +78,11 @@ function AllotmentCard({ row, refreshedAt }: { row: AllotmentRow; refreshedAt: s
 
       {reg && (
         <div className="al-actions">
-          {isAllowedExternalUrl(reg.website) ? (
-            <button className="btn al-check" onClick={() => openExternalUrl(reg.website as string)}>
+          {registrarAllotmentUrl(reg.website) ? (
+            <button
+              className="btn al-check"
+              onClick={() => openExternalUrl(registrarAllotmentUrl(reg.website) as string, 'registrar')}
+            >
               Check allotment ↗
             </button>
           ) : reg.website ? (
