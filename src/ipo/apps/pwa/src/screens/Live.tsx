@@ -140,12 +140,15 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
   const lastSeen = getLastSeen()
   const ordered = useMemo(() => {
     if (!data) return []
-    // Live signals = the current pipeline: issues that have opened and not yet listed (open now, or
-    // closed and awaiting listing — where the verdict is live). Already-listed IPOs belong to
-    // History; not-yet-open ones to Upcoming.
+    // Live signals = currently bidding: opened, not yet closed, not yet listed. Retires on
+    // close_date (the same book_closed anchor build_features uses, features/build.py) — the day
+    // AFTER close it leaves Live, at the exact boundary History's "Awaiting listing outcome"
+    // picks it up (close_date < today), so a closed IPO hands off with no gap and no double-show.
+    // It stays through the close day itself (matching statusLabel's "CLOSES TODAY", still live).
+    // Already-listed IPOs belong to History; not-yet-open ones to Upcoming.
     const t = today()
     const active = data.filter(
-      (r) => r.listing_date == null && midnight(r.open_date) <= t,
+      (r) => r.listing_date == null && midnight(r.open_date) <= t && midnight(r.close_date) >= t,
     )
     const val = (r: IPOListRow): string | number => {
       if (sort.key === 'company') return r.name.toLowerCase()
