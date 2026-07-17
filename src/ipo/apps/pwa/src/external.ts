@@ -47,13 +47,19 @@ export function isAllowedRhpUrl(url: string | null): url is string {
 // we substitute it in rather than trust the cached URL's exact path. Keyed by the SAME hosts as
 // REGISTRAR_HOSTS, so a resolved URL always also passes isAllowedExternalUrl.
 const REGISTRAR_ALLOTMENT_URL: Record<string, string> = {
-  'linkintime.co.in': 'https://linkintime.co.in/initial_offer/public-issues.html',
+  // linkintime.co.in itself no longer resolves at all (the company rebranded to MUFG Intime) —
+  // route to the live MUFG page, same as the mpms.mufg.com entry below.
+  'linkintime.co.in': 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html',
   'kfintech.com': 'https://ipostatus.kfintech.com/',
   'bigshareonline.com': 'https://www.bigshareonline.com/ipo_allotment.html',
   'mpms.mufg.com': 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html',
   'maashitla.com': 'https://maashitla.com/allotment-status/public-issues',
   'skylinerta.com': 'https://www.skylinerta.com/display_ipo_rightissue_allotment.php',
-  'cameoindia.com': 'https://ipo.cameoindia.com/',
+  // The whole ipo*.cameoindia.com family (the main host + all 3 numbered mirrors) is down as of
+  // this writing -- even Cameo's own working homepage still links to the dead one. Falling back to
+  // their confirmed-live homepage, which links to "IPO Status" once that comes back up, rather than
+  // hand out a URL that's currently dead.
+  'cameoindia.com': 'https://cambridge.cameoindia.com/',
   'purvashare.com': 'https://www.purvashare.com/investor-service/ipo-query',
 }
 

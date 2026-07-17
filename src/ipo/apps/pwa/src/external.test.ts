@@ -23,13 +23,13 @@ test('isAllowedRhpUrl allows any https URL, issuer-hosted included', () => {
 
 test('registrarAllotmentUrl resolves every pinned registrar to its curated check-allotment page', () => {
   const cases: [string, string][] = [
-    ['https://www.linkintime.co.in/', 'https://linkintime.co.in/initial_offer/public-issues.html'],
+    ['https://www.linkintime.co.in/', 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html'],
     ['https://kfintech.com/', 'https://ipostatus.kfintech.com/'],
     ['https://www.bigshareonline.com/', 'https://www.bigshareonline.com/ipo_allotment.html'],
     ['https://in.mpms.mufg.com/', 'https://in.mpms.mufg.com/Initial_Offer/public-issues.html'],
     ['https://maashitla.com/', 'https://maashitla.com/allotment-status/public-issues'],
     ['https://skylinerta.com/', 'https://www.skylinerta.com/display_ipo_rightissue_allotment.php'],
-    ['https://cameoindia.com/', 'https://ipo.cameoindia.com/'],
+    ['https://cameoindia.com/', 'https://cambridge.cameoindia.com/'],
     ['https://purvashare.com/', 'https://www.purvashare.com/investor-service/ipo-query'],
   ]
   for (const [cachedWebsite, expected] of cases) {
