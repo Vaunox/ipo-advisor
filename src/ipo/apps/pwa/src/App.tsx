@@ -17,6 +17,9 @@ import { Upcoming } from './screens/Upcoming'
 import { getDevConsole, setThemeMode, useDevConsole } from './state/prefs'
 import { Toaster } from './components/Toaster'
 
+// How long a backtick press must be held before it counts as a "hold" (peek) rather than a click.
+const BACKTICK_HOLD_MS = 350
+
 const TITLES: Record<View, [string, string]> = {
   live: ['Live signals', 'mainboard · updated live · IST'],
   upcoming: ['Upcoming IPOs', 'mainboard calendar · anchor days flagged'],
@@ -63,7 +66,7 @@ const HelpOverlay = ({ onClose, devConsole }: { onClose: () => void; devConsole:
         <div className="hk"><span>Go to History · Settings</span><span><kbd>g h</kbd><kbd>g s</kbd></span></div>
         <div className="hk"><span>Toggle light / dark</span><kbd>t</kbd></div>
         {devConsole && (
-          <div className="hk"><span>Toggle console log</span><kbd>`</kbd></div>
+          <div className="hk"><span>Console log · hold to peek</span><kbd>`</kbd></div>
         )}
         <div className="hk"><span>Close · back</span><kbd>Esc</kbd></div>
         <div className="hk"><span>This help</span><kbd>?</kbd></div>
@@ -123,6 +126,12 @@ export function App() {
   useEffect(() => {
     let gPending = false
     let gTimer = 0
+    // Backtick: a quick tap toggles the console (unchanged); holding past BACKTICK_HOLD_MS shows it
+    // for as long as it's held and hides it on release — a peek gesture, distinct from the toggle.
+    // e.repeat guards the OS's own key-repeat firing on keydown while held, which used to re-run the
+    // toggle every repeat tick and made the console flicker open/closed.
+    let backtickHoldTimer = 0
+    let backtickHeld = false
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
       const isCmdK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'
@@ -148,9 +157,15 @@ export function App() {
       } else if (e.key === 't') {
         setThemeMode(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light')
       } else if (e.key === '`' && getDevConsole()) {
-        // v3 V3-16: backtick toggles the console open/closed — but only when enabled in Settings
-        // (getDevConsole() is read live, so a fresh install / disabled state leaves the key dead).
-        setConsoleOpen((o) => !o)
+        // v3 V3-16: only when enabled in Settings (getDevConsole() is read live, so a fresh install /
+        // disabled state leaves the key dead). The actual open/close decision happens on keyup below.
+        if (e.repeat) return
+        window.clearTimeout(backtickHoldTimer)
+        backtickHeld = false
+        backtickHoldTimer = window.setTimeout(() => {
+          backtickHeld = true
+          setConsoleOpen(true)
+        }, BACKTICK_HOLD_MS)
       } else if (e.key === '/') {
         e.preventDefault()
         setPaletteOpen(true)
@@ -160,11 +175,24 @@ export function App() {
         setPaletteOpen(false)
         setHelpOpen(false)
         setConsoleOpen(false)
+        window.clearTimeout(backtickHoldTimer)
+        backtickHeld = false
         setDetailId((d) => (d ? null : d))
       }
     }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== '`' || !getDevConsole()) return
+      window.clearTimeout(backtickHoldTimer)
+      setConsoleOpen(backtickHeld ? false : (o) => !o) // held → hide on release; quick tap → toggle
+      backtickHeld = false
+    }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    document.addEventListener('keyup', onKeyUp)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keyup', onKeyUp)
+      window.clearTimeout(backtickHoldTimer)
+    }
   }, [])
 
   // Disabling the console in Settings closes it if it's open (the ` key is already dead by then).

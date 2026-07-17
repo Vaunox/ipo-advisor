@@ -12,30 +12,36 @@ import { ThemeToggle } from './ThemeToggle'
 // data pull — the same VM-primary→fallback cycle the app runs automatically (via the shell's
 // privileged stdin channel, `window.ipoDesktop.refresh`), NOT a cosmetic spinner or timestamp bump.
 // The "Updated" chip (SyncStatus) advances on its own once the genuine pull lands. In-flight state:
-// disabled + spinning while a pull is outstanding, cleared when a newer successful pull lands (the
-// `/status` timestamp advances) or after a bounded timeout so a coalesced/failed/VM-unreachable pull
-// can't hang the spinner. Overlapping fetches are impossible anyway — the engine coalesces triggers
-// within a 15s debounce (`_STDIN_REFRESH_DEBOUNCE_SEC`), so a mid-cycle press never stacks a pull.
+// disabled + spinning while a pull is outstanding, cleared as soon as `/status` shows the engine
+// genuinely DID something — `last_successful_ingest` OR `last_attempt` moved past this click's
+// baseline. Watching `last_attempt` too (not just success) matters: a pull that reached NSE and
+// failed still completes quickly and shouldn't leave the button spinning for no reason. The bounded
+// fallback timeout only covers the one case neither signal can see — the engine's own 15s debounce
+// (`_STDIN_REFRESH_DEBOUNCE_SEC`) silently swallowing a click that lands right after a cycle already
+// ran (scheduled or a prior manual press); nothing to observe from here, so it just times out.
 function RefreshButton() {
   const qc = useQueryClient()
   const status = useStatus()
   const updatedAt = status.data?.last_successful_ingest ?? null
+  const attemptedAt = status.data?.last_attempt ?? null
   const [busy, setBusy] = useState(false)
-  const baseline = useRef<string | null>(null)
+  const baselineSuccess = useRef<string | null>(null)
+  const baselineAttempt = useRef<string | null>(null)
 
   useEffect(() => {
     if (!busy) return
-    if (updatedAt !== baseline.current) {
-      setBusy(false) // a genuinely-newer successful pull landed
+    if (updatedAt !== baselineSuccess.current || attemptedAt !== baselineAttempt.current) {
+      setBusy(false) // the engine genuinely attempted a pull (succeeded or failed) since this click
       return
     }
-    const t = window.setTimeout(() => setBusy(false), 20_000) // bounded: coalesced / failed / VM-down
+    const t = window.setTimeout(() => setBusy(false), 10_000) // bounded: the click was debounced away
     return () => window.clearTimeout(t)
-  }, [busy, updatedAt])
+  }, [busy, updatedAt, attemptedAt])
 
   const onClick = () => {
     if (busy) return
-    baseline.current = updatedAt
+    baselineSuccess.current = updatedAt
+    baselineAttempt.current = attemptedAt
     setBusy(true)
     const api = (window as unknown as { ipoDesktop?: { refresh?: () => Promise<boolean> } }).ipoDesktop
     if (api?.refresh) void api.refresh()

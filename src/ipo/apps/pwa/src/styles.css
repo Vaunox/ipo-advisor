@@ -422,6 +422,10 @@ body.compact .meter { margin-top:6px; }
 
 /* debug console log (v3 V3-16) — read-only terminal window; follows the app theme via the tokens */
 .cl-overlay { position:fixed; inset:0; background:rgba(3,6,10,.62); backdrop-filter:blur(3px); z-index:55; display:flex; align-items:center; justify-content:center; padding:5vh 20px; }
+/* Opens/closes instantly, no fade — a dev tool, snappy on purpose. Explicit + !important because
+   the global `html.theme-anim *` rule above (line 31) has enough specificity to leak a background
+   transition onto this overlay if a theme toggle and a console open/close ever land close together. */
+.cl-overlay, .cl-overlay * { transition:none !important; animation:none !important; }
 /* ALWAYS DARK: a dev tool, and the level colours are calibrated for a dark ground — so the console
    redefines the tokens locally (fixed dark values) instead of inheriting the app's light/dark theme.
    Every var(--…) below this point resolves to these, in either app theme. */
