@@ -10,6 +10,7 @@ import { test } from 'node:test'
 import {
   currentApplyAlerts,
   pruneRelevantIds,
+  pruneSeenIds,
   relevantApplyCrossings,
   relevantTransitions,
 } from './alerts.ts'
@@ -111,6 +112,20 @@ test('relevantTransitions keeps every transition of unresolved IPOs, drops the r
 
 test('pruneRelevantIds drops ids that have listed or left the board', () => {
   assert.deepEqual(pruneRelevantIds(['open', 'listed', 'ghost', 'await'], board).sort(), [
+    'await',
+    'open',
+  ])
+})
+
+test('pruneSeenIds does NOT wipe the seen-set against a board that has not loaded', () => {
+  // Regression: on a cold start the board prop is [] until the query resolves. Pruning then matched
+  // nothing, persisted an empty set, and the cleared badge re-lit on every restart.
+  const seen = ['open', 'await']
+  assert.deepEqual(pruneSeenIds(seen, []), seen)
+})
+
+test('pruneSeenIds still prunes once the board has actually loaded', () => {
+  assert.deepEqual(pruneSeenIds(['open', 'listed', 'ghost', 'await'], board).sort(), [
     'await',
     'open',
   ])

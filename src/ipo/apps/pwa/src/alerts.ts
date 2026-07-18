@@ -52,3 +52,14 @@ export function pruneRelevantIds(ids: string[], board: IPOListRow[]): string[] {
   const relevant = relevanceSet(board)
   return ids.filter((id) => relevant.has(id))
 }
+
+// The persisted-seen-set prune, guarded for the cold start. NEVER prune against an EMPTY board: on
+// launch the board prop is `[]` for the first render(s) (the query hasn't resolved), and pruning
+// then matches nothing, wipes the whole persisted set, and re-lights the badge for alerts the user
+// had already cleared — the seen-state does not survive a restart. Skipping is safe because an empty
+// board also cannot GROW the set: ids only ever enter it from `currentApplyAlerts`, derived from
+// these same rows. So "no rows" means "nothing to add and nothing to judge against" — wait for data.
+export function pruneSeenIds(ids: string[], board: IPOListRow[]): string[] {
+  if (board.length === 0) return ids
+  return pruneRelevantIds(ids, board)
+}

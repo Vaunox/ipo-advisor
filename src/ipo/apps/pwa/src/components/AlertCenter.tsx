@@ -1,5 +1,5 @@
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
-import { currentApplyAlerts, pruneRelevantIds, relevantApplyCrossings } from '../alerts'
+import { currentApplyAlerts, pruneSeenIds, relevantApplyCrossings } from '../alerts'
 import { useTransitions } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { getAlertsSeen, setAlertsSeen } from '../state/prefs'
@@ -35,10 +35,12 @@ export function AlertCenter({
   const unread = alerts.filter((a) => !seen.has(a.ipo_id)).length
 
   // Prune the persisted "seen" set to ids that are still relevant (on the board and not yet listed),
-  // so it can't grow without bound as IPOs list and leave (v3 BUG 2).
+  // so it can't grow without bound as IPOs list and leave (v3 BUG 2). Guarded against the cold-start
+  // empty board (see pruneSeenIds) — pruning against no data used to wipe the set and re-light the
+  // badge on every restart.
   useEffect(() => {
     const persisted = getAlertsSeen()
-    const pruned = pruneRelevantIds(persisted, rows)
+    const pruned = pruneSeenIds(persisted, rows)
     if (pruned.length !== persisted.length) {
       setAlertsSeen(pruned)
       setSeen(new Set(pruned))
