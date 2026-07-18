@@ -33,6 +33,8 @@ the deep dives (`docs/deep_dives/`, `docs/v2/deep_dives/`), and the operator reb
    - [4.8 Shipped v2 features — A3 / B2-VIX / B9](#48-shipped-v2-features)
    - [4.9 Total-only / QIB-only — the category-split substitutability probe](#49-total-only)
 5. [Shipped-app wiring — what's live](#5-shipped-app-wiring)
+6. [Engine defects found after close](#6-engine-defects-after-close)
+   - [BUG-4 — the context cache never re-read (stale-forever on a long-lived process)](#bug-4)
 
 ---
 
@@ -762,3 +764,96 @@ sidecar + a React/PWA front end. As of the live-ingestion cutover (2026-07-03) i
 
 *Build/rebuild instructions (how to freeze the engine + build the installer, signing, the Windows-11
 makeappx workaround) live in the still-current operator guide `docs/GATE7_PACKAGING.md`.*
+
+---
+
+<a name="6-engine-defects-after-close"></a>
+## 6. Engine defects found after close
+
+*Bugs in the shipped engine discovered **after** v3 closed. BUG 1–3 were v3 items and are recorded in
+[`docs/v3/V3_PROGRESS.md`](v3/V3_PROGRESS.md); the numbering continues here because v3 is closed and
+these belong to the permanent engine record, not to whichever track happened to trip over them.*
+
+<a name="bug-4"></a>
+### BUG-4 — the context cache never re-read (stale-forever on a long-lived process)
+
+**Status:** FIXED (2026-07-18).
+**Found by:** a long-running-server test scenario — an engine left running against a data dir that
+began empty, its served output compared against a freshly-constructed engine over the *same* store.
+The two disagreed about context availability. Diagnosed before being written up; the disagreement was
+the symptom, not the bug.
+
+**Defect.** `ContextStore.__init__` loaded the per-IPO Upstox context cache **once** and never looked
+at the file again. `runner.main` constructs the store at boot — *before* the first
+`refresh_data_plane` cycle writes that file. So a process started against a data dir with no context
+cache served `available=false` / `not_loaded` on `/allotment` and `/context/{id}` **for the life of
+the process**, while correct data sat on disk and every subsequent refresh rewrote it. Even in steady
+state, context refreshed on disk never reached the served API without a restart.
+
+Confirmed directly rather than inferred: a store constructed against an absent path still reported
+`available=False` after the file landed; a store constructed fresh over the identical path reported
+`True`.
+
+**Why it hid for so long.** On the desktop it is nearly invisible — the app restarts constantly, and
+an installed data dir usually already holds a context file from a previous session, so the boot-order
+window rarely opens and never persists. It only becomes serious on a **long-lived headless
+process started against an empty data dir** — one provisioned fresh and then left running for weeks.
+There, the Allotment tab and every RHP/registrar field would be dead on arrival, silently, for the
+entire life of the process.
+
+**Fix — mtime-guarded reload (writer-agnostic).** The store keeps its in-memory snapshot and re-reads
+only when the file's `(mtime_ns, size)` moves. Steady state is one `stat` per read and **zero**
+parses.
+
+The rationale that must survive future refactors: **the reload reacts to the file, never to being
+told who wrote it.** That is what makes it cover the engine's own cycle, an operator running
+`scripts/refresh_context.py` against the app's data dir, *and* a restore from the durable archive,
+with no coupling between the store and any writer. The cheaper-looking alternative — have the refresh
+cycle notify the store after it writes — was **considered and rejected**: it encodes writer identity
+into the store, so the day a second writer appears the store goes silently stale again, reintroducing
+this exact bug class. It is not an optimization to be reapplied later.
+
+Parse-on-every-read was also rejected: `build_allotment_view` calls `ContextStore.get()` once **per
+record**, so it would re-parse the whole cache once per row of `/allotment`.
+
+**Intra-request snapshot.** `ContextStore.snapshot()` returns one frozen `ContextSnapshot`
+(availability + freshness + entries from a single file version), and both view builders take it once
+per request instead of reading the store per row. `build_allotment_view` previously did
+`get()` + `available` + `refreshed_at` **per row** — 3N+2 independent reload checks — so a refresh
+landing mid-request could return rows drawn from different cache versions with a freshness line
+matching none of them; `build_ipo_context` had the same shape at 13 checks per request. The
+regression test makes this concrete rather than theoretical: with a hook that rewrites the cache on
+every reload check, the old code produced a three-row response reading `REG-2`, `REG-5`, `REG-8`,
+while the snapshot version returns one consistent answer. Per-request cost drops from O(rows) stat
+calls to exactly one. Deliberately local to the two view builders — no request-scoped caching layer,
+which would be over-engineering for a cache written 3×/day.
+
+**Two companion fixes, each closing a hole the reload itself opened:**
+
+1. **The context write is now atomic** (`data_plane._refresh_context`: tmp + `os.replace`, matching
+   `IngestStateStore._flush` — one pattern in the codebase, not two). The old plain `write_text` was
+   harmless *only because nothing re-read the file*; the moment reload landed it became a real
+   torn-read window on every cycle, where the API thread could parse a half-written document.
+2. **A failed reload keeps the last-good snapshot.** Only `__init__` may start empty — at boot there
+   genuinely is nothing. After boot, a truncated or corrupt read logs and retains what was last read
+   successfully. Degrading good data to empty on one bad read would trade a known-dead surface for an
+   intermittently-dead one: strictly worse, and far harder to diagnose.
+
+Also corrected `vm/models.py`'s docstring, which already claimed "`ContextStore` re-validates it on
+read" — inaccurate when written, true as of this fix. Code and comment now agree.
+
+**Scoring path untouched — measured, not asserted.** Verdicts dumped before and after the fix
+over all **386** IPOs: **0 verdict changes, 0 reason changes, `MAX|Δprob| = 0.0`**. Scoring-path guard
+clean (`src/ipo/service/` and `src/ipo/data/ingest/` are outside the guarded prefixes, and context is
+already import-graph-proven unreachable from feature construction).
+
+**Tests (+10).** The exact failure condition (empty data dir → store constructed → cycle writes → surface
+reflects it, no restart) at both unit level and end-to-end over the real `refresh_data_plane`;
+last-good retained on a corrupt reload and on a vanished file; honest empty degradation when the file
+is corrupt *at boot*; the atomic-write mechanism (asserted on `os.replace` tmp→final, not by racing
+threads — a timing test here would be flaky in the direction that matters, passing while the bug is
+present); and **`test_unchanged_file_is_not_reparsed`**, which pins the mtime guard by parse count so
+the fix cannot silently degrade into parse-on-every-read; and two snapshot-consistency tests (one
+`/allotment` request reads one cache version, and both builders perform exactly one reload check),
+verified non-vacuous by temporarily restoring the per-row reads and watching them fail.
+

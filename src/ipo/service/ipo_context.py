@@ -24,7 +24,9 @@ It is walled off from the model exactly as before (structural, import-graph prov
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+import threading
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
@@ -69,42 +71,153 @@ class _ContextCacheFile(BaseModel):
     ipos: dict[str, IpoContext] = {}
 
 
+@dataclass(frozen=True)
+class ContextSnapshot:
+    """One consistent read of the cache — what a single request builds its whole view from.
+
+    Taken once per request via :meth:`ContextStore.snapshot`. Without it, a view builder reading
+    ``store.get()`` / ``store.available`` / ``store.refreshed_at`` per row re-checks the file on
+    every access — so a refresh landing mid-request could blend rows from two cache versions into
+    one response, with a freshness line matching neither. Building the whole view off one frozen
+    snapshot closes that window, and drops the per-request cost from O(rows) stat calls to one.
+    """
+
+    available: bool
+    refreshed_at: datetime | None
+    by_symbol: Mapping[str, IpoContext]
+
+    def get(self, ipo_id: str) -> IpoContext | None:
+        """The cached context for an IPO (joined by symbol), or ``None`` if not in this snapshot."""
+        return self.by_symbol.get(ipo_id.upper())
+
+
 class ContextStore:
-    """Read-only holder of the per-IPO Upstox context cache (v3 V3-5/V3-6).
+    """Read-only holder of the per-IPO Upstox context cache (v3 V3-5/V3-6; reload fixed in BUG-4).
 
     Loaded from a JSON file the external refresh job writes into the data dir. Missing/corrupt →
     ``available=False`` with an empty map (degrade honestly, never crash a surface). Keyed by NSE
     symbol upper-cased; an ``IPORecord`` joins by ``ipo_id.upper()``.
+
+    **BUG-4 — the cache is re-read when the file changes.** This store used to load once at
+    construction and never look again. ``runner.main`` builds it at boot, *before* the first refresh
+    cycle writes the file — so a long-running process started against an empty data dir served
+    ``not_loaded`` forever while correct data sat on disk (invisible on the desktop, which restarts
+    constantly; fatal on a server that runs for weeks).
+
+    The reload is **writer-agnostic by design, and must stay that way.** It reacts to the *file*
+    changing, never to being told who wrote it. That is precisely why it covers the engine's own
+    refresh cycle, an operator running ``scripts/refresh_context.py`` against the app's data dir,
+    and a restore from the durable archive — with no coupling between this store and any of them.
+    The tempting "just have the refresh cycle notify the store" alternative was **considered and
+    rejected**: it encodes writer identity into the store, so the day a second writer appears it
+    goes silently stale again — reintroducing the exact bug class this docstring exists to close.
+    Do not "optimize" it back into a notify hook.
+
+    **Cost.** Guarded by the file's ``(mtime_ns, size)``: steady state is one ``stat`` per read and
+    **zero** parses. It re-parses only when the file actually moves, never on every read;
+    ``test_unchanged_file_is_not_reparsed`` pins that by parse count, so this cannot quietly degrade
+    into parse-on-every-read. Request handlers should take a :meth:`snapshot` rather than call
+    :meth:`get` per row — that makes the whole request one reload check *and* one cache version.
+
+    **A failed reload never erases good data.** ``__init__`` may legitimately start empty — at boot
+    there genuinely is nothing. But a *reload* that hits a truncated or corrupt file keeps the
+    last-good snapshot and logs, because turning one transient bad read into a blank Allotment tab
+    trades a known-dead surface for an intermittently-dead one, which is worse.
+
+    Thread-safe: the scheduler thread writes the file, the API thread reads it here. The snapshot is
+    replaced wholesale under a lock and never mutated in place, so a reader either sees the old map
+    or the new one — never a half-updated one.
     """
 
     def __init__(self, path: Path) -> None:
         """Open (or note the absence of) the cache at ``path`` and load it into memory."""
         self._path = path
+        self._lock = threading.Lock()
         self._available = False
         self._refreshed_at: datetime | None = None
         self._by_symbol: dict[str, IpoContext] = {}
-        if path.is_file():
-            try:
-                cache = _ContextCacheFile.model_validate_json(path.read_text(encoding="utf-8"))
-                self._refreshed_at = cache.refreshed_at
-                self._by_symbol = {k.upper(): v for k, v in cache.ipos.items()}
-                self._available = True
-            except (ValueError, OSError, ValidationError) as exc:
-                _log.warning("ipo_context_cache_load_failed", extra={"error": str(exc)})
+        # The change token: (mtime_ns, size), or None when the file does not exist. Starting at None
+        # makes __init__ and every later read share ONE code path — an absent file at boot compares
+        # equal and loads nothing; a present one compares unequal and loads.
+        self._stamp: tuple[int, int] | None = None
+        # Incremented on every parse ATTEMPT. Exists so the regression test can assert that an
+        # unchanged file is not re-parsed — i.e. that the mtime guard is real and this has not
+        # quietly degraded into parse-on-every-read.
+        self._parse_count = 0
+        with self._lock:
+            self._reload_if_changed()
+
+    def _current_stamp(self) -> tuple[int, int] | None:
+        """The file's ``(mtime_ns, size)``, or ``None`` if it is absent/unstattable."""
+        try:
+            st = self._path.stat()
+        except OSError:
+            return None
+        return (st.st_mtime_ns, st.st_size)
+
+    def _reload_if_changed(self) -> None:
+        """Re-read the cache iff the file moved since the last look. Caller must hold the lock.
+
+        Size is checked alongside mtime because a same-second rewrite of a different length is a
+        real change that a coarse mtime alone can miss.
+        """
+        stamp = self._current_stamp()
+        if stamp == self._stamp:
+            return
+        # Record the new stamp even when the parse below fails, so a persistently corrupt file is
+        # re-parsed once per change — not once per read.
+        self._stamp = stamp
+        if stamp is None:
+            # The file vanished (mid-rotation, a wiped data dir). Absence is not evidence the data
+            # is gone; keep the last-good snapshot rather than blanking the surface.
+            _log.warning("ipo_context_cache_vanished", extra={"path": str(self._path)})
+            return
+        self._parse_count += 1
+        try:
+            cache = _ContextCacheFile.model_validate_json(self._path.read_text(encoding="utf-8"))
+        except (ValueError, OSError, ValidationError) as exc:
+            # At boot the snapshot is already empty, so this degrades honestly to "not loaded".
+            # After boot it keeps whatever we last read successfully (see the class docstring).
+            _log.warning(
+                "ipo_context_cache_load_failed",
+                extra={"error": str(exc), "kept_last_good": self._available},
+            )
+            return
+        self._refreshed_at = cache.refreshed_at
+        self._by_symbol = {k.upper(): v for k, v in cache.ipos.items()}
+        self._available = True
 
     @property
     def available(self) -> bool:
         """True once a cache file has been loaded (fresh install → False, honest degradation)."""
-        return self._available
+        with self._lock:
+            self._reload_if_changed()
+            return self._available
 
     @property
     def refreshed_at(self) -> datetime | None:
         """When the cache was last written by the refresh job, or ``None`` if never/unavailable."""
-        return self._refreshed_at
+        with self._lock:
+            self._reload_if_changed()
+            return self._refreshed_at
 
     def get(self, ipo_id: str) -> IpoContext | None:
         """The cached context for an IPO (joined by symbol), or ``None`` if not in the cache."""
-        return self._by_symbol.get(ipo_id.upper())
+        with self._lock:
+            self._reload_if_changed()
+            by_symbol = self._by_symbol  # replaced wholesale, never mutated → safe to read outside
+        return by_symbol.get(ipo_id.upper())
+
+    def snapshot(self) -> ContextSnapshot:
+        """One consistent read of the cache: availability, freshness, and entries from one version.
+
+        This is what a request handler should use. One reload check, one frozen view — so every row
+        and the freshness line beside them describe the same file, and a refresh landing mid-request
+        cannot blend two versions into one response.
+        """
+        with self._lock:
+            self._reload_if_changed()
+            return ContextSnapshot(self._available, self._refreshed_at, self._by_symbol)
 
 
 def field_state(
@@ -162,12 +275,16 @@ def build_allotment_view(
     stays outside the scoring path by construction. Sorted most-recently-closed first.
     """
     today = clock().date()
+    # ONE snapshot for the whole request: every row and the freshness line beside them describe the
+    # same cache version, and a refresh landing mid-request cannot blend two versions into one
+    # response. Also drops this handler from O(rows) reload checks to exactly one.
+    snap = store.snapshot()
     rows: list[AllotmentRow] = []
     for record in records:
         stage = _stage(record, today)
         if stage is None:
             continue
-        ctx = store.get(record.ipo_id)
+        ctx = snap.get(record.ipo_id)
         reg = ctx.registrar if ctx else None
         rows.append(
             AllotmentRow(
@@ -179,15 +296,15 @@ def build_allotment_view(
                 registrar=reg,
                 registrar_state=field_state(
                     reg is not None,
-                    available=store.available,
-                    refreshed_at=store.refreshed_at,
+                    available=snap.available,
+                    refreshed_at=snap.refreshed_at,
                     open_date=record.open_date,
                     today=today,
                 ),
             )
         )
     rows.sort(key=lambda r: r.close_date, reverse=True)
-    return AllotmentView(available=store.available, refreshed_at=store.refreshed_at, rows=rows)
+    return AllotmentView(available=snap.available, refreshed_at=snap.refreshed_at, rows=rows)
 
 
 def build_ipo_context(
@@ -204,7 +321,8 @@ def build_ipo_context(
     filed yet" from "our cache predates the filing".
     """
     today = clock().date()
-    ctx = store.get(record.ipo_id)
+    snap = store.snapshot()  # one snapshot per request — see build_allotment_view
+    ctx = snap.get(record.ipo_id)
     reg = ctx.registrar if ctx else None
     rhp_url = ctx.rhp_url if ctx else None
     lot_size = ctx.lot_size if ctx else None
@@ -214,16 +332,16 @@ def build_ipo_context(
     def _state(present: bool) -> str:
         return field_state(
             present,
-            available=store.available,
-            refreshed_at=store.refreshed_at,
+            available=snap.available,
+            refreshed_at=snap.refreshed_at,
             open_date=record.open_date,
             today=today,
         )
 
     return IpoContextView(
         ipo_id=record.ipo_id,
-        available=store.available,
-        refreshed_at=store.refreshed_at,
+        available=snap.available,
+        refreshed_at=snap.refreshed_at,
         rhp_url=rhp_url,
         rhp_state=_state(rhp_url is not None),
         lot_size=lot_size,

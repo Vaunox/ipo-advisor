@@ -17,6 +17,8 @@ from collections.abc import Mapping
 from datetime import date, datetime
 from pathlib import Path
 
+import pytest
+
 from ipo.core.types import IPORecord, Segment
 from ipo.service.ipo_context import ContextStore, build_allotment_view, build_ipo_context
 
@@ -304,3 +306,207 @@ def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
         "the scoring path transitively reaches ipo.service.* or ipo.archive.* — display/archive "
         f"data could reach the model: {result.stdout} {result.stderr}"
     )
+
+
+# --- BUG-4: the cache is re-read when the file changes ------------------------------------------
+#
+# Before BUG-4, ContextStore loaded once at construction and never looked again. `runner.main`
+# builds it at boot, BEFORE the first refresh cycle writes the file — so a long-running process
+# started against an empty data dir served "not_loaded" forever while correct data sat on disk.
+# Invisible on the desktop (constant restarts); fatal on a server that runs for weeks.
+
+
+def test_bug4_store_started_empty_reflects_a_later_write(tmp_path: Path) -> None:
+    """THE FAILURE CONDITION: empty data dir -> store built -> file written -> surface updates.
+
+    This is the exact provisioning sequence of a fresh serving box, and the one the old store
+    failed. No restart, no notification, no second construction — the same instance must simply
+    start telling the truth once the data exists.
+    """
+    path = tmp_path / "context" / "ipo_context.json"
+    store = ContextStore(path)  # boot: nothing on disk yet, honestly not loaded
+    assert store.available is False
+    assert store.get("knack") is None
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "refreshed_at": "2026-07-14T09:00:00+05:30",
+                "ipos": {"KNACK": {"registrar": {"name": "MUFG Intime"}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert store.available is True, "the surface stayed dead after the cache landed (BUG-4)"
+    ctx = store.get("knack")
+    assert ctx is not None and ctx.registrar is not None
+    assert ctx.registrar.name == "MUFG Intime"
+    assert store.refreshed_at is not None
+
+
+def test_bug4_reload_picks_up_a_later_rewrite(tmp_path: Path) -> None:
+    """Steady state, not just first write: a refreshed cache reaches the surface, no restart."""
+    store = _store_reg(tmp_path, {"KNACK": {"name": "MUFG Intime"}})
+    first = store.get("knack")
+    assert first is not None and first.registrar is not None
+    assert first.registrar.name == "MUFG Intime"
+
+    path = tmp_path / "context" / "ipo_context.json"
+    path.write_text(
+        json.dumps(
+            {
+                "refreshed_at": "2026-07-15T09:00:00+05:30",
+                "ipos": {"KNACK": {"registrar": {"name": "KFin Technologies"}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    second = store.get("knack")
+    assert second is not None and second.registrar is not None
+    assert second.registrar.name == "KFin Technologies"
+
+
+def test_bug4_failed_reload_keeps_the_last_good_snapshot(tmp_path: Path) -> None:
+    """A torn/corrupt read must NOT blank a working surface.
+
+    Degrading good data to empty on one bad read would trade a known-dead surface for an
+    intermittently-dead one — strictly worse, and far harder to diagnose.
+    """
+    store = _store_reg(tmp_path, {"KNACK": {"name": "MUFG Intime"}})
+    assert store.available is True
+
+    path = tmp_path / "context" / "ipo_context.json"
+    path.write_text('{"refreshed_at": "2026-07-15T09:00', encoding="utf-8")  # truncated mid-write
+
+    assert store.available is True, "a corrupt reload erased good data"
+    ctx = store.get("knack")
+    assert ctx is not None and ctx.registrar is not None
+    assert ctx.registrar.name == "MUFG Intime"
+
+
+def test_bug4_vanished_file_keeps_the_last_good_snapshot(tmp_path: Path) -> None:
+    """An absent file is not evidence the data is gone (mid-rotation, a wiped dir)."""
+    store = _store_reg(tmp_path, {"KNACK": {"name": "MUFG Intime"}})
+    assert store.available is True
+    (tmp_path / "context" / "ipo_context.json").unlink()
+    assert store.available is True
+    assert store.get("knack") is not None
+
+
+def test_bug4_corrupt_at_boot_still_degrades_honestly(tmp_path: Path) -> None:
+    """Only __init__ may start empty — at boot there genuinely is no last-good to keep."""
+    path = tmp_path / "ipo_context.json"
+    path.write_text("{ not valid json", encoding="utf-8")
+    store = ContextStore(path)
+    assert store.available is False
+    assert store.get("anything") is None
+
+
+def test_unchanged_file_is_not_reparsed(tmp_path: Path) -> None:
+    """THE GUARD AGAINST OPTION-B SILENTLY BECOMING OPTION-A.
+
+    The mtime guard is the whole reason this fix is affordable: `build_allotment_view` calls `get()`
+    once PER RECORD, so a parse-on-every-read would re-parse the entire cache once per row. If a
+    future edit drops the guard, every read re-parses and this test fails — which is exactly when
+    someone needs to be told.
+    """
+    store = _store_reg(tmp_path, {"KNACK": {"name": "MUFG Intime"}})
+    assert store._parse_count == 1  # the construction-time load
+
+    for _ in range(50):
+        store.get("knack")
+        _ = store.available
+        _ = store.refreshed_at
+    assert store._parse_count == 1, "unchanged file was re-parsed — the mtime guard is gone"
+
+    # ...and a real change is still picked up (the guard must not be stuck shut either).
+    (tmp_path / "context" / "ipo_context.json").write_text(
+        json.dumps(
+            {
+                "refreshed_at": "2026-07-15T09:00:00+05:30",
+                "ipos": {"KNACK": {"registrar": {"name": "KFin Technologies"}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert store.get("knack") is not None
+    assert store._parse_count == 2
+
+
+def test_allotment_rows_all_come_from_one_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One request = one cache version. Rows must never blend two.
+
+    `build_allotment_view` used to read `store.get()` + `store.available` + `refreshed_at`
+    PER ROW — 3N+2 independent reload checks — so a refresh landing mid-request could produce a
+    response whose rows came from different cache versions, with a freshness line matching none.
+
+    The churn hook below rewrites the cache with a different registrar on EVERY reload check. Under
+    the old per-row reads that yields a different name per row; under one snapshot every row agrees.
+    """
+    path = tmp_path / "context" / "ipo_context.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write(name: str) -> None:
+        path.write_text(
+            json.dumps(
+                {
+                    "refreshed_at": "2026-07-14T09:00:00+05:30",
+                    "ipos": {s: {"registrar": {"name": name}} for s in ("AAA", "BBB", "CCC")},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    write("REG-0")
+    store = ContextStore(path)
+    real_stamp = store._current_stamp
+    churns = {"n": 0}
+
+    def churning_stamp() -> tuple[int, int] | None:
+        churns["n"] += 1
+        write(f"REG-{churns['n']}")  # the file moves under us on every single check
+        return real_stamp()
+
+    monkeypatch.setattr(store, "_current_stamp", churning_stamp)
+
+    closed = date(2026, 7, 3)
+    view = build_allotment_view(
+        [_rec("aaa", close=closed), _rec("bbb", close=closed), _rec("ccc", close=closed)],
+        store,
+        clock=lambda: datetime(2026, 7, 6, 10, 0),
+    )
+
+    assert len(view.rows) == 3
+    names = {r.registrar.name for r in view.rows if r.registrar is not None}
+    assert len(names) == 1, f"rows blended across cache versions: {sorted(map(str, names))}"
+    assert churns["n"] == 1, f"expected ONE reload check for the whole request, got {churns['n']}"
+
+
+def test_ipo_context_detail_uses_one_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Same guarantee on the detail surface: 13 reads of the store, one view of the cache."""
+    store = _store(
+        tmp_path,
+        "2026-07-14T09:00:00+05:30",
+        {"KNACK": {"registrar": {"name": "MUFG Intime"}, "rhp_url": "https://x/y.pdf"}},
+    )
+    checks = {"n": 0}
+    real_stamp = store._current_stamp
+
+    def counting_stamp() -> tuple[int, int] | None:
+        checks["n"] += 1
+        return real_stamp()
+
+    monkeypatch.setattr(store, "_current_stamp", counting_stamp)
+
+    view = build_ipo_context(
+        _rec("knack", close=date(2026, 7, 3)), store, clock=lambda: datetime(2026, 7, 6, 10, 0)
+    )
+    assert view.registrar is not None and view.rhp_url is not None
+    assert checks["n"] == 1, f"expected ONE reload check for the whole request, got {checks['n']}"

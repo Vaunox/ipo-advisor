@@ -14,6 +14,7 @@ exactly as before the VM existed (ships dark; the only addition is a ``source`` 
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -78,7 +79,14 @@ def _refresh_context(
     try:
         envelope = vm_client.fetch_context()
         context_path.parent.mkdir(parents=True, exist_ok=True)
-        context_path.write_text(envelope.model_dump_json(), encoding="utf-8")
+        # Atomic (tmp + os.replace), matching IngestStateStore._flush — ONE pattern for writing a
+        # store the API thread reads, not two. This became load-bearing with BUG-4: now that
+        # ContextStore re-reads the file when it changes, a plain write_text would expose a real
+        # torn-read window on every cycle, where a reader could parse a half-written document. The
+        # replace is what makes a reader see either the whole old file or the whole new one.
+        tmp = context_path.with_suffix(context_path.suffix + ".tmp")
+        tmp.write_text(envelope.model_dump_json(), encoding="utf-8")
+        os.replace(tmp, context_path)
         ingest_state.record_context_source("vm")
         _log.info("context_from_vm", extra={"ipos": len(envelope.ipos)})
     except VmUnavailable as exc:

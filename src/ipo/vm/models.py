@@ -8,8 +8,11 @@ back to local, rather than feeding garbage into the app.
 * ``RecordsEnvelope`` is validated **deeply** (every ``IPORecord``): these feed the local scorer, so
   a bad shape must never reach it.
 * ``ContextEnvelope`` is validated at the **envelope** level only (``ipos`` left as raw objects):
-  context is display-only and walled from the model, and ``ContextStore`` re-validates it on read,
-  so the client only needs to confirm it is a well-formed ``{refreshed_at, ipos}`` document.
+  context is display-only and walled from the model, and ``ContextStore`` re-validates each entry
+  when it (re-)reads the cache file, so the client only needs to confirm it is a well-formed
+  ``{refreshed_at, ipos}`` document. *(Accurate as of BUG-4: before that fix ``ContextStore``
+  validated once at construction and never re-read, so this sentence described behaviour the code
+  did not have. The two now agree.)*
 """
 
 from __future__ import annotations
