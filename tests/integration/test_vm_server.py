@@ -19,7 +19,7 @@ from ipo.core.constants import IST
 from ipo.core.types import IPORecord, Segment
 from ipo.data.ingest.state import IngestStateStore
 from ipo.data.store.repository import ParquetRepository
-from ipo.vm.server import create_vm_app
+from ipo.vm.server import _RATE_LIMIT_REQUESTS, _FixedWindowLimiter, create_vm_app
 
 
 def _seed(data_dir: Path) -> None:
@@ -80,6 +80,56 @@ def test_api_is_structurally_read_only(tmp_path: Path) -> None:
         assert set(methods) <= {"GET", "HEAD", "OPTIONS"}, f"{path} allows {methods}"
     # And functionally: a write is rejected, not silently accepted.
     assert TestClient(app).post("/records").status_code == 405
+
+
+def test_normal_app_polling_is_never_rate_limited(tmp_path: Path) -> None:
+    """The real traffic shape must pass untouched: 2 calls per user per ~30-min ingest cycle.
+
+    Simulates a whole CGNAT'd carrier — 20 users sharing one public IP, each pulling /records +
+    /context in the same cycle — because that shared IP is the realistic worst case, not one user.
+    """
+    _seed(tmp_path)
+    client = TestClient(create_vm_app(tmp_path))
+    for _ in range(20):
+        assert client.get("/records").status_code == 200
+        assert client.get("/context").status_code == 200
+
+
+def test_burst_beyond_the_limit_is_rejected_with_retry_after(tmp_path: Path) -> None:
+    _seed(tmp_path)
+    client = TestClient(create_vm_app(tmp_path))
+    codes = [client.get("/health").status_code for _ in range(_RATE_LIMIT_REQUESTS + 5)]
+    assert codes[:_RATE_LIMIT_REQUESTS] == [200] * _RATE_LIMIT_REQUESTS  # the allowance passes
+    assert set(codes[_RATE_LIMIT_REQUESTS:]) == {429}  # everything past it is refused
+    refused = client.get("/health")
+    assert int(refused.headers["Retry-After"]) >= 1  # tells the caller when to come back
+
+
+def test_rate_limited_response_still_carries_cors_headers(tmp_path: Path) -> None:
+    """CORS must wrap the limiter, or a browser sees an opaque CORS error instead of a clean 429."""
+    client = TestClient(create_vm_app(tmp_path))
+    for _ in range(_RATE_LIMIT_REQUESTS):
+        client.get("/health")
+    refused = client.get("/health", headers={"Origin": "https://ipoadvisor.in"})
+    assert refused.status_code == 429
+    assert refused.headers["access-control-allow-origin"] == "*"
+
+
+def test_limiter_memory_stays_bounded_under_many_distinct_sources() -> None:
+    """An unbounded {ip: state} dict is itself a way to kill a 1 GB box — prove the cap holds."""
+    limiter = _FixedWindowLimiter(limit=60, window=60.0, max_tracked=100)
+    for i in range(5_000):  # 5k distinct "IPs", far past the cap
+        limiter.check(f"10.0.{i // 256}.{i % 256}", now=1_000.0)
+    assert len(limiter._windows) <= 100
+
+
+def test_window_resets_so_a_limited_caller_recovers() -> None:
+    limiter = _FixedWindowLimiter(limit=2, window=60.0, max_tracked=100)
+    assert limiter.check("1.2.3.4", now=0.0) == (None, False)
+    assert limiter.check("1.2.3.4", now=1.0) == (None, False)
+    retry_after, first = limiter.check("1.2.3.4", now=2.0)
+    assert retry_after is not None and first is True  # third call in-window is refused, and logged
+    assert limiter.check("1.2.3.4", now=61.0) == (None, False)  # next window: allowed again
 
 
 def test_vm_server_never_imports_the_model() -> None:

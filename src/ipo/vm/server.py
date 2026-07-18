@@ -13,16 +13,20 @@ Two guarantees are structural, not careful:
   corrupt the durable archive it is meant to protect.
 * **No model.** It serves *inputs* (records + context); the app scores LOCALLY. This module imports
   only the data/core layers — never the scorer/engine — so the VM is incapable of running the model.
+* **Bounded.** A per-IP rate limit keeps one caller from saturating the free 1-vCPU/1-GB box now
+  that port 8000 faces the public internet (see ``_FixedWindowLimiter``).
 """
 
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from ipo.core.logging import get_logger
 from ipo.data.ingest.state import IngestStateStore
@@ -33,10 +37,83 @@ _log = get_logger("ipo.vm.server")
 
 _CONTEXT_REL = ("context", "ipo_context.json")
 
+# Per-IP rate limit. The box is Always-Free (1 OCPU / 1 GB) on a public IP, so one scraper could
+# otherwise starve the desktop fleet it exists to serve. Deliberately DEPENDENCY-FREE and in-memory:
+# uvicorn runs a SINGLE worker here (scripts/run_vm_server.py calls uvicorn.run with no --workers),
+# so a process-local counter is coherent — no Redis needed. A library (slowapi et al) would also be
+# dead weight in every shipped .exe, since this module is a PyInstaller hidden import the desktop
+# build carries but never executes.
+#
+# 60/min is deliberately generous vs. real use: the app pulls /records + /context once per ~30-min
+# ingest cycle (2 requests per user per half hour). It is set for CGNAT, not for one user — Indian
+# mobile carriers put many subscribers behind one public IP, and that shared IP must never trip the
+# limit. It still stops a naive scraper dead.
+_RATE_LIMIT_REQUESTS = 60
+_RATE_LIMIT_WINDOW_SEC = 60.0
+_RATE_LIMIT_MAX_TRACKED = 20_000
+
+
+class _FixedWindowLimiter:
+    """Bounded, process-local, per-key fixed-window request counter.
+
+    Memory is capped on purpose: an unbounded ``{ip: state}`` dict is itself a way to kill a 1 GB
+    box (spoofed sources would grow it without limit), so expired windows are pruned once the dict
+    exceeds ``max_tracked`` and the whole table is dropped if pruning cannot get back under the cap.
+    """
+
+    def __init__(self, limit: int, window: float, max_tracked: int) -> None:
+        self._limit = limit
+        self._window = window
+        self._max_tracked = max_tracked
+        self._windows: dict[str, tuple[float, int]] = {}
+
+    def check(self, key: str, now: float) -> tuple[float | None, bool]:
+        """Count a hit; return ``(retry_after_seconds | None, is_first_rejection)``."""
+        start, count = self._windows.get(key, (now, 0))
+        if now - start >= self._window:  # window elapsed → start a fresh one
+            start, count = now, 0
+        count += 1
+        self._windows[key] = (start, count)
+        if len(self._windows) > self._max_tracked:
+            self._prune(now)
+        if count > self._limit:
+            return max(1.0, self._window - (now - start)), count == self._limit + 1
+        return None, False
+
+    def _prune(self, now: float) -> None:
+        for key in [k for k, (start, _) in self._windows.items() if now - start >= self._window]:
+            del self._windows[key]
+        if len(self._windows) > self._max_tracked:
+            self._windows.clear()  # pathological flood: reset rather than grow without bound
+
 
 def create_vm_app(data_dir: Path) -> FastAPI:
     """Build the VM's GET-only read-API over the stores in ``data_dir`` (no engine, no writes)."""
     app = FastAPI(title="IPO Advisor — VM data plane (read-only)", version="0.1.0")
+
+    limiter = _FixedWindowLimiter(
+        _RATE_LIMIT_REQUESTS, _RATE_LIMIT_WINDOW_SEC, _RATE_LIMIT_MAX_TRACKED
+    )
+
+    # Registered BEFORE CORS on purpose: Starlette runs the LAST-added middleware outermost, so
+    # this ordering leaves CORS wrapping the limiter — a 429 still carries CORS headers instead
+    # of looking like an opaque cross-origin failure to a browser client.
+    @app.middleware("http")
+    async def _rate_limit(request: Request, call_next):  # type: ignore[no-untyped-def]
+        client = request.client
+        key = client.host if client is not None else "unknown"
+        retry_after, first_rejection = limiter.check(key, time.monotonic())
+        if retry_after is not None:
+            # Logged only on the transition into limiting — logging every rejected request would
+            # turn a flood into a second flood (disk), which is the thing being defended against.
+            if first_rejection:
+                _log.warning("vm_rate_limited", extra={"client": key})
+            return JSONResponse(
+                {"detail": "rate limit exceeded"},
+                status_code=429,
+                headers={"Retry-After": str(int(retry_after))},
+            )
+        return await call_next(request)
 
     # GET-only across origins: the app reads cross-origin; no other verb is allowed (never mutates).
     app.add_middleware(

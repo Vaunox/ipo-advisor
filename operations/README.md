@@ -258,6 +258,70 @@ runs exactly as before the VM existed (pure local scrape).
   read-API. The output half (app history → durable VM archive) is **V3-2**, and by design the **VM
   pulls** it (the app never pushes).
 
+### The data VM's network state — firewall, rate limit, public IP (2026-07-18)
+
+**Why this section exists:** these rules previously lived ONLY in the OCI console and in no repo
+file, so their state was misread more than once — including a confident "any user anywhere can
+reach the VM" that was exactly backwards (port 8000 was in fact pinned to one ISP block, so most
+`.exe` users were silently falling back to local scraping). Nothing below is inferable from code;
+if you change a rule in the console, change it here in the same sitting.
+
+**Ingress rules** — *Default Security List for `vcn-20260704-1352`*, the only security list on the
+VCN. The instance VNIC has **no Network Security Group** (`Network security groups: —`), so this
+list is the *sole* cloud-side gate — there is nothing additive to look for elsewhere.
+
+| Source | Proto | Port | Why |
+|---|---|---|---|
+| `0.0.0.0/0` | TCP | **8000** | The read-API. **Public on purpose** (opened 2026-07-18): every shipped `.exe` fetches from it, so any restriction silently degrades users to local scraping. Safe to expose — GET-only, no mutation route, no accounts/tokens, and the served data (NSE records + Upstox context) is public and token-free. |
+| `<OPERATOR_ISP_CIDR>` | TCP | **22** | SSH, operator ISP block. |
+| `0.0.0.0/0` | ICMP | 3, 4 | Path-MTU / unreachable signalling (Oracle default). |
+| `10.0.0.0/16` | ICMP | 3 | Intra-VCN unreachable (Oracle default). |
+
+**SSH is `/24`, NOT the `/32` that `operations/vm2/VM2_RUNBOOK.md` prescribes — a deliberate
+deviation, not an oversight.** Key-only auth is confirmed on the box (`sshd -T` → `passwordauthentication
+no`, `kbdinteractiveauthentication no`, `permitemptypasswords no`, `pubkeyauthentication yes`), so
+brute-force is already ineffective and the marginal gain of `/32` over `/24` only binds against an
+attacker who is *both* inside the operator's ISP block *and* holding the private key. Against that
+thin gain, `/32` carries a real recurring cost: the ISP demonstrably reassigns the operator's address
+**within** this block, so a single-IP rule would lock SSH out on every reshuffle. `/24` still refuses
+~99.99% of the internet, survives the reshuffle, and leaves key-auth covering the remainder. If you
+ever need to widen it in an emergency, the OCI console (Cloud Shell / serial console) is the way back
+in — it does not depend on this rule.
+
+**Both layers must agree.** Oracle's Ubuntu images ship their own `iptables` that drop most inbound
+traffic, *independently* of the security list. On this box port 8000 is already accepted at the
+instance level (`-A INPUT -p tcp -m tcp --dport 8000 -j ACCEPT`), so the console rule is sufficient
+today — but if a port ever looks open in the console and still refuses connections, check `sudo
+iptables -S INPUT` before anything else. That mismatch is the classic Oracle gotcha.
+
+**Per-IP rate limit — 60 requests/minute, in the app itself.** Implemented in
+[`src/ipo/vm/server.py`](../src/ipo/vm/server.py) (`_FixedWindowLimiter`), not in a proxy: there is no
+nginx on this box, and uvicorn runs a **single worker**, so a process-local counter is coherent
+without Redis. Deliberately **dependency-free** — `ipo.vm.server` is a PyInstaller *hidden import*, so
+adding `slowapi` (or similar) would ship that library inside every desktop `.exe` for code the desktop
+never executes. Over the limit → `429` + `Retry-After`; the limiter is registered *before* CORS so a
+`429` still carries CORS headers instead of surfacing to a browser as an opaque cross-origin failure.
+The dict of tracked IPs is capped (20k) and pruned, because an unbounded `{ip: state}` map is itself a
+way to exhaust a 1 GB box. **The limit is sized for CGNAT, not for one user:** normal use is ~2 requests
+per user per ~30-min ingest cycle, and Indian mobile carriers put many subscribers behind one public
+IP, so that shared address must never trip it. Verified live: 60 pass, the 61st gets `429`, and a
+20-user CGNAT cycle (40 requests) is untouched.
+
+**The public IP `<VM_IP>` is EPHEMERAL, and cannot be converted.** Oracle is explicit: *"you
+can't convert the ephemeral public IP to a reserved public IP with address 203.0.113.2."* The console
+edit panel confirms it — the "Public IP type" radio offers only *No public IP* / *Ephemeral public IP*.
+Taking a reserved IP therefore means **accepting a different address**, which would instantly break
+every shipped `.exe` (the URL is baked in at build time). What that actually costs you:
+
+- **Stop/start is SAFE** — *"When you stop an instance, its ephemeral public IPs remain assigned to
+  the instance."* (An earlier note in this project claimed the opposite; it was wrong.)
+- **Termination loses the address for good** — which is the real exposure here, since Always-Free
+  reclamation *terminates* idle instances. That is precisely what the keepalive + the ≤30-day console
+  login exist to prevent; treat both as load-bearing for IP stability, not just uptime.
+- **The durable fix is a domain, not a reserved IP.** Point a hostname (e.g. `data.ipoadvisor.in`) at
+  the VM and bake *that* into the `.exe`; then an address change is a DNS edit instead of a rebuild-
+  and-redistribute. This also composes with the pending HTTP→HTTPS/TLS upgrade — do them together.
+
 ### The VM's Upstox context refresh — live (v3 V3-1) + token rotation
 
 On the deployed VM (`<VM_IP>`), `refresh_context.py` runs **3×/day at 08:15 / 13:15 / 18:15 IST**
