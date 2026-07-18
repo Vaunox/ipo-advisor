@@ -311,7 +311,7 @@ export function Settings() {
       <div className="card full">
         <h3 className="sec">About</h3>
         <div className="about">
-          <b>IPO Advisor</b> v0.8.0 · Windows desktop (Electron shell + Python FastAPI engine
+          <b>IPO Advisor</b> v0.8.1 · Windows desktop (Electron shell + Python FastAPI engine
           sidecar). Mainboard IPOs only.
         </div>
         <div className="disclaimer">
