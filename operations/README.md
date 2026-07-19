@@ -243,7 +243,7 @@ runs exactly as before the VM existed (pure local scrape).
      binary; only **`vm-config.example.json`** is committed, showing the shape with a `<VM_IP>`
      placeholder. **To build a VM-primary `.exe`:** copy the example to `vm-config.json`, set the real
      URL, then `npm run dist`. Absent or still-placeholder value → the build ships **local-only**
-     (fail-safe — never a silently-broken URL). GET-only base: `/health`, `/records`, `/context`.
+     (fail-safe — never a silently-broken URL). GET-only base: `/health`, `/records`, `/context`, `/subscription-series` (v3-DP DP-2, one-IPO-scoped: `?ipo_id=` is REQUIRED).
 - **Behavior:** each refresh pulls both stores from the VM; on any failure (unreachable, non-200,
   malformed/truncated envelope, timeout — 10s × 2 retries) that store falls back to local and the
   header sync chip says so honestly — **records** re-scrape fresh from NSE (still current), **context**
@@ -400,6 +400,7 @@ source files, with three sharp edges:
 | Keepalive / heartbeat | `vm_keepalive.py`, `vm_heartbeat.py` | `vm_health.py`, `heartbeat.py` |
 | Telegram (V3-3) | `vm_telegram_bot.py`, `vm_telegram_digest.py`, `vm_alert_check.py` | `telegram.py`, `telegram_format.py`, `telegram_alerts.py`, `telegram_commands.py`, `vm_status.py`, `oracle_login.py` |
 | **Subscription series recorder (v3-DP DP-1)** | `run_live_ingest.py` (already listed above) | `vm_health.py`, `vm_status.py` (both already listed above) |
+| **Subscription-series read route (v3-DP DP-2)** | `run_vm_server.py` (unchanged — it just serves the app) | — (the route lives in `src/ipo/vm/`, see below) |
 
 **DP-1 also adds a whole new package**, which the two-column table above cannot express — it is the
 first VM feature to do so, and a package missing from the box fails only when the ingest unit next
@@ -408,6 +409,12 @@ runs. Copy the whole directory:
 | Area | `src/ipo/` |
 |---|---|
 | Subscription series recorder (v3-DP DP-1) | `series/` (`__init__.py`, `models.py`, `store.py`, `state.py`, `recorder.py`) — plus the modified `data/ingest/live.py` and `data/sources/nse.py` |
+| Subscription-series read route (v3-DP DP-2) | `vm/server.py`, `vm/models.py` |
+
+**NOT `vm/client.py`.** It is the ENGINE-side client that runs inside the shipped `.exe`, never on
+the VM — sending it to a box that never executes it would break "one writer, one home" and invite a
+future reader to think the VM calls itself. DP-2 leaves it untouched; the engine-side fetch belongs
+to DP-3, whose engine-mediated fetch is a separate, not-yet-locked decision.
 
 The new-IPO onset trigger (below) touches no new file — it's entirely inside `run_live_ingest.py` +
 `refresh_context.py`, both already itemized in the first row above. Nothing to add to this table for
@@ -652,6 +659,55 @@ the ingest cadence.
 **Dark-ship:** desktop and every other caller pass no sink, so this is inert everywhere except the
 VM's ingest unit.
 
+### Subscription-series read route (v3-DP DP-2) — deploy runbook
+
+A fourth GET route, `/subscription-series?ipo_id=…`, serving ONE IPO's banked trajectory (what DP-1
+appends) so DP-3 can draw the curve. It inherits read-only, rate-limiting, CORS and no-model from
+the existing API — a new `@app.get` is covered by `test_api_is_structurally_read_only` automatically.
+
+**`ipo_id` is REQUIRED, not an optional filter.** Every other route returns current state, roughly
+one small row per IPO; this one returns a time series. Serving the whole store would hand a growing
+multi-IPO blob to the box on every detail-page open.
+
+**The wire projection is deliberately leaner than the store, and that is the route's one real
+design decision.** DP-1 banks the complete NSE response plus all ~18 category rows, because a field
+discarded at collection can never be recovered. Serving it is a separate question: measured on the
+first genuinely banked sample a stored row is **6,163 bytes**, so a ~150-sample trajectory would be
+**~903 KB per request**. The route serves only the typed reading (`captured_at`,
+`source_update_time`, the six multiples, `schema_version`) — **376 bytes a sample, ~55 KB** for the
+same trajectory. `raw_response` and `categories` stay on disk for DP-4, which reads the store
+directly on the VM rather than over HTTP. Nothing is lost, only un-shipped; a test pins this so a
+later edit cannot quietly re-add the blob.
+
+**Rate limit unchanged.** The shared 60/min/IP was sized for "2 requests per user per 30-min cycle".
+DP-3 adds one request per detail-page open; breaching 60/min from a single IP would need 60
+detail-page opens in a minute, sustained one per second. It stays comfortable, so no per-route
+budget and — importantly — no raising the global limit, which protects `/records`.
+
+**`refreshed_at` is per-IPO**, the newest reading banked for THAT ipo_id, derived from the data
+rather than the file's mtime (a restore or `cp` rewrites mtime; `captured_at` survives being moved).
+An IPO open now is still growing; one that closed last week is complete. DP-3 must read this, not
+the app-global clock, which would misreport a finished curve as stale.
+
+**Honest degradation.** Unknown/absent `ipo_id`, an unreadable file, or an id unsafe as a filename
+all return an empty-but-valid envelope (`{refreshed_at: null, ipo_id, samples: []}`) — never a 404
+or a 500. For months the common answer genuinely is "nothing recorded". A missing `ipo_id`
+parameter is the one real client error and returns a clean 4xx.
+
+**Deploy (you provision):**
+
+1. `scp` the modified `src/ipo/vm/server.py`, `src/ipo/vm/models.py`, `src/ipo/vm/client.py` to
+   `/opt/ipo/src/ipo/vm/`.
+2. **Restart the read-API:** `sudo systemctl restart <the run_vm_server unit>` — unlike the recorder
+   this is a long-running server, so it holds the old routing table in memory. (Confirm the unit
+   name on the box; `run_vm_server.py` is not in the timer list.)
+3. **Verify:** `curl -s 'http://127.0.0.1:8000/subscription-series?ipo_id=cmll' | head -c 300` →
+   an envelope with `cmll`'s samples; `curl -s -o /dev/null -w '%{http_code}'
+   'http://127.0.0.1:8000/subscription-series'` → a 4xx (missing required param);
+   `?ipo_id=doesnotexist` → 200 with `samples: []`, not an error.
+
+**No new secret, no dependency change, no new unit.**
+
 ### Weekly fallback self-test (v3 V3-4) — off by default; deploy runbook
 
 V3-1's local fallback only runs when the VM is down, so it can rot undiscovered until the day you need
@@ -686,7 +742,7 @@ verdict `run_heartbeat` surfaces. No manufactured outage; the VM can be up and s
 | `scripts/run_t3_stability.py` | T+3 settlement cross-break calibration check | `docs/T3_STABILITY.md` |
 | `scripts/run_heartbeat.py` | Data-source freshness heartbeat **+ stranded-listing audit** (`--data-dir`, v3 finding-④) **+ VM-liveness check** (`--vm-heartbeat`, v3 V3-3) **+ fallback self-test verdict** (`--fallback-selftest`, v3 V3-4) | nothing (prints; exit 1 if a feed is missing, a listing is overdue, the VM heartbeat is stale/degraded, **or** the fallback self-test FAILED/stale) |
 | `scripts/refresh_context.py` | v3 V3-5/6/8/11 — refresh the per-IPO Upstox context cache (registrar + RHP + lot_size + isin + industry; display-only; needs `UPSTOX_TOKEN`). **Plus (v3, new-IPO onset trigger):** `refresh_one`/`merge_context`/`refresh_and_merge_one` — a single-symbol fetch + merge-write, called by `run_live_ingest.py`; `main()`'s own 3×/day full-batch overwrite is unchanged | `<data_dir>/context/ipo_context.json` (token-free) |
-| `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
+| `scripts/run_vm_server.py` | v3 V3-1 — the VM read-API server (GET-only `/health` `/records` `/context` `/subscription-series`; run **on** the VM behind its fetch jobs; never runs the model) | `<data_dir>/logs/vm.log` (serves records + context read-only) |
 | `scripts/archive_drop.ps1` | **Retired** (v3 V3-2, superseded) — desktop drop is permanently dropped; no longer scheduled | — |
 | `scripts/archive_pull.py` | **Retired** (v3 V3-2, superseded) — left in place, unused; nothing pulls into `ipo-archive` anymore | — |
 | `scripts/vm_archive_snapshot.py` | v3 V3-2 (revised) — VM-side: mirror records + context into the `ipo-archive` clone (pure copy; the unit's shell step commits/pushes) | `<archive-clone>/ipo_records.parquet`, `<archive-clone>/ipo_context.json`, `<data_dir>/logs/archive_snapshot.log` |

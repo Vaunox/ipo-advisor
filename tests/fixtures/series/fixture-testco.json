@@ -1,0 +1,1634 @@
+[
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T10:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 10:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.436,
+  "nii_sub": 0.2616,
+  "snii_sub": 0.3488,
+  "bnii_sub": 0.218,
+  "retail_sub": 0.1744,
+  "total_sub": 0.3052,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 976119.0,
+    "no_of_total_meant": 0.436,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 10:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000000b352f5b9ea684eb"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T10:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 10:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.4752,
+  "nii_sub": 0.2851,
+  "snii_sub": 0.3802,
+  "bnii_sub": 0.2376,
+  "retail_sub": 0.1901,
+  "total_sub": 0.3326,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1063880.0,
+    "no_of_total_meant": 0.4752,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 10:30:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000002506d3672c269d1"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T11:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 11:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.518,
+  "nii_sub": 0.3108,
+  "snii_sub": 0.4144,
+  "bnii_sub": 0.259,
+  "retail_sub": 0.2072,
+  "total_sub": 0.3626,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1159701.0,
+    "no_of_total_meant": 0.518,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 11:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000002c28b3923bbf4efc"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T11:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 11:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.5646,
+  "nii_sub": 0.3388,
+  "snii_sub": 0.4517,
+  "bnii_sub": 0.2823,
+  "retail_sub": 0.2258,
+  "total_sub": 0.3952,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1264029.0,
+    "no_of_total_meant": 0.5646,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 11:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000004380a50fcd4dca69"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T12:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 12:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.6154,
+  "nii_sub": 0.3692,
+  "snii_sub": 0.4923,
+  "bnii_sub": 0.3077,
+  "retail_sub": 0.2462,
+  "total_sub": 0.4308,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1377761.0,
+    "no_of_total_meant": 0.6154,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 12:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000538292595ce4a26e"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T12:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 12:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.6708,
+  "nii_sub": 0.4025,
+  "snii_sub": 0.5366,
+  "bnii_sub": 0.3354,
+  "retail_sub": 0.2683,
+  "total_sub": 0.4696,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1501790.0,
+    "no_of_total_meant": 0.6708,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 12:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000001f679f707bc428d5"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T13:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 13:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.7312,
+  "nii_sub": 0.4387,
+  "snii_sub": 0.585,
+  "bnii_sub": 0.3656,
+  "retail_sub": 0.2925,
+  "total_sub": 0.5118,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1637014.0,
+    "no_of_total_meant": 0.7312,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 13:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000005f60c38ecbf42f28"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T13:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 13:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.797,
+  "nii_sub": 0.4782,
+  "snii_sub": 0.6376,
+  "bnii_sub": 0.3985,
+  "retail_sub": 0.3188,
+  "total_sub": 0.5579,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1784328.0,
+    "no_of_total_meant": 0.797,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 13:30:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000019d132f5728f1291"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T14:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 14:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.8687,
+  "nii_sub": 0.5212,
+  "snii_sub": 0.695,
+  "bnii_sub": 0.4344,
+  "retail_sub": 0.3475,
+  "total_sub": 0.6081,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1944850.0,
+    "no_of_total_meant": 0.8687,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 14:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000286f4b61a8a0ebfa"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T14:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 14:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.9469,
+  "nii_sub": 0.5681,
+  "snii_sub": 0.7575,
+  "bnii_sub": 0.4734,
+  "retail_sub": 0.3788,
+  "total_sub": 0.6628,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2119924.0,
+    "no_of_total_meant": 0.9469,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 14:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000006e658b8be1e5ae76"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T15:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 15:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.0321,
+  "nii_sub": 0.6193,
+  "snii_sub": 0.8257,
+  "bnii_sub": 0.5161,
+  "retail_sub": 0.4128,
+  "total_sub": 0.7225,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2310671.0,
+    "no_of_total_meant": 1.0321,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 15:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000005c601df0806b2f3c"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T15:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 15:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.125,
+  "nii_sub": 0.675,
+  "snii_sub": 0.9,
+  "bnii_sub": 0.5625,
+  "retail_sub": 0.45,
+  "total_sub": 0.7875,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2518656.0,
+    "no_of_total_meant": 1.125,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 15:30:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000668934cb5220894a"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T16:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 16:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.2263,
+  "nii_sub": 0.7358,
+  "snii_sub": 0.981,
+  "bnii_sub": 0.6131,
+  "retail_sub": 0.4905,
+  "total_sub": 0.8584,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2745447.0,
+    "no_of_total_meant": 1.2263,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 16:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000070d6e8e687e55389"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T16:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 16:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.3367,
+  "nii_sub": 0.802,
+  "snii_sub": 1.0694,
+  "bnii_sub": 0.6683,
+  "retail_sub": 0.5347,
+  "total_sub": 0.9357,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2992611.0,
+    "no_of_total_meant": 1.3367,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 16:30:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000201a52ccf8f9d3d1"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T17:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.457,
+  "nii_sub": 0.8742,
+  "snii_sub": 1.1656,
+  "bnii_sub": 0.7285,
+  "retail_sub": 0.5828,
+  "total_sub": 1.0199,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 3261939.0,
+    "no_of_total_meant": 1.457,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000003ee595f054054638"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T17:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.5881,
+  "nii_sub": 0.9529,
+  "snii_sub": 1.2705,
+  "bnii_sub": 0.7941,
+  "retail_sub": 0.6352,
+  "total_sub": 1.1117,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 3555446.0,
+    "no_of_total_meant": 1.5881,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:30:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000005af2112851d9468"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T18:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 18:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.731,
+  "nii_sub": 1.0386,
+  "snii_sub": 1.3848,
+  "bnii_sub": 0.8655,
+  "retail_sub": 0.6924,
+  "total_sub": 1.2117,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 3875371.0,
+    "no_of_total_meant": 1.731,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 18:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000144ad459df4f641e"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T18:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 18:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.8868,
+  "nii_sub": 1.1321,
+  "snii_sub": 1.5094,
+  "bnii_sub": 0.9434,
+  "retail_sub": 0.7547,
+  "total_sub": 1.3208,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 4224177.0,
+    "no_of_total_meant": 1.8868,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 18:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000001c08b6826ec72e5c"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T19:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 19:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 2.0566,
+  "nii_sub": 1.234,
+  "snii_sub": 1.6453,
+  "bnii_sub": 1.0283,
+  "retail_sub": 0.8226,
+  "total_sub": 1.4396,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 4604326.0,
+    "no_of_total_meant": 2.0566,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 19:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000021ed3773486c45b3"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T19:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 19:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 2.2417,
+  "nii_sub": 1.345,
+  "snii_sub": 1.7934,
+  "bnii_sub": 1.1208,
+  "retail_sub": 0.8967,
+  "total_sub": 1.5692,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 5018729.0,
+    "no_of_total_meant": 2.2417,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 19:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000006ffc8fcba1c4eba3"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T20:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 20:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 2.4435,
+  "nii_sub": 1.4661,
+  "snii_sub": 1.9548,
+  "bnii_sub": 1.2217,
+  "retail_sub": 0.9774,
+  "total_sub": 1.7104,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 5470520.0,
+    "no_of_total_meant": 2.4435,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 20:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000008ac9c4505caf7ad"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T20:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 20:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 2.6634,
+  "nii_sub": 1.598,
+  "snii_sub": 2.1307,
+  "bnii_sub": 1.3317,
+  "retail_sub": 1.0654,
+  "total_sub": 1.8644,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 5962833.0,
+    "no_of_total_meant": 2.6634,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 20:30:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000022668a74b0b90cb"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T21:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 21:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 2.9031,
+  "nii_sub": 1.7419,
+  "snii_sub": 2.3225,
+  "bnii_sub": 1.4515,
+  "retail_sub": 1.1612,
+  "total_sub": 2.0322,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 6499475.0,
+    "no_of_total_meant": 2.9031,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 21:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000009638682db04a6f5"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T21:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 21:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 3.1644,
+  "nii_sub": 1.8986,
+  "snii_sub": 2.5315,
+  "bnii_sub": 1.5822,
+  "retail_sub": 1.2658,
+  "total_sub": 2.2151,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 7084475.0,
+    "no_of_total_meant": 3.1644,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 21:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000007d1eb0d90afa0b1c"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T22:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 22:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 3.4492,
+  "nii_sub": 2.0695,
+  "snii_sub": 2.7594,
+  "bnii_sub": 1.7246,
+  "retail_sub": 1.3797,
+  "total_sub": 2.4144,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 7722086.0,
+    "no_of_total_meant": 3.4492,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 22:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000004276fa76b786cf7e"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T22:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 22:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 3.7596,
+  "nii_sub": 2.2558,
+  "snii_sub": 3.0077,
+  "bnii_sub": 1.8798,
+  "retail_sub": 1.5038,
+  "total_sub": 2.6317,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 8417011.0,
+    "no_of_total_meant": 3.7596,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 22:30:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000043bfb365b8c2311"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T23:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 23:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.098,
+  "nii_sub": 2.4588,
+  "snii_sub": 3.2784,
+  "bnii_sub": 2.049,
+  "retail_sub": 1.6392,
+  "total_sub": 2.8686,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 9174623.0,
+    "no_of_total_meant": 4.098,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 23:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000000c3e1af03a6d40a0"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-15T23:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 23:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 23:30:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000012eb8dfff3f68a99"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T00:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000297714e507dc97b9"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T00:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000000d6d48e34ab1a04c"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T01:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000032d6c2c6d8f174ec"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T01:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000003a72801427d88e52"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T02:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000006c89beb0e58ddc34"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T02:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000002d4a8aa0564c4529"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T03:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000037bacb91508c52ae"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T03:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000022395c7e6ac8faa8"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T04:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000027afd79a66cd4dd8"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T04:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000005c63f870c1dbb3aa"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T05:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000064c9bf395b1dd8f2"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T05:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000064078c2509b91b68"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T06:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000006658c66f8267b2d8"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T06:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000041c29d1bbc7309bd"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T07:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000014fda645212199b"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T07:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000029c560161dc5cff0"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T08:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000007fd0d3b265522fcc"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T08:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000049722162bc4a807c"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T09:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000004f8bfd6a28ed21a4"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-testco",
+  "symbol": "FIXTURE-TESTCO",
+  "captured_at": "2026-05-16T09:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-TESTCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000145f4c33ff07cb0a"
+ }
+]

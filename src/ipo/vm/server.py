@@ -31,7 +31,8 @@ from fastapi.responses import JSONResponse
 from ipo.core.logging import get_logger
 from ipo.data.ingest.state import IngestStateStore
 from ipo.data.store.repository import ParquetRepository
-from ipo.vm.models import RecordsEnvelope
+from ipo.series.store import SubscriptionSeriesStore
+from ipo.vm.models import RecordsEnvelope, SeriesEnvelope, SeriesSample
 
 _log = get_logger("ipo.vm.server")
 
@@ -161,5 +162,52 @@ def create_vm_app(data_dir: Path) -> FastAPI:
             _log.warning("vm_context_malformed", extra={"type": type(payload).__name__})
             return {"refreshed_at": None, "ipos": {}}
         return payload
+
+    @app.get("/subscription-series", response_model=SeriesEnvelope)
+    def subscription_series(ipo_id: str) -> SeriesEnvelope:
+        """ONE IPO's banked subscription trajectory (v3-DP DP-2), oldest sample first.
+
+        ``ipo_id`` is a REQUIRED query parameter, not an optional filter. Every other route returns
+        current state — roughly one small row per IPO — whereas this one returns a time series, so
+        returning the whole store would hand a growing multi-IPO blob to a 1 vCPU / 1 GB box on
+        every detail-page open. One IPO per request is the design, not a convenience. FastAPI turns
+        a missing ``ipo_id`` into a 422 by itself: that is the one genuine CLIENT error here, and it
+        is deliberately distinct from a valid request for an IPO that simply has no series.
+
+        Read fresh from disk each call, like ``/records``, so a recorder write is served immediately
+        with no cache to go stale.
+
+        Degrades honestly in every other case, because for MONTHS the common answer is "nothing
+        recorded": an unknown id, an IPO that closed before recording began, an unreadable file, or
+        an id unsafe as a filename all return an empty-but-valid envelope rather than a 404 or a
+        500. ``SubscriptionSeriesStore.read`` already logs the corrupt case loudly, so genuine
+        absence and a real fault stay distinguishable in the log even though both read as empty on
+        the wire (the same discipline as ``/context``).
+
+        **The B1 wall still holds here.** This serves the trajectory to a DISPLAY; it does not, and
+        must not, become a path by which the series reaches the scorer. The route is data-only, like
+        the rest of this module, and the import-boundary test keeps that structural.
+        """
+        samples = SubscriptionSeriesStore(data_dir).read(ipo_id)
+        wire = [
+            SeriesSample(
+                schema_version=s.schema_version,
+                captured_at=s.captured_at,
+                source_update_time=s.source_update_time,
+                qib_sub=s.qib_sub,
+                nii_sub=s.nii_sub,
+                snii_sub=s.snii_sub,
+                bnii_sub=s.bnii_sub,
+                retail_sub=s.retail_sub,
+                total_sub=s.total_sub,
+            )
+            for s in samples
+        ]
+        # Per-IPO freshness, derived from the DATA rather than the file's mtime: mtime is an
+        # artifact of the filesystem (a restore, a `cp`, an rsync all rewrite it) whereas
+        # captured_at is the reading's own truth and survives being moved. None for an empty series
+        # — honestly "nothing recorded", not "recorded at the epoch".
+        refreshed_at = max((s.captured_at for s in wire), default=None)
+        return SeriesEnvelope(refreshed_at=refreshed_at, ipo_id=ipo_id, samples=wire)
 
     return app
