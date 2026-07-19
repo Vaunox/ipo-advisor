@@ -635,8 +635,15 @@ the ingest cadence.
    `data/sources/nse.py`, `scripts/run_live_ingest.py`, `service/vm_health.py`,
    `service/vm_status.py` (see the sync file-list above — a package missing from the box fails only
    when the unit next runs).
-2. Nothing to restart: `ipo-ingest.service` is `Type=oneshot`, so the next 30-min firing picks up
-   the new code via the editable `.venv`. No dependency change, no new unit, no new secret.
+2. **The recorder itself needs no restart** — `ipo-ingest.service` is `Type=oneshot`, so the next
+   30-min firing picks up the new code via the editable `.venv`. Same for
+   `ipo-telegram-digest.service` and `ipo-alert-check.service` (both oneshot timers), so the new
+   `Recorder` row appears in the digest and in alert-checking on their own.
+   **BUT restart the bot:** `sudo systemctl restart ipo-telegram-bot`. It is the one
+   **long-running** unit (`Restart=always`) and it imports `vm_status.build_status` at start, so
+   until it restarts the `/status` command keeps serving the OLD row set — silently missing the
+   `Recorder` row while the digest correctly shows it. No dependency change, no new unit, no new
+   secret.
 3. **Verify** after the next cycle (≤30 min):
    `ls /opt/ipo/data/series/` and `cat /opt/ipo/data/series/recorder_state.json`, then confirm the
    `Recorder` row appears in the next digest or `/status`. With no IPO currently open the honest
