@@ -349,7 +349,8 @@ to pick up newly-opened IPOs; this is the "occasional" cadence, not a live one.
 
 The 3×/day context baseline above can leave a genuinely new IPO's registrar/RHP/lot-size fields empty
 for hours if it opens mid-interval (e.g. NSE lists it at 09:00, the next context batch isn't until
-13:15). `run_live_ingest.py` (the 30-min records timer) now closes that gap itself: after each
+13:15). `run_live_ingest.py` (the 30-min records timer — unit `ipo-ingest.timer`/`ipo-ingest.service`,
+reference copies in `operations/systemd/`) now closes that gap itself: after each
 `refresh_from_nse` upsert, it diffs the post-upsert `ipo_id` set against a pre-upsert snapshot of the
 same store — anything new fires **one** immediate single-symbol context pull via
 `refresh_context.refresh_and_merge_one`, merged into the existing `ipo_context.json` (not a full
@@ -365,9 +366,12 @@ overwrite). The 3×/day baseline is unchanged; this only fills the onset gap for
   `refresh_context.py`). A field that IS found displays immediately regardless; an empty result just
   waits for the next real 3×/day batch to (correctly) label it, rather than mislabeling it early.
 - **Dark-ships without `UPSTOX_TOKEN`** — same posture as the batch job. `run_live_ingest.py`'s own
-  systemd unit therefore needs `EnvironmentFile=/etc/ipo/context.env` added alongside
+  systemd unit therefore needs `EnvironmentFile=/etc/ipo/context.env` alongside
   `ipo-context.service`'s (same token, read by both units) for the trigger to actually fire on the
   box; without it, new IPOs simply wait for the next 3×/day slot as before (never an error).
+  **Status: DONE.** Verified on the box 2026-07-19 — it is applied as the drop-in
+  `ipo-ingest.service.d/environment.conf` (this line previously read as an outstanding step long
+  after it had been carried out; reference copy now committed under `operations/systemd/`).
 - **One symbol's failure never blocks another's**, and never affects the records ingest — the records
   write has already completed by the time context pulls fire.
 
@@ -395,6 +399,15 @@ source files, with three sharp edges:
 | Durable archive (v3 V3-2 revised) | `vm_archive_snapshot.py` | — |
 | Keepalive / heartbeat | `vm_keepalive.py`, `vm_heartbeat.py` | `vm_health.py`, `heartbeat.py` |
 | Telegram (V3-3) | `vm_telegram_bot.py`, `vm_telegram_digest.py`, `vm_alert_check.py` | `telegram.py`, `telegram_format.py`, `telegram_alerts.py`, `telegram_commands.py`, `vm_status.py`, `oracle_login.py` |
+| **Subscription series recorder (v3-DP DP-1)** | `run_live_ingest.py` (already listed above) | `vm_health.py`, `vm_status.py` (both already listed above) |
+
+**DP-1 also adds a whole new package**, which the two-column table above cannot express — it is the
+first VM feature to do so, and a package missing from the box fails only when the ingest unit next
+runs. Copy the whole directory:
+
+| Area | `src/ipo/` |
+|---|---|
+| Subscription series recorder (v3-DP DP-1) | `series/` (`__init__.py`, `models.py`, `store.py`, `state.py`, `recorder.py`) — plus the modified `data/ingest/live.py` and `data/sources/nse.py` |
 
 The new-IPO onset trigger (below) touches no new file — it's entirely inside `run_live_ingest.py` +
 `refresh_context.py`, both already itemized in the first row above. Nothing to add to this table for
@@ -580,6 +593,58 @@ snapshot (`vm_status.build_status`) so what you see is consistent, and **all dar
 re-registers on the next `ipo-telegram-bot` restart (`getMyCommands` to confirm). **Dark-ship:** remove
 or blank `telegram.env` and all three go inert — no messages, no errors.
 
+### Forward subscription recorder (v3-DP DP-1) — piggybacks `ipo-ingest`; deploy runbook
+
+Banks the full intraday demand book of every mainboard IPO across its open→close window, so the
+close-day questions this project keeps returning to ("does the noon book differ from the 3 PM
+book?") become answerable in ~6–12 months. Intraday subscription is **collect-forward-or-lose-it**:
+NSE re-serves only the final book, so there is no archive to backfill from.
+
+**It is a code + deploy change, NOT a new timer.** `ipo-ingest.service` already fetches each open
+IPO's subscription every 30 min in order to score it; DP-1 makes that same response also append to
+an append-only series. One fetch, two writes — zero added NSE load, and the recorder's cadence *is*
+the ingest cadence.
+
+- **VM-only by construction.** The sink is created in `run_live_ingest.py`, **not** inside
+  `refresh_from_nse` — which is also the desktop's local-fallback leaf, so hooking it there would
+  turn every shipped `.exe` into a recorder during a VM outage. One writer, one home.
+- **Store:** `/opt/ipo/data/series/<ipo_id>.json`, one file per IPO, replaced atomically
+  (`tmp` + `os.replace`). Each IPO's series is bounded (~3 days ≈ ~150 samples ≈ ~150 KB) so it
+  completes rather than growing; an interrupted write can never corrupt the bank because a partial
+  file is never observable at the live path. Volume ≈ **26 MB/year** at ~40 mainboard IPOs.
+- **A failed fetch banks NOTHING** — never a fabricated row. (`_degrade_subscription` replays the
+  prior record's numbers stamped with the prior `captured_at`; banking that would be
+  indistinguishable from a real reading later.) An honest gap, visible on the health row.
+- **Health:** a `Recorder` row in the existing digest fan-out — so it also reaches `/status`, the
+  DEGRADED rollup, and the 20-min alert-check's break/recover transitions with their existing
+  repeat-suppression, with **no second writer to `alert_state.json`**. Crucially the row separates
+  *correctly idle* ("no IPO in window" — the normal state for weeks between IPOs) from *broken*
+  ("IPOs in window but nothing banked", or the cycle itself not running). A row that went red for
+  quiet weeks would be ignored by the time it mattered.
+- **`OnFailure` is deliberately untouched** — see `operations/systemd/README.md` for why routing the
+  recorder through it would make that alert contradict the digest.
+- **Logs** now go to `<data-dir>/logs/engine.log` (the rotated family `service/logs.py` reads)
+  rather than stderr only, so recorder events are durable and greppable on the box. Note what this
+  does *not* buy: the recorder runs only on the VM, and the V3-16 debug console reads the *local*
+  engine log, so these events do not appear in a desktop console. Serving them would need a `/logs`
+  route on the VM read-API, which does not exist and is out of scope here.
+
+**Deploy (you provision):**
+
+1. `scp` the new `src/ipo/series/` package **and** the modified `data/ingest/live.py`,
+   `data/sources/nse.py`, `scripts/run_live_ingest.py`, `service/vm_health.py`,
+   `service/vm_status.py` (see the sync file-list above — a package missing from the box fails only
+   when the unit next runs).
+2. Nothing to restart: `ipo-ingest.service` is `Type=oneshot`, so the next 30-min firing picks up
+   the new code via the editable `.venv`. No dependency change, no new unit, no new secret.
+3. **Verify** after the next cycle (≤30 min):
+   `ls /opt/ipo/data/series/` and `cat /opt/ipo/data/series/recorder_state.json`, then confirm the
+   `Recorder` row appears in the next digest or `/status`. With no IPO currently open the honest
+   expected result is `Recorder  idle — no IPO in window (0 samples banked)` — **not** an error.
+
+**Dark-ship:** desktop and every other caller pass no sink, so this is inert everywhere except the
+VM's ingest unit.
+
 ### Weekly fallback self-test (v3 V3-4) — off by default; deploy runbook
 
 V3-1's local fallback only runs when the VM is down, so it can rot undiscovered until the day you need
@@ -641,6 +706,32 @@ major, do it deliberately in one pass: bump the cap, run the full gate, fix what
 - **`black>=24.0,<27`** — black changes its stable style yearly (26.x reformatted `logging.py` +
   `refresh_context.py`).
 - **`httpx>=0.27,<1.0`** — pinned until the starlette/httpx2 TestClient cutover is handled.
+
+### Dev note — STANDING RULE: systemd unit state is NOT a health signal
+
+**Health is derived from `ingest_state.json` + live probes, never from systemd unit state — a
+unit's `active`/`failed` status is not a truth source here.**
+
+This is already true throughout the codebase and was, until now, recorded only as a one-line code
+comment. Verified by grep: `systemctl` / `is-active` / `is-failed` / `ActiveState` appear **zero**
+times across `src/` and `scripts/`. Instead, `check_ingest` judges freshness from
+`IngestStateStore`'s `last_success` / `last_attempt_ok`, and the read-API row runs a real HTTP
+probe — deliberately, per `vm_status.py`: *a hung app stays systemd-`active` but stops serving.*
+
+The rule cuts both ways, and the second direction is the one that catches people:
+
+- **`active` does not mean healthy** — the hung-but-active case above.
+- **`failed` does not mean the job failed** — a unit can be made to exit non-zero to signal
+  something *other* than its primary job, at which point its status lies to anyone reading it.
+
+v3-DP DP-1 hit exactly the second case and declined it: routing the recorder's failure through
+`ipo-ingest.service`'s `OnFailure` would have marked the ingest unit `failed` on a recorder hiccup
+while the ingest itself had succeeded and committed — and the very next digest would have correctly
+reported `✓ NSE ingest` off `ingest_state.json`. Two contradictory surfaces from one event.
+
+Write it down here so the next session does not rediscover this by grep, and is not tempted by the
+same `OnFailure` shortcut. If you need a new health signal, add a `FeedHealth` row fed by a fact the
+code owns — not by asking systemd how a unit is feeling.
 
 ### Dev note — the scoring-path guard (Part I rule 1)
 

@@ -88,6 +88,24 @@ class NseSubscription:
     nii_big: float | None = None  # bNII: bid > ₹10L
 
 
+@dataclass(frozen=True)
+class NseSubscriptionSnapshot:
+    """A subscription reading PLUS the provenance the scoring path throws away (v3-DP DP-1).
+
+    ``parse_subscription`` binds only ``dataList``; ``updateTime`` — NSE's own "when this reading
+    was actually true" stamp — and the raw bytes fall away with the parsed document. The scoring
+    path genuinely does not need them, so this is an addition rather than a correction: the
+    forward series recorder does, and it cannot reconstruct either after the fact.
+
+    ``raw_content`` is the response verbatim, so a future reader is never limited to the fields
+    today's parser happened to think were interesting.
+    """
+
+    subscription: NseSubscription
+    raw_content: bytes
+    update_time: str | None = None
+
+
 # --- pure parsing helpers ---------------------------------------------------
 
 
@@ -187,6 +205,28 @@ def parse_subscription(raw: RawResponse) -> NseSubscription:
         total=value_for(lambda c: c == "Total"),
         nii_small=value_for(lambda c: "Two Lakh Rupees upto Ten Lakh" in c),
         nii_big=value_for(lambda c: "more than Ten Lakh Rupees" in c),
+    )
+
+
+def parse_subscription_snapshot(raw: RawResponse) -> NseSubscriptionSnapshot:
+    """``parse_subscription`` plus the provenance it discards (v3-DP DP-1).
+
+    Deliberately layered ON TOP of ``parse_subscription`` rather than replacing it, so the scoring
+    path's parse stays byte-for-byte the code it already was and this cannot change a multiple.
+    A missing/oddly-typed ``updateTime`` degrades to ``None``; it is provenance, never a reason to
+    fail a fetch the scoring path would otherwise have accepted.
+    """
+    subscription = parse_subscription(raw)
+    stamp: str | None = None
+    try:
+        document = json.loads(raw.content)
+        value = document.get("updateTime") if isinstance(document, dict) else None
+        stamp = value.strip() if isinstance(value, str) and value.strip() else None
+    except (json.JSONDecodeError, AttributeError):  # pragma: no cover - parse_subscription raises
+        stamp = None
+    content = raw.content if isinstance(raw.content, bytes) else str(raw.content).encode("utf-8")
+    return NseSubscriptionSnapshot(
+        subscription=subscription, raw_content=content, update_time=stamp
     )
 
 
@@ -370,14 +410,23 @@ class NseClient:
 
     def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
         """Fetch + parse subscription for one symbol (``force`` re-fetches live, skipping cache)."""
+        return self.subscription_snapshot(symbol, force=force).subscription
+
+    def subscription_snapshot(self, symbol: str, *, force: bool = False) -> NseSubscriptionSnapshot:
+        """As ``subscription``, but also returns NSE's ``updateTime`` and the raw response bytes.
+
+        ONE fetch serves both: the scoring path takes ``.subscription`` and the v3-DP series
+        recorder takes the provenance off the same response, so banking the trajectory adds no NSE
+        load whatsoever.
+        """
         url = f"{SUBSCRIPTION_URL}?symbol={symbol}"
         if force:
             self._ensure_cookies()
             resp = self._client.fetch(
                 "nse_sub", url, headers={"Accept": "application/json", "Referer": NSE_HOMEPAGE}
             )
-            return parse_subscription(resp)
-        return parse_subscription(self._get_json("nse_sub", url, referer=NSE_HOMEPAGE))
+            return parse_subscription_snapshot(resp)
+        return parse_subscription_snapshot(self._get_json("nse_sub", url, referer=NSE_HOMEPAGE))
 
     def listing_prices(self, symbol: str, listing_day: date) -> tuple[float, float] | None:
         """Fetch (cached) the bhavcopy for ``listing_day`` and return (open, close).

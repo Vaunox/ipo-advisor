@@ -116,6 +116,9 @@ This route's `refreshed_at` is *per-IPO*, not the app-global `last_success` that
 - **Missing `ipo_id` param** → a clean 4xx (the one genuine client error — a malformed request, distinct from a valid request for an IPO with no data).
 - **Corrupt/unreadable series** → empty envelope + a logged warning (honest-logging discipline), never a torn read that 500s the box (the #2/#3 lesson applied to the read side).
 
+### Known follow-on inherited from DP-1 (added at DP-1's merge)
+DP-1 routes the recorder's structured events into the VM's `engine.log` family — durable, rotated, greppable — but they are **not console-visible**: the recorder runs on the VM, and V3-16's debug console reads the *local* engine log, so nothing surfaces them to an operator's screen. Closing that needs a **`/logs` surface on the VM read-API**, which does not exist (the existing `/logs` is on the app's `service/api.py`, not `vm/server.py`). Deliberately out of scope for DP-1; noted here because DP-2 is the item that opens a read door onto VM-side data and is therefore where it would naturally live. **Not a requirement of DP-2** — a separate call, made deliberately, if the operator wants VM logs on a screen rather than over SSH.
+
 ### Proof obligations
 - **Read-only:** covered by the existing all-routes test automatically; add an explicit GET-only assertion for the new route (belt-and-suspenders).
 - **`MAX|Δprob|=0.0`:** VM-only, no scoring-path file touched — git-proven + guard. (This route runs only on the VM; a PyInstaller hidden import the `.exe` carries but never executes, like the rest of `vm/`.)

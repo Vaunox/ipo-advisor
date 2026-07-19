@@ -72,10 +72,15 @@ _SHIPPED_V3 = frozenset(
     }
 )
 
-# Empty ON PURPOSE: every v3-DP item is NOT STARTED, so no row has earned ledger protection yet.
-# The guard is armed now rather than retrofitted at first merge — retrofitting is exactly how V3-16
-# went five days without its `merged <sha>` marker. Add each DP id here as it lands.
-_SHIPPED_DP: frozenset[str] = frozenset()
+# Each DP id joins this ledger AS IT LANDS, in the same commit that merges it — the guard was armed
+# ahead of the first merge precisely so this step could never become a follow-up, which is how V3-16
+# went five days without its `merged <sha>` marker.
+#
+# KNOWN GAP (guard-hardening candidate, not yet implemented): this catches a DROPPED or ORPHANED
+# row, but NOT a stale-STATUS row — a ledger item whose row still reads "NOT STARTED"/pending after
+# it shipped. That is precisely the V3-16 failure mode and it remains uncaught. "Is this status
+# true?" is not automatable in general, but "a shipped-ledger item must not read NOT STARTED" is.
+_SHIPPED_DP: frozenset[str] = frozenset({"DP-1"})
 
 
 @dataclass(frozen=True)

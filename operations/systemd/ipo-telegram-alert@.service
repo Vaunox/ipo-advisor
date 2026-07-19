@@ -1,0 +1,11 @@
+# Reference copy of /etc/systemd/system/ipo-telegram-alert@.service on the data VM.
+# The OnFailure target above. Fixed-format message; %i is the failing unit's name.
+# No secret here: the bot token and chat id live only in /etc/ipo/telegram.env (root:root, 600).
+[Unit]
+Description=Telegram alert for failed unit %i (v3 V3-3)
+
+[Service]
+Type=oneshot
+User=<vm-user>
+EnvironmentFile=/etc/ipo/telegram.env
+ExecStart=/opt/ipo/.venv/bin/python -c "from ipo.service.telegram import send_telegram, telegram_env; t,c=telegram_env(); send_telegram(t,c,\"WARN: %i errored (systemd OnFailure)\")"

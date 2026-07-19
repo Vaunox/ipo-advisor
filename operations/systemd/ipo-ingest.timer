@@ -1,0 +1,12 @@
+# Reference copy of /etc/systemd/system/ipo-ingest.timer on the data VM.
+# Source of truth is the box; see ./README.md. Verify with: systemctl cat ipo-ingest.timer
+[Unit]
+Description=Run the IPO live NSE ingest every 30 min
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -29,6 +29,7 @@ from ipo.core.types import IPORecord, Segment
 from ipo.data.ingest.state import IngestStateStore
 from ipo.data.sources.base import SourceError
 from ipo.data.sources.nse import NseClient, NseCurrentIssue, NseSubscription
+from ipo.series.recorder import SeriesSink
 
 _log = get_logger("ipo.data.ingest.live")
 
@@ -83,6 +84,7 @@ def build_live_records(
     *,
     clock: Callable[[], datetime] = now_ist,
     existing: Mapping[str, IPORecord] | None = None,
+    sink: SeriesSink | None = None,
 ) -> list[IPORecord]:
     """Fetch current + forthcoming mainboard issues + subscription and build ``IPORecord``s.
 
@@ -97,6 +99,12 @@ def build_live_records(
     trustworthy proxy for the closing book, else the issue abstains honestly — always logged (see
     ``_degrade_subscription``). ``existing`` defaults to empty (no preserve, all-None on failure) so
     the happy path and direct callers are unaffected. SME issues are excluded.
+
+    ``sink`` (v3-DP DP-1) is the forward series recorder, and defaults to ``None`` so this function
+    behaves exactly as before for every caller that does not pass one. Only the VM's
+    ``run_live_ingest.py`` passes a real sink — deliberately NOT ``refresh_from_nse`` itself, which
+    is also the DESKTOP's local-fallback leaf, so an unconditional hook would turn every shipped
+    ``.exe`` into a recorder during a VM outage and break "one writer, one home".
     """
     issues = client.current_issues()
     try:
@@ -119,8 +127,30 @@ def build_live_records(
             continue  # not enough to build a valid record yet
         now = clock()
         try:
-            sub = client.subscription(issue.symbol, force=True)
+            snapshot = client.subscription_snapshot(issue.symbol, force=True)
+            sub = snapshot.subscription
             captured = now
+            if sink is not None:
+                # v3-DP DP-1. THIS BRANCH ONLY — the `except` below synthesises a replay of the
+                # PRIOR record stamped with the prior captured_at, and banking that would write a
+                # fabricated sample indistinguishable from a real one. A failed fetch banks
+                # nothing: an honest gap. `observe` never raises, and is wrapped regardless so a
+                # recorder fault can never cost us a scoring record.
+                try:
+                    sink.observe(
+                        ipo_id=issue.symbol.lower(),
+                        symbol=issue.symbol,
+                        captured_at=captured,
+                        raw_content=snapshot.raw_content,
+                        open_date=issue.open_date,
+                        close_date=issue.close_date,
+                        today=now.date(),
+                    )
+                except Exception as exc:  # noqa: BLE001 - recorder must never break ingest
+                    _log.warning(
+                        "series_observe_failed",
+                        extra={"symbol": issue.symbol, "error": str(exc)},
+                    )
         except SourceError as exc:
             # A transient sub-fetch failure must not silently zero (and clobber) the book. Preserve
             # last-known when it's a trustworthy proxy, else abstain honestly — but never silently.
@@ -247,6 +277,7 @@ def refresh_from_nse(
     *,
     clock: Callable[[], datetime] = now_ist,
     state: IngestStateStore | None = None,
+    sink: SeriesSink | None = None,
 ) -> int:
     """Pull live current mainboard IPOs, resolve any that have listed, and upsert. Never raises.
 
@@ -259,6 +290,11 @@ def refresh_from_nse(
     genuinely succeeds. Reaching NSE — not the record count — is what "fresh" means (a successful
     pull that finds no active IPOs is still a successful pull). Degrade-don't-crash is preserved;
     the failure is now *recorded* (visible) instead of silently swallowed.
+
+    ``sink`` (v3-DP DP-1) rides the SAME fetch: one NSE call, two writes — current state is
+    overwritten as it always has been, and the identical reading is appended to the forward series.
+    It is only populated here; the caller flushes it AFTER this returns, so a series write can
+    never sit between the fetch and the scoring upsert.
     """
     attempt = clock()
     ok = True
@@ -267,7 +303,7 @@ def refresh_from_nse(
     # instead of clobbering them with None (see build_live_records / _degrade_subscription).
     existing = {r.ipo_id: r for r in repo.list_all()}
     try:
-        records = build_live_records(client, clock=clock, existing=existing)
+        records = build_live_records(client, clock=clock, existing=existing, sink=sink)
     except SourceError as exc:
         _log.warning("live_refresh_failed", extra={"error": str(exc)})
         records = []

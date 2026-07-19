@@ -1,0 +1,21 @@
+# Reference copy of /etc/systemd/system/ipo-ingest.service on the data VM.
+# Source of truth is the box; see ./README.md. Verify with: systemctl cat ipo-ingest.service
+#
+# NOTE the ExecStart: run_live_ingest.py is the LIVE NSE path (-> refresh_from_nse), NOT
+# run_ingest.py (the curated seed pipeline) and NOT run_backfill.py. Serving seed data under a
+# fresh refreshed_at would be a BUG-1-class silent failure.
+#
+# v3-DP DP-1: the forward subscription recorder piggybacks THIS cycle. It is a code change, not a
+# new timer -- one NSE fetch, two writes (current-state upsert + series append).
+[Unit]
+Description=IPO Advisor VM live NSE ingest (v3 V3-1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# `<vm-user>` is a placeholder per operations/README.md — this repo is public and the real
+# login lives in the operator's private note. Substitute it when comparing against the box.
+Type=oneshot
+User=<vm-user>
+WorkingDirectory=/opt/ipo
+ExecStart=/opt/ipo/.venv/bin/python /opt/ipo/scripts/run_live_ingest.py --data-dir /opt/ipo/data

@@ -31,6 +31,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
+from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, load_config
 from ipo.core.logging import configure_logging, get_logger
 from ipo.data.ingest.live import refresh_from_nse
@@ -38,6 +39,10 @@ from ipo.data.ingest.state import IngestStateStore
 from ipo.data.sources.base import PoliteClient, RawCache
 from ipo.data.sources.nse import NseClient
 from ipo.data.store.repository import ParquetRepository
+from ipo.series.models import SubscriptionSample
+from ipo.series.recorder import SeriesSink
+from ipo.series.state import RecorderStateStore
+from ipo.series.store import SeriesWriteError, SubscriptionSeriesStore
 
 _log = get_logger("ipo.scripts.run_live_ingest")
 
@@ -85,9 +90,53 @@ def live_ingest_new_ids(nse: NseClient, data_dir: Path) -> tuple[int, set[str]]:
     repo = ParquetRepository(data_dir)
     existing_ids = {r.ipo_id for r in repo.list_all()}
     state = IngestStateStore(data_dir / "ingest_state.json")
-    count = refresh_from_nse(repo, nse, state=state)
+    # v3-DP DP-1. The sink is created HERE, in the VM's entry point, and NOT inside
+    # `refresh_from_nse` — which is also the desktop's local-fallback leaf, so hooking it there
+    # would start a recorder on every shipped `.exe` whenever the VM is unreachable.
+    sink = SeriesSink()
+    count = refresh_from_nse(repo, nse, state=state, sink=sink)
     new_ids = {r.ipo_id for r in repo.list_all()} - existing_ids
+    # AFTER the current-state upsert has committed, never before.
+    flush_series(data_dir, sink)
     return count, new_ids
+
+
+def flush_series(data_dir: Path, sink: SeriesSink) -> int:
+    """Bank this cycle's readings and record recorder health. NEVER raises — returns 0 on failure.
+
+    Deliberately swallowing here is the whole point: current state and the verdicts derived from it
+    have already been written by the time this runs, and a recorder problem must degrade to a gap
+    in the series, never to a missed score. The failure is not silent — it is logged as a
+    structured event AND persisted to the recorder state the Telegram digest's ``Recorder`` row
+    reads, so it surfaces within one alert-check cycle.
+    """
+    now = now_ist()
+    store = SubscriptionSeriesStore(data_dir)
+    state_store = RecorderStateStore(data_dir)
+    written = 0
+    error: str | None = None
+
+    by_ipo: dict[str, list[SubscriptionSample]] = {}
+    for sample in sink.samples:
+        by_ipo.setdefault(sample.ipo_id, []).append(sample)
+
+    for ipo_id, samples in sorted(by_ipo.items()):
+        try:
+            written += store.append_many(ipo_id, samples)
+        except (SeriesWriteError, OSError) as exc:
+            error = f"{ipo_id}: {exc}"
+            _log.error("series_write_failed", extra={"ipo_id": ipo_id, "error": str(exc)})
+
+    try:
+        state_store.record_cycle(now=now, in_window=sink.in_window, written=written, error=error)
+    except OSError as exc:  # the health surface itself failing must still not break ingest
+        _log.error("recorder_state_write_failed", extra={"error": str(exc)})
+
+    _log.info(
+        "series_recorder_cycle",
+        extra={"in_window": sink.in_window, "written": written, "ok": error is None},
+    )
+    return written
 
 
 def fire_new_ipo_context_pulls(
@@ -138,8 +187,18 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(env=args.env)
-    configure_logging(config.logging.level, json_output=config.logging.json_output)
     data_dir = Path(args.data_dir)
+    # v3-DP DP-1: log into the SAME `engine.log` family the V3-16 debug console reads
+    # (`service/logs.py` globs engine.log[.1-.4]), instead of stderr-only as before — so the
+    # recorder's structured events are durable, rotated and greppable rather than living only in
+    # journald. Sole writer of this file on the VM (the engine process does not run here), so
+    # there is no concurrent-rotation hazard. See the deploy note in operations/README.md about
+    # what this does and does NOT buy: it does not make VM events appear in a desktop console.
+    configure_logging(
+        config.logging.level,
+        json_output=config.logging.json_output,
+        file_path=data_dir / "logs" / "engine.log",
+    )
     count, new_ids = live_ingest_new_ids(build_nse(config, data_dir), data_dir)
     snap = IngestStateStore(data_dir / "ingest_state.json").current()
     _log.info("run_live_ingest_done", extra={"records": count, "ok": snap.last_attempt_ok})
