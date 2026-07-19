@@ -698,9 +698,13 @@ parameter is the one real client error and returns a clean 4xx.
 
 1. `scp` the modified `src/ipo/vm/server.py`, `src/ipo/vm/models.py`, `src/ipo/vm/client.py` to
    `/opt/ipo/src/ipo/vm/`.
-2. **Restart the read-API:** `sudo systemctl restart <the run_vm_server unit>` — unlike the recorder
-   this is a long-running server, so it holds the old routing table in memory. (Confirm the unit
-   name on the box; `run_vm_server.py` is not in the timer list.)
+2. **Restart the read-API:** `sudo systemctl restart ipo-vm-api` — unlike the recorder this is a
+   long-running server (`Type=simple, Restart=always`), so it holds the old ROUTING TABLE in memory.
+   Verified live during the DP-2 deploy: with the new `server.py` already on disk but the unit not
+   yet restarted, the box still answered `404` for `/subscription-series` and advertised only the
+   old three routes. Reference copy: `operations/systemd/ipo-vm-api.service`.
+   *(The unit is not a timer, so it does not appear in `systemctl list-timers` — its name was in no
+   repo file until DP-2's deploy, the fourth box-vs-repo drift in this workstream.)*
 3. **Verify:** `curl -s 'http://127.0.0.1:8000/subscription-series?ipo_id=cmll' | head -c 300` →
    an envelope with `cmll`'s samples; `curl -s -o /dev/null -w '%{http_code}'
    'http://127.0.0.1:8000/subscription-series'` → a 4xx (missing required param);

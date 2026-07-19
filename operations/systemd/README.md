@@ -21,6 +21,10 @@ Building v3-DP DP-1 surfaced **three** on-box realities that appeared in no repo
    that gave no hint this mechanism existed — the first analysis concluded "no immediate alert path
    exists", which was true of the Python code and false of the box.
 
+4. **The read-API server's unit name was also absent** — it is `ipo-vm-api.service`, and because it
+   is not a timer it did not even appear in `systemctl list-timers`. DP-2's deploy needed it by
+   name, and establishing it took another SSH session.
+
 Each was a case of source not reflecting reality, found by looking at the box rather than the repo.
 Committing the units is the durable fix.
 
@@ -52,3 +56,22 @@ mid-incident is exactly the "a surface must never lie" failure this project guar
 The recorder's health therefore goes entirely through its own `Recorder` row in the existing digest
 fan-out (≤20-min latency, inheriting repeat-suppression and recovery). `OnFailure` keeps doing its
 one honest job: firing when the ingest *genuinely* fails. **Do not overload it.**
+
+## Oneshot vs long-running — the distinction that bites at deploy
+
+Every `ipo-*` unit is `Type=oneshot` behind a timer **except two**: `ipo-vm-api.service` and
+`ipo-telegram-bot.service`, both `Type=simple, Restart=always`.
+
+That matters because a oneshot picks up scp'd code on its next firing with no restart, while a
+long-running unit holds its imported code — and, for the API, its **routing table** — in memory.
+Both long-running units have already caused a real deploy trap:
+
+* **`ipo-vm-api`** — DP-2 added `/subscription-series`. Copying `vm/server.py` without restarting
+  leaves the new route on disk and the OLD three routes being served. Verified live: before the
+  restart the box answered `404` for the new path while the file was already in place.
+* **`ipo-telegram-bot`** — it imports `vm_status.build_status` at start, so DP-1's new `Recorder`
+  health row would have been missing from `/status` while the digest (oneshot) showed it correctly
+  — two surfaces disagreeing about the same data.
+
+**Rule: after scp'ing anything under `src/ipo/vm/` or `src/ipo/service/`, restart the two
+long-running units. After scp'ing anything the timers run, restart nothing.**
