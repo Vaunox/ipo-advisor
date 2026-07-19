@@ -17,7 +17,13 @@ from ipo.core.interfaces import Repository
 from ipo.core.types import IPORecord, ListingLabel, Segment
 from ipo.data.ingest.live import build_live_records, refresh_from_nse, resolve_listings
 from ipo.data.sources.base import SourceError
-from ipo.data.sources.nse import NseClient, NseCurrentIssue, NsePastIssue, NseSubscription
+from ipo.data.sources.nse import (
+    NseClient,
+    NseCurrentIssue,
+    NsePastIssue,
+    NseSubscription,
+    NseSubscriptionSnapshot,
+)
 from ipo.features.build import build_features
 from ipo.model.verdict import missing_critical
 
@@ -55,6 +61,16 @@ class _StubClient:
         if symbol in self._sub_errors:
             raise SourceError(f"nse: subscription fetch failed for {symbol}")
         return self._subs.get(symbol, NseSubscription(qib=None, nii=None, retail=None, total=None))
+
+    def subscription_snapshot(self, symbol: str, *, force: bool = False) -> NseSubscriptionSnapshot:
+        """v3-DP DP-1: the live path now asks for the snapshot (reading + provenance).
+
+        Delegates to this double's own canned ``subscription`` so the scoring behaviour under test
+        is unchanged; ``raw_content`` is a placeholder because these tests pass no recorder sink.
+        """
+        return NseSubscriptionSnapshot(
+            subscription=self.subscription(symbol, force=force), raw_content=b"{}"
+        )
 
     def past_issues(self, *, force: bool = False) -> list[NsePastIssue]:
         if self._past is None:

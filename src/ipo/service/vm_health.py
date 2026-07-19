@@ -42,6 +42,8 @@ CONTEXT_MAX_AGE = timedelta(
 )  # 3x/day (08:15/13:15/18:15 IST); clears the ~14h overnight gap
 BOT_MARKER_MAX_AGE = timedelta(minutes=5)  # bot.marker touched every ~50s poll → ~6 missed = down
 VM_KEEPALIVE_MAX_AGE = timedelta(hours=1)  # keepalive runs every 30 min → flag after ~2 missed
+# v3-DP DP-1: the recorder rides the 30-min ingest cycle, so the same ~3-missed-cycle budget.
+RECORDER_MAX_AGE = timedelta(minutes=90)
 ORACLE_WARN_DAYS = 21
 ORACLE_URGENT_DAYS = 27
 ORACLE_RECLAIM_DAYS = 30
@@ -108,6 +110,61 @@ def check_keepalive(
     if age > max_age:
         return FeedHealth(name, STALE, f"keepalive last ran {ago(age)} ago — Oracle reclaim risk")
     return FeedHealth(name, OK, f"keepalive {ago(age)} ago")
+
+
+def check_recorder(
+    name: str,
+    *,
+    last_cycle_at: datetime | None,
+    last_write_at: datetime | None,
+    in_window: int,
+    samples_last_cycle: int,
+    samples_total: int,
+    last_error: str | None,
+    now: datetime,
+    max_age: timedelta = RECORDER_MAX_AGE,
+) -> FeedHealth:
+    """Judge the v3-DP forward subscription recorder (DP-1).
+
+    The distinction this exists for: **writing nothing is usually CORRECT.** Between IPOs there is
+    no open book for days or weeks, and a row that went red for that would cry wolf until it was
+    ignored — which is exactly how the real failure gets missed months later. So idleness is judged
+    against whether there was anything to write:
+
+    * ``last_cycle_at`` ageing out  -> the recorder is not RUNNING. Loud, regardless of window.
+      This is what catches a total stall, which a write-time-only check could never distinguish
+      from a legitimately quiet week.
+    * a write error last cycle      -> loud, and names the error.
+    * ``in_window == 0``            -> OK, and says so plainly ("no IPO in window").
+    * ``in_window > 0``, no samples -> loud: there WAS a book to record and nothing was banked.
+    """
+    if last_cycle_at is None:
+        # DARK-SHIP. No state file means no recorder cycle has ever completed on this box, which
+        # before deployment is the CORRECT state — flagging it would paint every VM (and every
+        # test data dir) DEGRADED the moment this merges, for a feature that isn't running yet.
+        # This is not a blind spot: `flush_series` writes the state on every cycle including
+        # failures, so once the code is on the box the file exists within one cycle and the
+        # staleness/error branches below take over.
+        return FeedHealth(name, OK, "not deployed — no recorder cycle has run")
+    age = now - last_cycle_at
+    if age > max_age:
+        return FeedHealth(name, STALE, f"recorder last ran {ago(age)} ago — series may have gaps")
+    if last_error:
+        return FeedHealth(name, STALE, f"recorder write FAILED — {last_error}")
+    if in_window == 0:
+        # Idle by design, not broken. Report the total so a long quiet spell still shows the bank.
+        return FeedHealth(name, OK, f"idle — no IPO in window ({samples_total} samples banked)")
+    if samples_last_cycle == 0:
+        return FeedHealth(
+            name, STALE, f"{in_window} IPO(s) in window but nothing banked — recorder not writing"
+        )
+    written = "never" if last_write_at is None else f"{ago(now - last_write_at)} ago"
+    return FeedHealth(
+        name,
+        OK,
+        f"{samples_last_cycle} banked last cycle ({in_window} in window), "
+        f"last write {written}, {samples_total} total",
+    )
 
 
 def check_vm_heartbeat(

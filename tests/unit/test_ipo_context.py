@@ -275,11 +275,19 @@ def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
     """The model is *physically* unable to see display/context/archive data — via the real graph.
 
     A fresh interpreter imports EVERY module under features/ model/ calibration/ core/ (their whole
-    transitive import closure) and asserts NO ``ipo.service.*`` OR ``ipo.archive.*`` module lands in
-    ``sys.modules`` — the invariant behind V3-5/V3-6's boundary (the context store lives in
-    ipo.service.*) and V3-2's (the durable archive lives in ipo.archive.*). Stronger + rename-proof:
-    any indirect path from the scoring path into the service layer (context cache, /allotment join,
-    RHP join) or the archive fails this test.
+    transitive import closure) and asserts NO ``ipo.service.*``, ``ipo.archive.*`` OR
+    ``ipo.series.*`` lands in ``sys.modules`` — the invariant behind V3-5/V3-6's boundary (the store
+    lives in ipo.service.*), V3-2's (the durable archive lives in ipo.archive.*), and **v3-DP DP-1's
+    B1 WALL** (the forward subscription series lives in ipo.series.*). Stronger + rename-proof: any
+    indirect path from the scoring path into the service layer (context cache, /allotment join, RHP
+    join), the archive, or the series fails this test.
+
+    THE B1 WALL is why ``ipo.series`` is here, and it is the sharpest of the three. That store banks
+    the exact data a REJECTED model feature would want: B1 (subscription-trajectory-as-a-score-
+    feature) was gated in v2 and returned a NULL RESULT — it is in the graveyard. v3-DP collects,
+    serves, displays and analyses the trajectory; it must never FEED it to the model. This test is
+    what stops a future session mistaking "we have the data now" for "the gate is open". It does not
+    forbid a chart (DP-3) or an offline study (DP-4) from reading the series — only the scorer.
 
     Run in a subprocess because the pytest process has already imported the service layer (via the
     API tests), so this process's ``sys.modules`` cannot answer the question.
@@ -294,7 +302,8 @@ def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
         "            importlib.import_module(m.name)\n"
         "        except Exception:\n"
         "            pass\n"
-        "leaked = sorted(m for m in sys.modules if m.startswith(('ipo.service', 'ipo.archive')))\n"
+        "leaked = sorted(m for m in sys.modules "
+        "if m.startswith(('ipo.service', 'ipo.archive', 'ipo.series')))\n"
         "print('LEAK ' + ','.join(leaked) if leaked else 'CLEAN')\n"
     )
     env = {**os.environ, "PYTHONPATH": str(src) + os.pathsep + os.environ.get("PYTHONPATH", "")}
@@ -303,8 +312,10 @@ def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
     )
     assert result.returncode == 0, f"probe failed: {result.stderr}"
     assert result.stdout.strip().splitlines()[-1] == "CLEAN", (
-        "the scoring path transitively reaches ipo.service.* or ipo.archive.* — display/archive "
-        f"data could reach the model: {result.stdout} {result.stderr}"
+        "the scoring path transitively reaches ipo.service.*, ipo.archive.* or ipo.series.* — "
+        "display/archive data could reach the model, or (for ipo.series) the B1 wall is breached "
+        "and the subscription trajectory can reach the scorer, which is a GRAVEYARDED feature: "
+        f"{result.stdout} {result.stderr}"
     )
 
 

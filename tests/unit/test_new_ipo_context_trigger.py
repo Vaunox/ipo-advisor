@@ -16,7 +16,12 @@ from datetime import date
 from pathlib import Path
 from types import ModuleType
 
-from ipo.data.sources.nse import NseClient, NseCurrentIssue, NseSubscription
+from ipo.data.sources.nse import (
+    NseClient,
+    NseCurrentIssue,
+    NseSubscription,
+    NseSubscriptionSnapshot,
+)
 
 _ISSUE_A = NseCurrentIssue(
     symbol="ALPHACO",
@@ -63,6 +68,16 @@ class _CannedNse(NseClient):
 
     def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
         return _SUB
+
+    def subscription_snapshot(self, symbol: str, *, force: bool = False) -> NseSubscriptionSnapshot:
+        """v3-DP DP-1: the live path now asks for the snapshot (reading + provenance).
+
+        Delegates to this double's own canned ``subscription`` so the scoring behaviour under test
+        is unchanged; ``raw_content`` is a placeholder because these tests pass no recorder sink.
+        """
+        return NseSubscriptionSnapshot(
+            subscription=self.subscription(symbol, force=force), raw_content=b"{}"
+        )
 
     def past_issues(self, *, force: bool = False) -> list:  # type: ignore[type-arg]
         return []

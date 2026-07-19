@@ -20,7 +20,7 @@ from ipo.core.constants import IST
 from ipo.core.types import IPORecord, Segment
 from ipo.data.ingest.data_plane import refresh_data_plane
 from ipo.data.ingest.state import IngestStateStore
-from ipo.data.sources.nse import NseClient, NseSubscription
+from ipo.data.sources.nse import NseClient, NseSubscription, NseSubscriptionSnapshot
 from ipo.data.store.repository import ParquetRepository
 from ipo.service.ipo_context import ContextStore
 from ipo.vm.client import VmClient, VmUnavailable
@@ -54,6 +54,16 @@ class _FakeNse:
 
     def subscription(self, symbol: str, *, force: bool = False) -> NseSubscription:
         return NseSubscription(qib=None, nii=None, retail=None, total=None)
+
+    def subscription_snapshot(self, symbol: str, *, force: bool = False) -> NseSubscriptionSnapshot:
+        """v3-DP DP-1: the live path now asks for the snapshot (reading + provenance).
+
+        Delegates to this double's own canned ``subscription`` so the scoring behaviour under test
+        is unchanged; ``raw_content`` is a placeholder because these tests pass no recorder sink.
+        """
+        return NseSubscriptionSnapshot(
+            subscription=self.subscription(symbol, force=force), raw_content=b"{}"
+        )
 
     def past_issues(self, *, force: bool = False) -> list[object]:
         return []

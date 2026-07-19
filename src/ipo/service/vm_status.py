@@ -20,6 +20,7 @@ import requests
 
 from ipo.core.constants import IST
 from ipo.data.ingest.state import IngestStateStore
+from ipo.series.state import read_recorder_state
 from ipo.service.heartbeat import FeedHealth
 from ipo.service.oracle_login import read_oracle_login
 from ipo.service.vm_health import (
@@ -35,6 +36,7 @@ from ipo.service.vm_health import (
     check_ingest,
     check_keepalive,
     check_read_api,
+    check_recorder,
 )
 
 # The Upstox token is a fixed one-year read-only Analytics Token (V3-1 deploy): expires 01/07/2027.
@@ -111,6 +113,28 @@ def probe_read_api(base: str, *, timeout: float = 3.0) -> bool:
         return False
 
 
+def _recorder_row(data_dir: Path, now: datetime) -> FeedHealth:
+    """The v3-DP DP-1 recorder row.
+
+    Adding ONE ``FeedHealth`` here fans out to every health surface at once — the Telegram digest
+    (which iterates ``status.rows`` blindly), ``/status``, the DEGRADED rollup, and the 20-min
+    alert-check's break/recover transitions with their existing repeat-suppression. No second
+    writer to ``alert_state.json`` and no new machinery: the recorder inherits alerting rather than
+    inventing it.
+    """
+    state = read_recorder_state(data_dir)
+    return check_recorder(
+        "Recorder",
+        last_cycle_at=state.last_cycle_at,
+        last_write_at=state.last_write_at,
+        in_window=state.in_window_last_cycle,
+        samples_last_cycle=state.samples_last_cycle,
+        samples_total=state.samples_total,
+        last_error=state.last_error,
+        now=now,
+    )
+
+
 def build_status(
     data_dir: Path,
     *,
@@ -150,6 +174,7 @@ def build_status(
             max_age=VM_KEEPALIVE_MAX_AGE,
         ),
         check_bot_listener(_marker_time(data_dir / _BOT_MARKER), now),
+        _recorder_row(data_dir, now),
     ]
     oracle = assess_oracle_login(read_oracle_login(data_dir / _ORACLE_LOGIN_FILE), day)
     token = assess_token_expiry(token_expiry, day)
