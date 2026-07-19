@@ -30,6 +30,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from ipo.core.logging import get_logger
 from ipo.core.types import Verdict
 from ipo.data.ingest.state import IngestStateStore
 from ipo.service.calibration import load_calibration_view
@@ -44,9 +45,14 @@ from ipo.service.views import (
     IPODetail,
     IPOListRow,
     LogsView,
+    SeriesSampleView,
+    SeriesView,
     StatusView,
     VerdictTransitionView,
 )
+from ipo.vm.client import VmClient, VmUnavailable
+
+_log = get_logger("ipo.service.api")
 
 
 def create_app(
@@ -56,6 +62,7 @@ def create_app(
     ingest_state: IngestStateStore | None = None,
     context_store: ContextStore | None = None,
     log_dir: Path | None = None,
+    vm_client: VmClient | None = None,
 ) -> FastAPI:
     """Build the read-only advisory API over a composed ``VerdictEngine``.
 
@@ -66,6 +73,12 @@ def create_app(
     ``ingest_state`` (v3 BUG 1 / Defect 2) is the live-ingest freshness store ``/status`` serves;
     when absent (no live feed wired) ``/status`` reports ``live_ingest=false`` with null
     timestamps — it never invents a freshness it cannot prove.
+
+    ``vm_client`` (v3-DP DP-3a) is the SAME VM client the 30-min data-plane cycle uses — hoisted to
+    one construction site and passed to both, so there is one home for the VM connection rather than
+    two clients that could drift apart. It is used ONLY by ``/subscription-series/{ipo_id}``, an
+    on-demand pass-through; nothing here participates in the ingest cycle. Absent → that route
+    reports ``not_loaded`` and the app behaves exactly as before the VM existed.
 
     ``context_store`` (v3 V3-5/V3-6) is the display-only per-IPO Upstox context cache the
     ``/allotment`` tab and ``/context/{id}`` read (registrar, RHP link, …). When absent both report
@@ -220,6 +233,54 @@ def create_app(
                 registrar_state="not_loaded",
             )
         return build_ipo_context(record, context_store)
+
+    @app.get("/subscription-series/{ipo_id}", response_model=SeriesView)
+    def subscription_series(ipo_id: str) -> SeriesView:
+        """One IPO's banked subscription trajectory, fetched live from the VM (v3-DP DP-3a).
+
+        AN ON-DEMAND PASS-THROUGH, DELIBERATELY NOT CACHED AND NOT IN THE 30-MIN CYCLE. The series
+        is per-IPO and many rows; most IPOs are never opened. Pre-fetching every IPO's trajectory
+        each cycle — or keeping a local series store — would recreate exactly the volume problem
+        DP-2 solved by scoping the VM route to one IPO. Read fresh per request instead, like
+        ``/records`` reads fresh from disk: a recorder write is visible on the next open, with no
+        cache layer to go stale.
+
+        FOUR DISTINCT STATES, kept apart on purpose (see ``SeriesView``). The one that matters is
+        ``not_recorded`` vs ``unavailable``: "nothing was ever banked for this IPO" and "we could
+        not reach the VM" are different truths, and a chart conflating them would tell the user an
+        absence it cannot vouch for. There is NO local fallback — the recorder is VM-only, so no
+        local series exists to fall back to.
+
+        Logged either way so it lands in ``engine.log`` and the V3-16 console: ``series_from_vm``
+        on a successful fetch, ``vm_series_unavailable`` (warning) when the VM cannot answer —
+        mirroring ``records_from_vm`` / ``vm_records_fallback_local``.
+
+        404 if the IPO is unknown — a bad request, distinct from a known IPO with no series (200,
+        ``not_recorded``). B1 wall: this serves a chart, never the scorer.
+        """
+        record = engine.get_record(ipo_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"unknown ipo_id: {ipo_id}")
+        if vm_client is None:
+            # Dark-ship: no VM configured, exactly as before the VM existed. Not an error, and not
+            # "not_recorded" either — with no VM we have no basis to claim anything was or wasn't.
+            return SeriesView(ipo_id=ipo_id, available=False, state="not_loaded")
+        try:
+            envelope = vm_client.fetch_series(ipo_id)
+        except VmUnavailable as exc:
+            _log.warning("vm_series_unavailable", extra={"ipo_id": ipo_id, "error": str(exc)})
+            return SeriesView(ipo_id=ipo_id, available=False, state="unavailable")
+        samples = [SeriesSampleView(**s.model_dump()) for s in envelope.samples]
+        _log.info("series_from_vm", extra={"ipo_id": ipo_id, "samples": len(samples)})
+        return SeriesView(
+            ipo_id=ipo_id,
+            available=True,
+            # An answered-but-empty series is honest absence, NOT a failure.
+            state="recorded" if samples else "not_recorded",
+            # Per-IPO freshness, straight from DP-2's envelope — never the app-global clock.
+            refreshed_at=envelope.refreshed_at,
+            samples=samples,
+        )
 
     @app.get("/calibration", response_model=CalibrationView)
     def calibration() -> CalibrationView:

@@ -282,6 +282,12 @@ def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
     indirect path from the scoring path into the service layer (context cache, /allotment join, RHP
     join), the archive, or the series fails this test.
 
+    ``ipo.vm`` joined at v3-DP DP-3a. Until then the series lived only on the VM, in a DIFFERENT
+    PROCESS from the scorer, so "the model cannot see it" was partly true by geography. DP-3a brings
+    the series types and the fetch method into the engine's own process, so that had to become true
+    by import graph instead. ``ipo.vm`` was already unreachable when the prefix was added — this
+    strengthens the guard rather than fixing a breach, and pins it before an edit can weaken it.
+
     THE B1 WALL is why ``ipo.series`` is here, and it is the sharpest of the three. That store banks
     the exact data a REJECTED model feature would want: B1 (subscription-trajectory-as-a-score-
     feature) was gated in v2 and returned a NULL RESULT — it is in the graveyard. v3-DP collects,
@@ -303,7 +309,7 @@ def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
         "        except Exception:\n"
         "            pass\n"
         "leaked = sorted(m for m in sys.modules "
-        "if m.startswith(('ipo.service', 'ipo.archive', 'ipo.series')))\n"
+        "if m.startswith(('ipo.service', 'ipo.archive', 'ipo.series', 'ipo.vm')))\n"
         "print('LEAK ' + ','.join(leaked) if leaked else 'CLEAN')\n"
     )
     env = {**os.environ, "PYTHONPATH": str(src) + os.pathsep + os.environ.get("PYTHONPATH", "")}
@@ -312,9 +318,10 @@ def test_scoring_path_cannot_transitively_reach_service_or_archive() -> None:
     )
     assert result.returncode == 0, f"probe failed: {result.stderr}"
     assert result.stdout.strip().splitlines()[-1] == "CLEAN", (
-        "the scoring path transitively reaches ipo.service.*, ipo.archive.* or ipo.series.* — "
-        "display/archive data could reach the model, or (for ipo.series) the B1 wall is breached "
-        "and the subscription trajectory can reach the scorer, which is a GRAVEYARDED feature: "
+        "the scoring path transitively reaches ipo.service.*, ipo.archive.*, ipo.series.* or "
+        "ipo.vm.* — display/archive data could reach the model, or (for ipo.series / ipo.vm) the "
+        "B1 wall is breached and the subscription trajectory can reach the scorer, which is a "
+        "GRAVEYARDED feature: "
         f"{result.stdout} {result.stderr}"
     )
 
