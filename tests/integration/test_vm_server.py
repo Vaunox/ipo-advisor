@@ -8,6 +8,7 @@ it never imports the model (data-only — the VM cannot score), each store comes
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import date, datetime
@@ -133,7 +134,16 @@ def test_window_resets_so_a_limited_caller_recovers() -> None:
 
 
 def test_vm_server_never_imports_the_model() -> None:
-    """The VM serves inputs and cannot score — importing it must not pull the model/feature code."""
+    """The VM serves inputs and cannot score — importing it must not pull the model/feature code.
+
+    Runs in a subprocess because this process has already imported the scoring modules via other
+    tests, so its own ``sys.modules`` cannot answer the question. ``PYTHONPATH`` must be passed
+    explicitly: pytest puts ``src`` on the path via ``[tool.pytest.ini_options] pythonpath``, and
+    that does NOT reach a child process — without it the probe dies on ``ModuleNotFoundError`` and
+    the assertion below reports an empty leak-list as though the boundary had been breached. Same
+    pattern as the sibling closure guard in ``tests/unit/test_ipo_context.py``.
+    """
+    src = Path(__file__).resolve().parents[2] / "src"
     code = (
         "import sys, ipo.vm.server;"
         "bad=[m for m in sys.modules if m.split('.')[:2]==['ipo','model']"
@@ -141,5 +151,10 @@ def test_vm_server_never_imports_the_model() -> None:
         "print(','.join(sorted(bad)));"
         "sys.exit(1 if bad else 0)"
     )
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
-    assert result.returncode == 0, f"VM server pulled scoring modules: {result.stdout.strip()}"
+    env = {**os.environ, "PYTHONPATH": str(src) + os.pathsep + os.environ.get("PYTHONPATH", "")}
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    # stderr is included so a probe that never RAN is distinguishable from a real breach.
+    assert result.returncode == 0, (
+        f"VM server pulled scoring modules: {result.stdout.strip()!r} (stderr: "
+        f"{result.stderr.strip()!r})"
+    )
