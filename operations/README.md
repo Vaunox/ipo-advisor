@@ -740,6 +740,23 @@ Write it down here so the next session does not rediscover this by grep, and is 
 same `OnFailure` shortcut. If you need a new health signal, add a `FeedHealth` row fed by a fact the
 code owns — not by asking systemd how a unit is feeling.
 
+**Corollary — a health read must CREATE nothing, and the test is what enforces that.**
+`vm_status.build_status` is documented as a pure read and is called by `/status`, the 4×/day digest
+and the 20-min alert-check. During the DP-1 deploy it was caught *writing*: the recorder-state read
+constructed a store whose `__init__` mkdir'd, so restarting the bot conjured an empty
+`/opt/ipo/data/series/` before the recorder had run once. That matters because an empty series
+directory is precisely the evidence used to tell **"deployed but never run"** from **"not deployed
+at all"** — a health check that fabricates it destroys the diagnostic it is meant to report.
+
+Note the failure mode, because it is the general lesson: `read_recorder_state`'s own docstring
+already said *"the health surface must not construct a writer"*, one line above the code
+constructing one. **A docstring is a wish; a test is the enforcement.** The invariant is now pinned
+by `tests/unit/test_series_recorder.py::test_health_read_creates_nothing_not_even_a_directory`
+(the read creates no directory) and its companion
+`::test_health_read_still_reads_a_real_state_file` (so the fix cannot silently degrade into a read
+that "creates nothing" by doing nothing). A future edit that reintroduces mkdir-on-read fails the
+gate rather than being contradicted by prose nobody re-reads.
+
 ### Dev note — the scoring-path guard (Part I rule 1)
 
 Every v3 change must leave the scoring path byte-identical. Two checks, run on each branch:
