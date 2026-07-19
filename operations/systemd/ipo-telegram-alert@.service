@@ -6,6 +6,6 @@ Description=Telegram alert for failed unit %i (v3 V3-3)
 
 [Service]
 Type=oneshot
-User=ubuntu
+User=<vm-user>
 EnvironmentFile=/etc/ipo/telegram.env
 ExecStart=/opt/ipo/.venv/bin/python -c "from ipo.service.telegram import send_telegram, telegram_env; t,c=telegram_env(); send_telegram(t,c,\"WARN: %i errored (systemd OnFailure)\")"
