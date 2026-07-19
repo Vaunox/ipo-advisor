@@ -508,3 +508,11 @@ circle.ss-dot.ss-ret { fill:var(--marginal); stroke-width:1.5; }
 .ss-shimmer { fill:var(--panel2); animation:ss-pulse 1.4s ease-in-out infinite; }
 @keyframes ss-pulse { 0%,100% { opacity:.25; } 50% { opacity:.6; } }
 @media (prefers-reduced-motion:reduce) { .ss-shimmer { animation:none; opacity:.4; } }
+
+/* v3-DP DP-3b — the trend card centres its plot in whatever height the grid gives it.
+   `.det` stretches every card to its row's tallest sibling (matched bottom edges are this page's
+   rule — see the paired Verdict-history / Reference cards), but a plot has a fixed intrinsic
+   height, so this card always has spare room. Centring splits that space above and below instead
+   of leaving it all beneath the legend, where it read as an unfinished card. */
+.ss-card { display:flex; flex-direction:column; }
+.ss-body { flex:1; display:flex; flex-direction:column; justify-content:center; }
