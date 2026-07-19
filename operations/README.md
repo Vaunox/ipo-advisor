@@ -574,7 +574,7 @@ snapshot (`vm_status.build_status`) so what you see is consistent, and **all dar
    TELEGRAM_CHAT_ID=…
    ```
 3. **Three systemd units**, each with `EnvironmentFile=/etc/ipo/telegram.env` and
-   `User=ubuntu`, `WorkingDirectory=/opt/ipo`:
+   `User=<vm-user>`, `WorkingDirectory=/opt/ipo`:
    - `ipo-telegram-digest.service` (`oneshot`) + `.timer` (the four `OnCalendar=… Asia/Kolkata` lines
      above, `Persistent=true`);
    - `ipo-alert-check.service` (`oneshot`) + `.timer` (`OnBootSec=3min`, `OnUnitActiveSec=20min`,
