@@ -30,7 +30,7 @@ v3 has four parts, and they are ordered by risk, not by excitement:
 - **V3-4 (fallback + self-test)** — DONE (`6f393f0`).
 - **Emergent (not in this plan):** the new-IPO onset context trigger (`f658948`), the two-repo/two-key split (`be53dde`), the IP-scrub / public-repo move (`cb840f5`).
 
-**Bugs (Part III):** BUG 1 / 2 / 3 all fixed; Finding-④ (listing-strand detector) added. See `V3_PROGRESS.md`.
+**Bugs (Part III):** BUG 1 / 2 / 3 all fixed (`7d06c4c` carried Finding-④, the listing-strand detector, which is an emergent item not planned here). **BUG-4** (context cache never re-read — stale-forever on a long-lived process, `7b4de4f`, 2026-07-18) was found after this plan was written and is tracked in `docs/PROJECT_LOG.md` §6, not as a Part III item. See `V3_PROGRESS.md`.
 
 **Features (Part IV):**
 - **DONE:** V3-5 (RHP links), V3-6 (Allotment tab), V3-8 (`lot_size`), V3-11 (`isin`/`industry`).
@@ -39,7 +39,7 @@ v3 has four parts, and they are ordered by risk, not by excitement:
 
 **Cosmetic (Part V) — DONE:** V3-12 (logo), V3-13 (header refresh button), V3-14 (awaiting-listing collapse), V3-15 (readability pass) all shipped.
 
-**V3-16 (read-only debug console) — DONE, the last v3 build item; v3 is now BUILD-COMPLETE.** Built in two stages: **Stage 1**, the honest-logging audit that made every operational path narrate its outcome (merged `ca6a6ee`); **Stage 2**, the screen itself — a ring buffer + `RotatingFileHandler`/expiry + GET-only `/logs` on the engine, and an Option-A terminal overlay ("Console log") armed by a persistent, default-off `UiPrefs` toggle + the backtick key on the front end. Reads the log the engine already writes (no second path); redacted at the sink on both the file and the ring; read-only, GET-only; `MAX|Δprob|=0.0`. Gated + `/logs` live-proven against the real engine (branch `feat/v3-16-console`, pending review + the shipped-`.exe` visual proof). See `V3_PROGRESS.md`.
+**V3-16 (read-only debug console) — DONE, the last v3 build item; v3 is now BUILD-COMPLETE.** Built in two stages: **Stage 1**, the honest-logging audit that made every operational path narrate its outcome (merged `ca6a6ee`); **Stage 2**, the screen itself — a ring buffer + `RotatingFileHandler`/expiry + GET-only `/logs` on the engine, and an Option-A terminal overlay ("Console log") armed by a persistent, default-off `UiPrefs` toggle + the backtick key on the front end. Reads the log the engine already writes (no second path); redacted at the sink on both the file and the ring; read-only, GET-only; `MAX|Δprob|=0.0`. Gated + `/logs` live-proven against the real engine. **Stage 2 merged `1693e48` (2026-07-16)** — reviewed (two follow-ups landed under the merge) and running live in the shipped `.exe`; nothing outstanding. See `V3_PROGRESS.md`.
 
 **Open / deferred (tracked so they are not lost):**
 - **V3-9** — deferred (forward interval data; see above).

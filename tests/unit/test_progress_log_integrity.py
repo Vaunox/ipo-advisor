@@ -36,7 +36,12 @@ _SHIPPED = frozenset(
         "V3-8",
         "V3-10",
         "V3-11",
+        "V3-16",
+        # Not blueprint items (so `test_progress_rows_reference_real_blueprint_items` skips them by
+        # design), but shipped work whose row must not vanish: Finding-④ is emergent, BUG-4 was found
+        # after the plan was written and is tracked in docs/PROJECT_LOG.md §6.
         "Finding-④",
+        "BUG-4",
     }
 )
 
