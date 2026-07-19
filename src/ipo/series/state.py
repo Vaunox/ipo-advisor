@@ -103,9 +103,32 @@ class RecorderStateStore:
         return state
 
 
+def recorder_state_path(data_dir: Path) -> Path:
+    """Where the recorder state lives, computed WITHOUT touching the filesystem."""
+    return data_dir / "series" / _STATE_FILE
+
+
 def read_recorder_state(data_dir: Path) -> RecorderState:
-    """Convenience read for the health surface (which must not construct a writer)."""
-    return RecorderStateStore(data_dir).read()
+    """Read-only view for the health surface — creates nothing, not even a directory.
+
+    Deliberately does NOT go through ``RecorderStateStore``, whose ``__init__`` mkdirs the series
+    directory. ``vm_status.build_status`` documents itself as "a PURE read (no writes, no state
+    change)" and is called by ``/status``, the digest and the alert-check, so constructing a writer
+    here made a health read create directories on the box — observed live: the empty
+    ``data/series/`` appeared on a bot restart, before the recorder had ever run.
+
+    That is not merely untidy. An empty series directory conjured by a health check is exactly the
+    evidence a human uses to judge whether the recorder was deployed at all, so creating it as a
+    side effect makes "deployed but never run" and "not deployed" look identical on disk.
+    """
+    path = recorder_state_path(data_dir)
+    if not path.is_file():
+        return RecorderState()
+    try:
+        return RecorderState.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, ValidationError) as exc:
+        _log.warning("recorder_state_load_failed", extra={"error": str(exc)})
+        return RecorderState()
 
 
 __all__ = ["RecorderState", "RecorderStateStore", "read_recorder_state"]

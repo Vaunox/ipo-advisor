@@ -385,3 +385,28 @@ def test_recorder_state_file_is_json_and_atomic(tmp_path: Path) -> None:
     payload = json.loads(store.path.read_text(encoding="utf-8"))
     assert payload["last_error"] == "acme: nope"
     assert not store.path.with_suffix(store.path.suffix + ".tmp").exists()
+
+
+def test_health_read_creates_nothing_not_even_a_directory(tmp_path: Path) -> None:
+    """`vm_status.build_status` documents itself as a PURE read, and health surfaces call it often.
+
+    Observed live during the DP-1 deploy: restarting the telegram bot conjured an empty
+    `data/series/` before the recorder had ever run, because the health path constructed a writer
+    whose __init__ mkdirs. That makes "deployed but never run" and "not deployed" look identical on
+    disk — destroying the very evidence an operator uses to tell them apart.
+    """
+    from ipo.series.state import read_recorder_state
+
+    state = read_recorder_state(tmp_path)
+    assert state.last_cycle_at is None  # honest "never run"
+    assert not (tmp_path / "series").exists(), "a health READ created the series directory"
+
+
+def test_health_read_still_reads_a_real_state_file(tmp_path: Path) -> None:
+    """...and the no-mkdir read must still actually read, or we traded a bug for a blind spot."""
+    from ipo.series.state import read_recorder_state
+
+    RecorderStateStore(tmp_path).record_cycle(now=_NOW, in_window=2, written=2)
+    state = read_recorder_state(tmp_path)
+    assert state.last_cycle_at == _NOW
+    assert state.samples_last_cycle == 2 and state.samples_total == 2
