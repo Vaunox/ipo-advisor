@@ -84,7 +84,7 @@ _SHIPPED_V3 = frozenset(
 # row, but NOT a stale-STATUS row — a ledger item whose row still reads "NOT STARTED"/pending after
 # it shipped. That is precisely the V3-16 failure mode and it remains uncaught. "Is this status
 # true?" is not automatable in general, but "a shipped-ledger item must not read NOT STARTED" is.
-_SHIPPED_DP: frozenset[str] = frozenset({"DP-1", "DP-2", "DP-3a"})
+_SHIPPED_DP: frozenset[str] = frozenset({"DP-1", "DP-2", "DP-3a", "DP-3b"})
 
 
 @dataclass(frozen=True)
