@@ -470,3 +470,41 @@ body.compact .meter { margin-top:6px; }
 .cl-ln.err { background:color-mix(in srgb, var(--skip-bg) 45%, transparent); }
 .cl-ln .xN { color:var(--marginal); font-weight:700; }
 .cl-empty { padding:26px 16px; text-align:center; color:var(--tx3); font-family:'Fira Code', ui-monospace, monospace; font-size:12px; }
+
+/* --- v3-DP DP-3b: subscription trend chart -------------------------------------------------------
+   Namespaced ss-* alongside the existing rd-* reliability diagram, reusing the same tokens and the
+   same Fira-Code 8px tick treatment — a new surface must look like it was always there (V3-15). */
+.ss-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.ss-fresh { font-family:'Fira Code'; font-size:10px; color:var(--tx3); white-space:nowrap; }
+.ss-fresh .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; vertical-align:1px; }
+.ss-fresh.live .dot { background:var(--apply); }
+.ss-fresh.done .dot { background:var(--insuf); }
+.ss-svg { display:block; width:100%; height:auto; }
+.ss-axis { stroke:var(--line2); stroke-width:1; }
+.ss-grid { stroke:var(--line); stroke-width:1; stroke-dasharray:2 4; }
+.ss-tick { font-family:'Fira Code'; font-size:8px; fill:var(--tx3); }
+/* QIB takes the same green the Subscription card already gives it — one meaning, one colour. */
+.ss-qib { fill:none; stroke:var(--apply); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+.ss-nii { fill:none; stroke:var(--accent); stroke-width:1.6; stroke-linejoin:round; stroke-linecap:round; }
+.ss-ret { fill:none; stroke:var(--marginal); stroke-width:1.6; stroke-linejoin:round; stroke-linecap:round; }
+circle.ss-dot { stroke:var(--panel); stroke-width:1.5; }
+circle.ss-dot.ss-qib { fill:var(--apply); stroke-width:1.5; }
+circle.ss-dot.ss-nii { fill:var(--accent); stroke-width:1.5; }
+circle.ss-dot.ss-ret { fill:var(--marginal); stroke-width:1.5; }
+.ss-legend { display:flex; gap:16px; margin-top:10px; font-family:'Fira Code'; font-size:10px; color:var(--tx3); }
+.ss-legend .k { display:inline-flex; align-items:center; gap:6px; }
+.ss-legend i { width:14px; height:2px; border-radius:2px; display:inline-block; }
+.ss-legend i.ss-qib { background:var(--apply); }
+.ss-legend i.ss-nii { background:var(--accent); }
+.ss-legend i.ss-ret { background:var(--marginal); }
+.ss-legend b { color:var(--tx2); font-weight:500; margin-left:3px; }
+.ss-gapnote { font-family:'Fira Code'; font-size:9px; fill:var(--tx3); }
+.ss-msg { font-size:12px; fill:var(--tx3); }
+/* Amber is reserved for "we could not find out" — never for honest, known absence. */
+.ss-msg.warn { fill:var(--marginal); }
+.ss-sub { font-size:10px; fill:var(--tx3); font-family:'Fira Code'; }
+/* A CSS animation, not SMIL: an infinitely-repeating <animate> keeps the renderer from ever
+   settling, which wedges screenshot/print tooling. Honours reduced-motion like the rest of the app. */
+.ss-shimmer { fill:var(--panel2); animation:ss-pulse 1.4s ease-in-out infinite; }
+@keyframes ss-pulse { 0%,100% { opacity:.25; } 50% { opacity:.6; } }
+@media (prefers-reduced-motion:reduce) { .ss-shimmer { animation:none; opacity:.4; } }

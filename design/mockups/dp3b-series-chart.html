@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>DP-3b — subscription trend chart (preview)</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Tokens lifted verbatim from src/ipo/apps/pwa/src/styles.css — the preview must not invent colour. */
+:root{
+  --bg:#0a0d12; --panel:#0f141b; --panel2:#141b24; --line:#1e2732; --line2:#28323f;
+  --tx:#e6ecf3; --tx2:#a6b3c4; --tx3:#8090a4; --accent:#5aa2ff;
+  --apply:#3ddc84; --marginal:#f5c451; --skip:#ff5d63; --insuf:#7c8aa0;
+}
+html[data-theme=light]{
+  --bg:#eef1f5; --panel:#ffffff; --panel2:#f6f8fb; --line:#dde3ea; --line2:#cbd4de;
+  --tx:#0f172a; --tx2:#41506a; --tx3:#5f6d80; --accent:#2563eb;
+  --apply:#0f9d58; --marginal:#b7791f; --skip:#d63a3f; --insuf:#5b6b80;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:28px;background:var(--bg);color:var(--tx);font:14px/1.5 Inter,system-ui,sans-serif}
+h1{font-size:15px;font-weight:600;margin:0 0 4px}
+.lede{font-size:12px;color:var(--tx3);margin:0 0 24px;max-width:900px;line-height:1.7}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:18px;max-width:1500px}
+.wrap{display:flex;flex-direction:column;gap:6px}
+.label{font-family:'Fira Code';font-size:10px;color:var(--tx3);letter-spacing:.08em;text-transform:uppercase}
+.note{font-size:11px;color:var(--tx3);line-height:1.6;padding:0 2px}
+.note b{color:var(--tx2);font-weight:500}
+
+/* --- card chrome: matches .card / h3.sec in the app ------------------------ */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.sec{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin:0 0 2px}
+
+/* --- the chart (ss-* namespace, mirroring the existing rd-* convention) ---- */
+.ss-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+.ss-fresh{font-family:'Fira Code';font-size:10px;color:var(--tx3);white-space:nowrap}
+.ss-fresh .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.ss-fresh.live .dot{background:var(--apply)}
+.ss-fresh.done .dot{background:var(--insuf)}
+.ss-svg{display:block;width:100%;height:auto}
+.ss-axis{stroke:var(--line2);stroke-width:1}
+.ss-grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4}
+.ss-tick{font-family:'Fira Code';font-size:8px;fill:var(--tx3)}
+.ss-qib{fill:none;stroke:var(--apply);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.ss-nii{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.ss-ret{fill:none;stroke:var(--marginal);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.ss-dot{stroke:var(--panel);stroke-width:1.5}
+.ss-legend{display:flex;gap:16px;margin-top:10px;font-family:'Fira Code';font-size:10px;color:var(--tx3)}
+.ss-legend .k{display:inline-flex;align-items:center;gap:6px}
+.ss-legend i{width:14px;height:2px;border-radius:2px;display:inline-block}
+.ss-legend b{color:var(--tx2);font-weight:500;margin-left:3px}
+.ss-gapnote{font-family:'Fira Code';font-size:9px;fill:var(--tx3)}
+
+/* empty / unavailable / loading — all keep the frame, differ inside it */
+.ss-msg{font-size:12px;fill:var(--tx3);font-family:Inter,sans-serif}
+.ss-msg.warn{fill:var(--marginal)}
+.ss-sub{font-size:10px;fill:var(--tx3);font-family:'Fira Code'}
+.ss-shimmer{fill:var(--panel2);animation:ss-pulse 1.4s ease-in-out infinite}
+@keyframes ss-pulse{0%,100%{opacity:.25}50%{opacity:.6}}
+@media (prefers-reduced-motion:reduce){.ss-shimmer{animation:none;opacity:.4}}
+</style>
+</head>
+<body>
+<h1>DP-3b — subscription history chart · look preview</h1>
+<p class="lede" style="color:var(--marginal)">Copy below is SYNCED to the shipped <code>MESSAGES</code> map in <code>src/series.ts</code> — if they ever diverge, the component is the truth and this file is stale.</p>
+<p class="lede">
+Hand-rolled SVG in the <code>ss-*</code> namespace, mirroring the app's existing <code>rd-*</code>
+reliability diagram — no charting library, no new visual language (V3-15). Colours are the app's own
+tokens: QIB uses <b style="color:var(--apply)">--apply</b> (the same green the Subscription card already
+gives QIB), NII <b style="color:var(--accent)">--accent</b>, Retail <b style="color:var(--marginal)">--marginal</b>.
+Axis labels are Fira Code at 8px, exactly like <code>.rd-tick</code>.
+Toggle <a href="#" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';return false" style="color:var(--accent)">light / dark</a>.
+</p>
+<div class="grid" id="grid"></div>
+
+<script>
+const PAD = {l: 34, r: 12, t: 10, b: 22}
+const W = 390, H = 170
+
+function fmtMult(v){ return v >= 10 ? Math.round(v)+'x' : v.toFixed(2).replace(/0$/,'')+'x' }
+function fmtTime(iso){ const d=new Date(iso); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0') }
+
+// A gap = a cycle interval materially longer than the modal spacing. Runs are split there, so the
+// polyline BREAKS rather than bridging — the chart must never invent a reading the recorder refused
+// to fabricate.
+function splitRuns(samples){
+  if (samples.length < 2) return [samples]
+  const ts = samples.map(s => new Date(s.captured_at).getTime())
+  const deltas = ts.slice(1).map((t,i) => t - ts[i]).sort((a,b)=>a-b)
+  const median = deltas[Math.floor(deltas.length/2)]
+  const runs = [[samples[0]]]
+  for (let i=1;i<samples.length;i++){
+    if (ts[i]-ts[i-1] > median*1.8) runs.push([samples[i]])
+    else runs[runs.length-1].push(samples[i])
+  }
+  return runs
+}
+
+function chart(env){
+  const s = env.samples || []
+  const frame = (inner) => `<svg class="ss-svg" viewBox="0 0 ${W} ${H}" role="img">
+      <line class="ss-axis" x1="${PAD.l}" y1="${PAD.t}" x2="${PAD.l}" y2="${H-PAD.b}"/>
+      <line class="ss-axis" x1="${PAD.l}" y1="${H-PAD.b}" x2="${W-PAD.r}" y2="${H-PAD.b}"/>
+      ${inner}
+    </svg>`
+
+  if (env.state === 'loading')
+    return frame(`
+      <rect class="ss-shimmer" x="${PAD.l+1}" y="${H-PAD.b-46}" width="${W-PAD.l-PAD.r-2}" height="44" rx="3" opacity=".5">
+      </rect>
+      <text class="ss-msg" x="${(W+PAD.l)/2}" y="${H/2+2}" text-anchor="middle">Loading subscription history…</text>`)
+
+  if (env.state === 'unavailable')
+    return frame(`
+      <text class="ss-msg warn" x="${(W+PAD.l)/2}" y="${H/2-4}" text-anchor="middle">Subscription history unavailable</text>
+      <text class="ss-sub" x="${(W+PAD.l)/2}" y="${H/2+15}" text-anchor="middle">Couldn't reach the server — try again shortly.</text>`)
+
+  if (env.state === 'not_loaded')
+    return frame(`
+      <text class="ss-msg" x="${(W+PAD.l)/2}" y="${H/2+2}" text-anchor="middle">Subscription history isn't available here.</text>`)
+
+  if (env.state === 'not_recorded' || s.length === 0)
+    return frame(`
+      <text class="ss-msg" x="${(W+PAD.l)/2}" y="${H/2-4}" text-anchor="middle">No subscription history recorded</text>
+      <text class="ss-sub" x="${(W+PAD.l)/2}" y="${H/2+14}" text-anchor="middle">This IPO closed before we started recording.</text>`)
+
+  // --- recorded ---
+  const ts = s.map(v => new Date(v.captured_at).getTime())
+  const t0 = ts[0], t1 = ts[ts.length-1] || t0+1
+  const vals = s.flatMap(v => [v.qib_sub, v.nii_sub, v.retail_sub]).filter(v => v != null)
+  const vmax = Math.max(...vals, 0.1) * 1.15
+  const X = t => PAD.l + (t1===t0 ? (W-PAD.l-PAD.r)/2 : (t-t0)/(t1-t0)*(W-PAD.l-PAD.r))
+  const Y = v => (H-PAD.b) - (v/vmax)*(H-PAD.b-PAD.t)
+  const runs = splitRuns(s)
+  const poly = (key, cls) => runs.map(run => {
+      const pts = run.filter(v => v[key] != null)
+        .map(v => `${X(new Date(v.captured_at).getTime()).toFixed(1)},${Y(v[key]).toFixed(1)}`).join(' ')
+      if (!pts) return ''
+      // A single-sample run has no line to draw — mark the point so a sparse series is still visible.
+      return run.length === 1
+        ? `<circle class="ss-dot" cx="${pts.split(',')[0]}" cy="${pts.split(',')[1]}" r="2.6" fill="var(${cls})"/>`
+        : `<polyline class="${cls === '--apply' ? 'ss-qib' : cls === '--accent' ? 'ss-nii' : 'ss-ret'}" points="${pts}"/>`
+    }).join('')
+
+  const yticks = [0, vmax/2, vmax].map(v =>
+    `<line class="ss-grid" x1="${PAD.l}" y1="${Y(v).toFixed(1)}" x2="${W-PAD.r}" y2="${Y(v).toFixed(1)}"/>
+     <text class="ss-tick" x="${PAD.l-5}" y="${(Y(v)+3).toFixed(1)}" text-anchor="end">${fmtMult(v)}</text>`).join('')
+  const xticks = [t0, t1].map((t,i) =>
+    `<text class="ss-tick" x="${X(t).toFixed(1)}" y="${H-PAD.b+11}" text-anchor="${i===0?'start':'end'}">${fmtTime(new Date(t).toISOString())}</text>`).join('')
+  const gapMark = runs.length > 1
+    ? `<text class="ss-gapnote" x="${W-PAD.r}" y="${PAD.t+8}" text-anchor="end">${runs.length-1} gap${runs.length>2?'s':''} — not recorded</text>` : ''
+
+  return frame(yticks + xticks + gapMark
+    + poly('retail_sub','--marginal') + poly('nii_sub','--accent') + poly('qib_sub','--apply'))
+}
+
+// The legend carries each series' LATEST value. On real data NII and Retail can sit within 1% of
+// each other (cmll: 1.5927 vs 1.5776 -> 1.1px apart), so the lines genuinely overlap; without the
+// numbers a reader would think a series was missing rather than coincident. The chart stays honest
+// either way, but the value readout is what makes the overlap legible instead of invisible.
+function legend(samples){
+  const last = samples[samples.length-1] || {}
+  const row = (name, key, tok) => {
+    const v = last[key]
+    return `<span class="k"><i style="background:var(${tok})"></i>${name}<b>${v==null?'—':fmtMult(v)}</b></span>`
+  }
+  return `<div class="ss-legend">${row('QIB','qib_sub','--apply')}${row('NII','nii_sub','--accent')}${row('Retail','retail_sub','--marginal')}</div>`
+}
+
+function card(env, title, label, note){
+  const s = env.samples || []
+  const live = env.state === 'recorded' && env.open
+  const fresh = env.state === 'recorded'
+    ? `<span class="ss-fresh ${live?'live':'done'}"><span class="dot"></span>${live?'updating':'complete'} · ${s.length} reading${s.length===1?'':'s'}</span>`
+    : ''
+  return `<div class="wrap">
+    <div class="label">${label}</div>
+    <div class="card">
+      <div class="ss-head"><h3 class="sec">Subscription history</h3>${fresh}</div>
+      ${chart(env)}
+      ${env.state==='recorded' ? legend(s) : ''}
+    </div>
+    <div class="note">${note}</div>
+  </div>`
+}
+
+const CMLL = {"refreshed_at":"2026-07-19T20:54:54.056626+05:30","ipo_id":"cmll","samples":[{"schema_version":1,"captured_at":"2026-07-19T19:24:21.462252+05:30","source_update_time":"Updated as on 17-Jul-2026 17:00:00","qib_sub":0.2933439937823973,"nii_sub":1.5926609711721422,"snii_sub":2.117380529961533,"bnii_sub":1.3303016605264943,"retail_sub":1.5775728443040182,"total_sub":1.2138836504815513},{"schema_version":1,"captured_at":"2026-07-19T19:54:33.879699+05:30","source_update_time":"Updated as on 17-Jul-2026 17:00:00","qib_sub":0.2933439937823973,"nii_sub":1.5926609711721422,"snii_sub":2.117380529961533,"bnii_sub":1.3303016605264943,"retail_sub":1.5775728443040182,"total_sub":1.2138836504815513},{"schema_version":1,"captured_at":"2026-07-19T20:24:37.057415+05:30","source_update_time":"Updated as on 17-Jul-2026 17:00:00","qib_sub":0.2933439937823973,"nii_sub":1.5926609711721422,"snii_sub":2.117380529961533,"bnii_sub":1.3303016605264943,"retail_sub":1.5775728443040182,"total_sub":1.2138836504815513},{"schema_version":1,"captured_at":"2026-07-19T20:54:54.056626+05:30","source_update_time":"Updated as on 17-Jul-2026 17:00:00","qib_sub":0.2933439937823973,"nii_sub":1.5926609711721422,"snii_sub":2.117380529961533,"bnii_sub":1.3303016605264943,"retail_sub":1.5775728443040182,"total_sub":1.2138836504815513}]}
+const FULL = {"refreshed_at":"2026-05-16T09:30:00+05:30","ipo_id":"fixture-testco","samples":[{"schema_version":1,"captured_at":"2026-05-15T10:00:00+05:30","source_update_time":"Updated as on 15-May-2026 10:00:00","qib_sub":0.436,"nii_sub":0.2616,"snii_sub":0.3488,"bnii_sub":0.218,"retail_sub":0.1744,"total_sub":0.3052},{"schema_version":1,"captured_at":"2026-05-15T10:30:00+05:30","source_update_time":"Updated as on 15-May-2026 10:30:00","qib_sub":0.4752,"nii_sub":0.2851,"snii_sub":0.3802,"bnii_sub":0.2376,"retail_sub":0.1901,"total_sub":0.3326},{"schema_version":1,"captured_at":"2026-05-15T11:00:00+05:30","source_update_time":"Updated as on 15-May-2026 11:00:00","qib_sub":0.518,"nii_sub":0.3108,"snii_sub":0.4144,"bnii_sub":0.259,"retail_sub":0.2072,"total_sub":0.3626},{"schema_version":1,"captured_at":"2026-05-15T11:30:00+05:30","source_update_time":"Updated as on 15-May-2026 11:30:00","qib_sub":0.5646,"nii_sub":0.3388,"snii_sub":0.4517,"bnii_sub":0.2823,"retail_sub":0.2258,"total_sub":0.3952},{"schema_version":1,"captured_at":"2026-05-15T12:00:00+05:30","source_update_time":"Updated as on 15-May-2026 12:00:00","qib_sub":0.6154,"nii_sub":0.3692,"snii_sub":0.4923,"bnii_sub":0.3077,"retail_sub":0.2462,"total_sub":0.4308},{"schema_version":1,"captured_at":"2026-05-15T12:30:00+05:30","source_update_time":"Updated as on 15-May-2026 12:30:00","qib_sub":0.6708,"nii_sub":0.4025,"snii_sub":0.5366,"bnii_sub":0.3354,"retail_sub":0.2683,"total_sub":0.4696},{"schema_version":1,"captured_at":"2026-05-15T13:00:00+05:30","source_update_time":"Updated as on 15-May-2026 13:00:00","qib_sub":0.7312,"nii_sub":0.4387,"snii_sub":0.585,"bnii_sub":0.3656,"retail_sub":0.2925,"total_sub":0.5118},{"schema_version":1,"captured_at":"2026-05-15T13:30:00+05:30","source_update_time":"Updated as on 15-May-2026 13:30:00","qib_sub":0.797,"nii_sub":0.4782,"snii_sub":0.6376,"bnii_sub":0.3985,"retail_sub":0.3188,"total_sub":0.5579},{"schema_version":1,"captured_at":"2026-05-15T14:00:00+05:30","source_update_time":"Updated as on 15-May-2026 14:00:00","qib_sub":0.8687,"nii_sub":0.5212,"snii_sub":0.695,"bnii_sub":0.4344,"retail_sub":0.3475,"total_sub":0.6081},{"schema_version":1,"captured_at":"2026-05-15T14:30:00+05:30","source_update_time":"Updated as on 15-May-2026 14:30:00","qib_sub":0.9469,"nii_sub":0.5681,"snii_sub":0.7575,"bnii_sub":0.4734,"retail_sub":0.3788,"total_sub":0.6628},{"schema_version":1,"captured_at":"2026-05-15T15:00:00+05:30","source_update_time":"Updated as on 15-May-2026 15:00:00","qib_sub":1.0321,"nii_sub":0.6193,"snii_sub":0.8257,"bnii_sub":0.5161,"retail_sub":0.4128,"total_sub":0.7225},{"schema_version":1,"captured_at":"2026-05-15T15:30:00+05:30","source_update_time":"Updated as on 15-May-2026 15:30:00","qib_sub":1.125,"nii_sub":0.675,"snii_sub":0.9,"bnii_sub":0.5625,"retail_sub":0.45,"total_sub":0.7875},{"schema_version":1,"captured_at":"2026-05-15T16:00:00+05:30","source_update_time":"Updated as on 15-May-2026 16:00:00","qib_sub":1.2263,"nii_sub":0.7358,"snii_sub":0.981,"bnii_sub":0.6131,"retail_sub":0.4905,"total_sub":0.8584},{"schema_version":1,"captured_at":"2026-05-15T16:30:00+05:30","source_update_time":"Updated as on 15-May-2026 16:30:00","qib_sub":1.3367,"nii_sub":0.802,"snii_sub":1.0694,"bnii_sub":0.6683,"retail_sub":0.5347,"total_sub":0.9357},{"schema_version":1,"captured_at":"2026-05-15T17:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":1.457,"nii_sub":0.8742,"snii_sub":1.1656,"bnii_sub":0.7285,"retail_sub":0.5828,"total_sub":1.0199},{"schema_version":1,"captured_at":"2026-05-15T17:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:30:00","qib_sub":1.5881,"nii_sub":0.9529,"snii_sub":1.2705,"bnii_sub":0.7941,"retail_sub":0.6352,"total_sub":1.1117},{"schema_version":1,"captured_at":"2026-05-15T18:00:00+05:30","source_update_time":"Updated as on 15-May-2026 18:00:00","qib_sub":1.731,"nii_sub":1.0386,"snii_sub":1.3848,"bnii_sub":0.8655,"retail_sub":0.6924,"total_sub":1.2117},{"schema_version":1,"captured_at":"2026-05-15T18:30:00+05:30","source_update_time":"Updated as on 15-May-2026 18:30:00","qib_sub":1.8868,"nii_sub":1.1321,"snii_sub":1.5094,"bnii_sub":0.9434,"retail_sub":0.7547,"total_sub":1.3208},{"schema_version":1,"captured_at":"2026-05-15T19:00:00+05:30","source_update_time":"Updated as on 15-May-2026 19:00:00","qib_sub":2.0566,"nii_sub":1.234,"snii_sub":1.6453,"bnii_sub":1.0283,"retail_sub":0.8226,"total_sub":1.4396},{"schema_version":1,"captured_at":"2026-05-15T19:30:00+05:30","source_update_time":"Updated as on 15-May-2026 19:30:00","qib_sub":2.2417,"nii_sub":1.345,"snii_sub":1.7934,"bnii_sub":1.1208,"retail_sub":0.8967,"total_sub":1.5692},{"schema_version":1,"captured_at":"2026-05-15T20:00:00+05:30","source_update_time":"Updated as on 15-May-2026 20:00:00","qib_sub":2.4435,"nii_sub":1.4661,"snii_sub":1.9548,"bnii_sub":1.2217,"retail_sub":0.9774,"total_sub":1.7104},{"schema_version":1,"captured_at":"2026-05-15T20:30:00+05:30","source_update_time":"Updated as on 15-May-2026 20:30:00","qib_sub":2.6634,"nii_sub":1.598,"snii_sub":2.1307,"bnii_sub":1.3317,"retail_sub":1.0654,"total_sub":1.8644},{"schema_version":1,"captured_at":"2026-05-15T21:00:00+05:30","source_update_time":"Updated as on 15-May-2026 21:00:00","qib_sub":2.9031,"nii_sub":1.7419,"snii_sub":2.3225,"bnii_sub":1.4515,"retail_sub":1.1612,"total_sub":2.0322},{"schema_version":1,"captured_at":"2026-05-15T21:30:00+05:30","source_update_time":"Updated as on 15-May-2026 21:30:00","qib_sub":3.1644,"nii_sub":1.8986,"snii_sub":2.5315,"bnii_sub":1.5822,"retail_sub":1.2658,"total_sub":2.2151},{"schema_version":1,"captured_at":"2026-05-15T22:00:00+05:30","source_update_time":"Updated as on 15-May-2026 22:00:00","qib_sub":3.4492,"nii_sub":2.0695,"snii_sub":2.7594,"bnii_sub":1.7246,"retail_sub":1.3797,"total_sub":2.4144},{"schema_version":1,"captured_at":"2026-05-15T22:30:00+05:30","source_update_time":"Updated as on 15-May-2026 22:30:00","qib_sub":3.7596,"nii_sub":2.2558,"snii_sub":3.0077,"bnii_sub":1.8798,"retail_sub":1.5038,"total_sub":2.6317},{"schema_version":1,"captured_at":"2026-05-15T23:00:00+05:30","source_update_time":"Updated as on 15-May-2026 23:00:00","qib_sub":4.098,"nii_sub":2.4588,"snii_sub":3.2784,"bnii_sub":2.049,"retail_sub":1.6392,"total_sub":2.8686},{"schema_version":1,"captured_at":"2026-05-15T23:30:00+05:30","source_update_time":"Updated as on 15-May-2026 23:30:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T00:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T00:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T01:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T01:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T02:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T02:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T03:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T03:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T04:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T04:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T05:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T05:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T06:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T06:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T07:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T07:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T08:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T08:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T09:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T09:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268}]}
+const GAPPED = {"refreshed_at":"2026-05-16T09:30:00+05:30","ipo_id":"fixture-gapco","samples":[{"schema_version":1,"captured_at":"2026-05-15T10:00:00+05:30","source_update_time":"Updated as on 15-May-2026 10:00:00","qib_sub":0.436,"nii_sub":0.2616,"snii_sub":0.3488,"bnii_sub":0.218,"retail_sub":0.1744,"total_sub":0.3052},{"schema_version":1,"captured_at":"2026-05-15T10:30:00+05:30","source_update_time":"Updated as on 15-May-2026 10:30:00","qib_sub":0.4752,"nii_sub":0.2851,"snii_sub":0.3802,"bnii_sub":0.2376,"retail_sub":0.1901,"total_sub":0.3326},{"schema_version":1,"captured_at":"2026-05-15T11:00:00+05:30","source_update_time":"Updated as on 15-May-2026 11:00:00","qib_sub":0.518,"nii_sub":0.3108,"snii_sub":0.4144,"bnii_sub":0.259,"retail_sub":0.2072,"total_sub":0.3626},{"schema_version":1,"captured_at":"2026-05-15T11:30:00+05:30","source_update_time":"Updated as on 15-May-2026 11:30:00","qib_sub":0.5646,"nii_sub":0.3388,"snii_sub":0.4517,"bnii_sub":0.2823,"retail_sub":0.2258,"total_sub":0.3952},{"schema_version":1,"captured_at":"2026-05-15T12:00:00+05:30","source_update_time":"Updated as on 15-May-2026 12:00:00","qib_sub":0.6154,"nii_sub":0.3692,"snii_sub":0.4923,"bnii_sub":0.3077,"retail_sub":0.2462,"total_sub":0.4308},{"schema_version":1,"captured_at":"2026-05-15T12:30:00+05:30","source_update_time":"Updated as on 15-May-2026 12:30:00","qib_sub":0.6708,"nii_sub":0.4025,"snii_sub":0.5366,"bnii_sub":0.3354,"retail_sub":0.2683,"total_sub":0.4696},{"schema_version":1,"captured_at":"2026-05-15T13:00:00+05:30","source_update_time":"Updated as on 15-May-2026 13:00:00","qib_sub":0.7312,"nii_sub":0.4387,"snii_sub":0.585,"bnii_sub":0.3656,"retail_sub":0.2925,"total_sub":0.5118},{"schema_version":1,"captured_at":"2026-05-15T13:30:00+05:30","source_update_time":"Updated as on 15-May-2026 13:30:00","qib_sub":0.797,"nii_sub":0.4782,"snii_sub":0.6376,"bnii_sub":0.3985,"retail_sub":0.3188,"total_sub":0.5579},{"schema_version":1,"captured_at":"2026-05-15T14:00:00+05:30","source_update_time":"Updated as on 15-May-2026 14:00:00","qib_sub":0.8687,"nii_sub":0.5212,"snii_sub":0.695,"bnii_sub":0.4344,"retail_sub":0.3475,"total_sub":0.6081},{"schema_version":1,"captured_at":"2026-05-15T14:30:00+05:30","source_update_time":"Updated as on 15-May-2026 14:30:00","qib_sub":0.9469,"nii_sub":0.5681,"snii_sub":0.7575,"bnii_sub":0.4734,"retail_sub":0.3788,"total_sub":0.6628},{"schema_version":1,"captured_at":"2026-05-15T15:00:00+05:30","source_update_time":"Updated as on 15-May-2026 15:00:00","qib_sub":1.0321,"nii_sub":0.6193,"snii_sub":0.8257,"bnii_sub":0.5161,"retail_sub":0.4128,"total_sub":0.7225},{"schema_version":1,"captured_at":"2026-05-15T15:30:00+05:30","source_update_time":"Updated as on 15-May-2026 15:30:00","qib_sub":1.125,"nii_sub":0.675,"snii_sub":0.9,"bnii_sub":0.5625,"retail_sub":0.45,"total_sub":0.7875},{"schema_version":1,"captured_at":"2026-05-15T22:00:00+05:30","source_update_time":"Updated as on 15-May-2026 22:00:00","qib_sub":3.4492,"nii_sub":2.0695,"snii_sub":2.7594,"bnii_sub":1.7246,"retail_sub":1.3797,"total_sub":2.4144},{"schema_version":1,"captured_at":"2026-05-15T22:30:00+05:30","source_update_time":"Updated as on 15-May-2026 22:30:00","qib_sub":3.7596,"nii_sub":2.2558,"snii_sub":3.0077,"bnii_sub":1.8798,"retail_sub":1.5038,"total_sub":2.6317},{"schema_version":1,"captured_at":"2026-05-15T23:00:00+05:30","source_update_time":"Updated as on 15-May-2026 23:00:00","qib_sub":4.098,"nii_sub":2.4588,"snii_sub":3.2784,"bnii_sub":2.049,"retail_sub":1.6392,"total_sub":2.8686},{"schema_version":1,"captured_at":"2026-05-15T23:30:00+05:30","source_update_time":"Updated as on 15-May-2026 23:30:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T00:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T00:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T01:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T01:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T02:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T02:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T03:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T03:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T04:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T04:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T05:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T05:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T06:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T06:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T07:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T07:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T08:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T08:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T09:00:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268},{"schema_version":1,"captured_at":"2026-05-16T09:30:00+05:30","source_update_time":"Updated as on 15-May-2026 17:00:00","qib_sub":4.4668,"nii_sub":2.6801,"snii_sub":3.5734,"bnii_sub":2.2334,"retail_sub":1.7867,"total_sub":3.1268}]}
+const SPARSE = {"refreshed_at":"2026-05-15T10:00:00+05:30","ipo_id":"fixture-mockon","samples":[{"schema_version":1,"captured_at":"2026-05-15T10:00:00+05:30","source_update_time":"Updated as on 15-May-2026 10:00:00","qib_sub":0.4,"nii_sub":0.24,"snii_sub":0.32,"bnii_sub":0.2,"retail_sub":0.16,"total_sub":0.28}]}
+
+const cards = [
+  card({state:'recorded', samples:CMLL.samples, open:true}, '', 'A · REAL DATA — cmll, live now',
+    '<b>The real banked curve.</b> 4 readings, and it is <b>flat</b> — the book genuinely did not move (Sunday, no bidding). A flat line is the honest render of that: recorded, unmoving, signal. Freshness reads <b>updating</b> because the book is still open.'),
+  card({state:'recorded', samples:FULL.samples, open:false}, '', 'B · FULL TRAJECTORY — fixture',
+    '<b>The normal case.</b> 48 readings across the open→close window, demand building. Note the flat weekend stretch mid-curve — recorded, not missing. Freshness reads <b>complete</b>: the book has closed.'),
+  card({state:'recorded', samples:GAPPED.samples, open:false}, '', 'C · FETCH GAP — fixture',
+    '<b>The line BREAKS.</b> DP-1 banked nothing across that window, so the chart draws nothing — never an interpolated bridge. The gap is annotated so it reads as absence, not as a rendering artefact.'),
+  card({state:'recorded', samples:SPARSE.samples, open:true}, '', 'D · SPARSE — one reading',
+    'A single sample has no line to draw, so it renders as a <b>point</b> rather than vanishing — the recorder deployed mid-book case.'),
+  card({state:'not_recorded', samples:[]}, '', 'E · NOT RECORDED — the History-5 case',
+    '<b>Frame renders, field empty.</b> Card, axes and chrome all present; only the line is absent. Reads as <b>never watched</b>, not as a failure.'),
+  card({state:'unavailable', samples:[]}, '', 'F · UNAVAILABLE — VM unreachable',
+    '<b>Visually distinct from E</b>, and deliberately so: amber, and it names a <b>connection failure</b> rather than the IPO's history. Different subject, different truth — without explaining our bookkeeping to the reader.'),
+  card({state:'loading', samples:[]}, '', 'G · LOADING — the ≤10s window',
+    'Shown while DP-3a waits on the VM. Without this the frame would flash the <b>E</b> empty-state and read as "never recorded" before resolving to <b>F</b> — a lie with a delay on it.'),
+  card({state:'not_loaded', samples:[]}, '', 'H · NOT LOADED — dark-ship build',
+    'No VM configured at all. Neutral wording — with no data plane we have no basis to claim anything was or was not recorded.'),
+]
+document.getElementById('grid').innerHTML = cards.join('')
+</script>
+</body>
+</html>

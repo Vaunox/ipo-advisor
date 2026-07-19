@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useIpo, useIpoContext, useTransitionsFor } from '../api/hooks'
+import { useIpo, useIpoContext, useSubscriptionSeries, useTransitionsFor } from '../api/hooks'
 import type { IPODetail, IPOFeatures, IpoContextView, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { Loading } from '../components/Loading'
+import { SeriesChart } from '../components/SeriesChart'
+import { chartState } from '../series'
 import { isAllowedRhpUrl, openExternalUrl } from '../external'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
@@ -257,6 +259,11 @@ function Contributions({ d }: { d: IPODetail }) {
 export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: d, isLoading, isError, refetch } = useIpo(id)
   const { data: ctx } = useIpoContext(id) // display-only Upstox context (RHP, lot) — never scored
+  // v3-DP DP-3b — the banked subscription history for the trend chart. Display-only; it reaches a
+  // chart and never the scorer (the B1 wall). `isLoading` is read so the chart can show a loading
+  // state instead of flashing the empty frame, which would read as "never recorded" and then change
+  // its mind — the engine's VM call can take up to ~10s before it answers "unavailable".
+  const series = useSubscriptionSeries(id)
   const [copied, setCopied] = useState(false)
 
   if (isLoading) return <Loading label="Loading verdict…" />
@@ -449,6 +456,12 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
             </div>
           </div>
         </div>
+
+        <SeriesChart
+          view={series.data}
+          state={chartState(series.data, series.isLoading)}
+          bookClosed={!!f.book_closed}
+        />
 
         <div className="card">
           <h3 className="sec">Watch items</h3>

@@ -10,6 +10,7 @@ import type {
   IPODetail,
   IPOListRow,
   IpoContextView,
+  SeriesView,
   StatusView,
   Verdict,
   VerdictTransition,
@@ -68,6 +69,17 @@ export const useIpoContext = (id: string | null) =>
   useQuery({
     queryKey: ['context', id],
     queryFn: () => apiGet<IpoContextView>(`/context/${id}`),
+    enabled: !!id,
+  })
+
+// v3-DP DP-3b — one IPO's banked subscription history for the trend chart. Display-only; the
+// series reaches a chart and NEVER the scorer (the B1 wall, enforced by the import-boundary test).
+// An on-demand pass-through: the engine calls the VM per request, so a recorder write shows on the
+// next open with no cache to go stale.
+export const useSubscriptionSeries = (id: string | null) =>
+  useQuery({
+    queryKey: ['series', id],
+    queryFn: () => apiGet<SeriesView>(`/subscription-series/${id}`),
     enabled: !!id,
   })
 

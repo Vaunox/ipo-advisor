@@ -214,3 +214,35 @@ export interface LogsResponse {
   last_seq: number
   source: string
 }
+
+// --- v3-DP DP-3b: one IPO's banked subscription history ------------------------------------------
+//
+// Mirrors the engine's SeriesView (service/views.py). The four `state` values are the DP-3a
+// contract and are load-bearing: `not_recorded` (the server answered — nothing was ever banked) and
+// `unavailable` (we could not reach the server) are DIFFERENT TRUTHS and must never be collapsed,
+// which is why the UI branches on `state` and not on `samples.length`.
+export type SeriesState = 'recorded' | 'not_recorded' | 'unavailable' | 'not_loaded'
+
+// The wire projection, trimmed by DP-2: the plotted reading only. The full NSE response and every
+// category row stay on the VM (a stored row is ~6.2 KB vs ~376 B here) — the chart never needs them.
+export interface SeriesSample {
+  schema_version: number
+  captured_at: string
+  source_update_time: string | null
+  qib_sub: number | null
+  nii_sub: number | null
+  snii_sub: number | null
+  bnii_sub: number | null
+  retail_sub: number | null
+  total_sub: number | null
+}
+
+export interface SeriesView {
+  ipo_id: string
+  available: boolean
+  state: SeriesState
+  // PER-IPO freshness — the newest reading banked for THIS ipo, not the app-global clock (which
+  // would misreport a closed, complete curve as stale).
+  refreshed_at: string | null
+  samples: SeriesSample[]
+}
