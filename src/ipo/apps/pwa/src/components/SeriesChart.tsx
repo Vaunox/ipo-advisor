@@ -35,7 +35,7 @@ function Frame({ children }: { children?: React.ReactNode }) {
   // to show"; a missing card would read as "this IPO has no such thing", which is a different and
   // wrong claim.
   return (
-    <svg className="ss-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Subscription history">
+    <svg className="ss-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Subscription trend">
       <line className="ss-axis" x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={H - PAD.b} />
       <line className="ss-axis" x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b} />
       {children}
@@ -136,10 +136,10 @@ export function SeriesChart({ view, state, bookClosed }: { view: SeriesView | un
   const last = plotting ? view.samples[view.samples.length - 1] : undefined
 
   return (
-    <div className="card">
+    <div className="card ss-card">
       <div className="ss-head">
         <h3 className="sec" style={{ margin: 0 }}>
-          Subscription history
+          Subscription Trend
         </h3>
         {plotting && view && (
           <span className={`ss-fresh ${bookClosed ? 'done' : 'live'}`}>
@@ -149,23 +149,33 @@ export function SeriesChart({ view, state, bookClosed }: { view: SeriesView | un
         )}
       </div>
 
-      {plotting && view ? <Plot samples={view.samples} /> : <Message state={state as Exclude<ChartState, 'recorded'>} />}
+      {/* The grid stretches this card to its row's tallest sibling (the ~535px Subscription card),
+          and the plot has a FIXED intrinsic height, so leftover space is unavoidable here without
+          breaking the page's matched-bottom-edge rule. Centring splits it above and below, which
+          reads as deliberate composition; all of it dumped underneath read as an unfinished card. */}
+      <div className="ss-body">
+        {plotting && view ? (
+          <Plot samples={view.samples} />
+        ) : (
+          <Message state={state as Exclude<ChartState, 'recorded'>} />
+        )}
 
-      {plotting && last && (
-        // The legend carries each series' LATEST value. On real data NII and Retail can sit within
-        // 1% of each other (cmll: 1.5927 vs 1.5776 — about a pixel apart), so the lines genuinely
-        // coincide; without the numbers a reader would think a series was missing rather than
-        // overlapping.
-        <div className="ss-legend">
-          {[...SERIES].reverse().map(({ key, cls, label }) => (
-            <span className="k" key={key}>
-              <i className={cls} />
-              {label}
-              <b>{last[key] == null ? '—' : fmtMultiple(last[key] as number)}</b>
-            </span>
-          ))}
-        </div>
-      )}
+        {plotting && last && (
+          // The legend carries each series' LATEST value. On real data NII and Retail can sit
+          // within 1% of each other (cmll: 1.5927 vs 1.5776 — about a pixel apart), so the lines
+          // genuinely coincide; without the numbers a reader would think a series was missing
+          // rather than overlapping.
+          <div className="ss-legend">
+            {[...SERIES].reverse().map(({ key, cls, label }) => (
+              <span className="k" key={key}>
+                <i className={cls} />
+                {label}
+                <b>{last[key] == null ? '—' : fmtMultiple(last[key] as number)}</b>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
