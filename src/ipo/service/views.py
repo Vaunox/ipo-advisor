@@ -276,3 +276,61 @@ class LogsView(BaseModel):
     entries: list[dict[str, Any]]
     last_seq: int
     source: str
+
+
+class SeriesSampleView(BaseModel):
+    """One point on an IPO's subscription curve, as the engine re-serves it (v3-DP DP-3a).
+
+    A pass-through of DP-2's wire shape — deliberately NOT re-widened here. The VM already trimmed
+    the stored row (~6.2 KB) down to the plotted reading (~376 B); re-adding `raw_response` or the
+    category rows on this hop would undo that saving for a chart that never draws them.
+    """
+
+    schema_version: int
+    captured_at: datetime
+    source_update_time: str | None = None
+    qib_sub: float | None = None
+    nii_sub: float | None = None
+    snii_sub: float | None = None
+    bnii_sub: float | None = None
+    retail_sub: float | None = None
+    total_sub: float | None = None
+
+
+class SeriesView(BaseModel):
+    """One IPO's banked subscription trajectory for the detail page (v3-DP DP-3a).
+
+    DISPLAY ONLY, AND STRUCTURALLY SO. This is the app-side end of the B1 wall: the trajectory
+    reaches a chart and never the scorer. B1 (subscription-trajectory-as-a-score-feature) was gated
+    in v2 and returned a null result — it is in the graveyard, and the import-boundary test keeps
+    that a fact about the import graph rather than a promise in a docstring.
+
+    ``state`` carries FOUR distinct truths, and keeping them apart is the whole point of this view
+    (the same discipline as ``IpoContextView.rhp_state`` distinguishing "not filed yet" from "cache
+    is stale"):
+
+    * ``recorded``      — the VM answered and this IPO has banked samples.
+    * ``not_recorded``  — the VM answered and there is NO series: the IPO closed before the recorder
+      existed, or its book never opened while the recorder ran. Honest absence, ``available=True``
+      because the answer itself is trustworthy. This is the months-long common case and the whole
+      History page.
+    * ``unavailable``   — the VM could not be reached, or sent a shape we refuse to trust. NOT the
+      same as empty: we do not know what the series holds. There is deliberately NO local fallback —
+      the recorder is VM-only, so no local series exists, and reporting ``[]`` here would state an
+      absence we cannot vouch for.
+    * ``not_loaded``    — no VM is configured at all (dark-ship). The app behaves as it did before
+      the VM existed; not an error.
+
+    Collapsing ``not_recorded`` into ``unavailable`` (or the reverse) would make the UI claim
+    knowledge it lacks — so they differ in BOTH ``available`` and ``state``, and a test pins it.
+
+    ``refreshed_at`` is PER-IPO — the newest reading banked for this ipo_id, straight from DP-2's
+    envelope — never the app-global ``last_success``. An open IPO is still growing; one that closed
+    last week is complete, and the global clock would misreport it as stale.
+    """
+
+    ipo_id: str
+    available: bool
+    state: str  # recorded | not_recorded | unavailable | not_loaded
+    refreshed_at: datetime | None = None
+    samples: list[SeriesSampleView] = []

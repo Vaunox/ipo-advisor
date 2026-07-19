@@ -38,6 +38,7 @@ from ipo.service.ipo_context import ContextStore
 from ipo.service.notify import build_notifier, notify_crossings
 from ipo.service.scheduler import CycleResult, ScoringScheduler
 from ipo.service.transitions import TransitionStore
+from ipo.vm.client import ON_DEMAND_RETRIES, ON_DEMAND_TIMEOUT_SEC, VmClient
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -188,6 +189,7 @@ def build_service(
     ingest_state: IngestStateStore | None = None,
     context_store: ContextStore | None = None,
     log_dir: Path | None = None,
+    vm_client: VmClient | None = None,
     clock: Callable[[], datetime] = now_ist,
 ) -> Service:
     """Wire the layers into a running service (composition only — no new logic).
@@ -241,8 +243,34 @@ def build_service(
             ingest_state=ingest_state,
             context_store=context_store,
             log_dir=log_dir,
+            vm_client=vm_client,  # v3-DP DP-3a: same client as the cycle, one home
         ),
     )
+
+
+def build_vm_client(*, on_demand: bool = False) -> VmClient | None:
+    """Construct the VM client from ``VM_BASE_URL``, or ``None`` when no VM is configured.
+
+    THE ONE CONSTRUCTION SITE (v3-DP DP-3a). Both consumers get their client from here — the 30-min
+    data-plane cycle and the API's on-demand ``/subscription-series`` route — so the VM connection
+    has one home rather than two definitions that can drift apart.
+
+    Read from the env, NOT core config: the URL is deploy state, and an ingest setting must not
+    reach into the protected scoring config. The name avoids the ``IPO_`` prefix on purpose —
+    ``_env_overrides`` maps every ``IPO_*`` var into AppConfig, which forbids unknown fields.
+    Absent → ``None`` → local-only, exactly as before the VM existed (ships dark).
+
+    ``on_demand`` selects the user-facing budget (see ``vm.client``): the cycle can afford to retry
+    hard because nobody is waiting, a detail-page open cannot.
+    """
+    import os
+
+    vm_base = os.environ.get("VM_BASE_URL", "").strip()
+    if not vm_base:
+        return None
+    if on_demand:
+        return VmClient(vm_base, timeout=ON_DEMAND_TIMEOUT_SEC, retries=ON_DEMAND_RETRIES)
+    return VmClient(vm_base)
 
 
 def _live_refresh(
@@ -261,13 +289,10 @@ def _live_refresh(
     if not config.scrape.live_ingest:
         return None
 
-    import os
-
     from ipo.data.ingest.data_plane import refresh_data_plane
     from ipo.data.ingest.live import refresh_from_nse
     from ipo.data.sources.base import PoliteClient, RawCache
     from ipo.data.sources.nse import NseClient
-    from ipo.vm.client import VmClient
 
     client = PoliteClient(
         user_agent=config.scrape.user_agent,
@@ -278,13 +303,10 @@ def _live_refresh(
     )
     nse = NseClient(client, RawCache(root=data_dir / "raw_cache"))
 
-    # VM-primary when a VM base URL is configured (v3 V3-1). Read from the env, NOT core config: the
-    # URL is deploy state, and an ingest setting must not reach into the protected scoring config
-    # (config.py holds weights). The name avoids the ``IPO_`` prefix on purpose — ``_env_overrides``
-    # maps every ``IPO_*`` var into AppConfig, which forbids unknown fields. Absent → local-only, as
-    # before the VM existed ("ships dark"); deploying the VM later is a config flip, not code.
-    vm_base = os.environ.get("VM_BASE_URL", "").strip()
-    vm_client = VmClient(vm_base) if vm_base else None
+    # VM-primary when a VM base URL is configured (v3 V3-1), via the shared constructor above so
+    # the cycle and the API cannot drift apart. Absent → local-only, as before the VM existed
+    # ("ships dark"); deploying the VM later is a config flip, not code.
+    vm_client = build_vm_client()
     context_path = data_dir / "context" / "ipo_context.json"
 
     def refresh() -> None:
@@ -373,6 +395,9 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         calibration_report_path=res / "models" / "reliability.json",
         transition_store=TransitionStore(data_dir / "verdict_transitions.json"),
         refresh=_live_refresh(config, repository, data_dir, ingest_state),
+        # v3-DP DP-3a: the API's own client, on the USER-FACING budget. Independent of
+        # live_ingest — /subscription-series is on-demand, not part of the cycle.
+        vm_client=build_vm_client(on_demand=True),
         ingest_state=ingest_state,
         context_store=context_store,
         log_dir=data_dir / "logs",  # v3 V3-16: GET /logs reads the rotated files here for history

@@ -138,6 +138,21 @@ The graph that consumes this (DP-3), the analysis (DP-4), any model use (B1 — 
 ### One-line essence
 On the IPO detail page, show **how the subscription book built over time** — a small trend curve of the QIB/NII/retail multiples across the open→close window — read from DP-2's route. It is a picture of the trajectory DP-1 banked, shown to a human. Nothing more.
 
+### Split into DP-3a + DP-3b (recorded at DP-3a's merge)
+DP-3 was planned as one item and built as two, because its two halves have different proof
+obligations and different ship surfaces:
+
+- **DP-3a — the engine-side data path (Python).** `VmClient.fetch_series` + a local
+  `GET /subscription-series/{ipo_id}` that re-serves the VM's DP-2 route on demand. This is where
+  the B1 wall becomes load-bearing: it is the first time the series types live in the SCORER'S OWN
+  PROCESS, so "the model cannot see it" stopped being true by geography and had to be made true by
+  import graph (`ipo.vm` joined the boundary guard's forbidden prefixes).
+- **DP-3b — the chart (React/TypeScript).** The curve itself, its three honest display states, and
+  the terminal aesthetic. Frontend-only.
+
+They ship together in the `.exe`, so **DP-3a is not independently live-provable** — it is merged and
+gated, and its live proof arrives with DP-3b.
+
 ### Why it exists
 Today the detail page shows only the **final** subscription figures (the "Subscription (final)" card). A user sees "QIB 92×" but not *how it got there* — steady build vs. close-day surge. This is the original **V3-9**, deferred in v3 for one reason ("needs the VM to first accumulate forward interval time-series"), now unblocked by DP-1.
 

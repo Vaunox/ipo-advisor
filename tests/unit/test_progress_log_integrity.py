@@ -41,7 +41,11 @@ _ISO_OR_PENDING_ROW = re.compile(r"^\|\s*(?:\d{4}-\d{2}-\d{2}|—)\s*\|")
 _UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
 # DP-N included so v3-DP rows are actually CHECKED. Without it every DP row fails `fullmatch` and is
 # skipped by the blueprint cross-check — the guard would go green while verifying nothing.
-_ITEM_ID = re.compile(r"(V3-\d+|DP-\d+|BUG \d+)")
+# The optional a/b suffix landed when DP-3 was built as two items (DP-3a engine data path,
+# DP-3b chart). Without it "DP-3a" fails `fullmatch`, so the row is skipped by the blueprint
+# cross-check and the guard goes green while verifying nothing — the same vacuous-pass mode
+# that made DP-N need adding in the first place.
+_ITEM_ID = re.compile(r"(V3-\d+|DP-\d+[ab]?|BUG \d+)")
 
 # The ledger of items whose progress-log row must NEVER silently vanish. When an item ships, add its
 # ID here — that deliberate, reviewed line puts the row under guard. New rows may be added freely;
@@ -80,7 +84,7 @@ _SHIPPED_V3 = frozenset(
 # row, but NOT a stale-STATUS row — a ledger item whose row still reads "NOT STARTED"/pending after
 # it shipped. That is precisely the V3-16 failure mode and it remains uncaught. "Is this status
 # true?" is not automatable in general, but "a shipped-ledger item must not read NOT STARTED" is.
-_SHIPPED_DP: frozenset[str] = frozenset({"DP-1", "DP-2"})
+_SHIPPED_DP: frozenset[str] = frozenset({"DP-1", "DP-2", "DP-3a"})
 
 
 @dataclass(frozen=True)

@@ -13,19 +13,37 @@ the VM returns; there is no sticky "VM is down" latch.
 from __future__ import annotations
 
 from typing import TypeVar
+from urllib.parse import quote
 
 import requests
 from pydantic import ValidationError
 
 from ipo.core.logging import get_logger
-from ipo.vm.models import ContextEnvelope, RecordsEnvelope
+from ipo.vm.models import ContextEnvelope, RecordsEnvelope, SeriesEnvelope
 
 _log = get_logger("ipo.vm.client")
 
-_Envelope = TypeVar("_Envelope", RecordsEnvelope, ContextEnvelope)
+_Envelope = TypeVar("_Envelope", RecordsEnvelope, ContextEnvelope, SeriesEnvelope)
 
 _TIMEOUT_SEC = 10.0  # blueprint: VM request timeout 10s ...
 _RETRIES = 2  # ... then 2 retries, then fall back to local
+
+# --- on-demand (user-facing) budget, v3-DP DP-3a ---------------------------
+#
+# The defaults above are sized for the 30-min BACKGROUND cycle, where retrying hard is right: no
+# one is waiting, and a missed cycle costs freshness. A detail-page open is the opposite — a person
+# is watching — so 10s x 3 attempts (~30s) would hang the UI for half a minute before it could
+# honestly say "unavailable". Same client class, different budget, because the tradeoff differs.
+#
+# Both numbers are pinned against MEASURED latency on the real desktop->VM path rather than picked
+# by feel (the unexplained-constant class this project keeps getting bitten by):
+#   median 45 ms, min 38 ms, max 1.18 s over 10 runs to the live endpoint.
+# The ~1.2s outliers are the 1-vCPU box under keepalive contention (a bounded CPU burn runs every
+# 30 min), so the ceiling must clear those comfortably or a healthy VM would be reported down.
+ON_DEMAND_TIMEOUT_SEC = 5.0  # ~4.2x the worst observed healthy response (1.18s) — clears a
+# keepalive-contended spike, still fails fast enough for a UI.
+ON_DEMAND_RETRIES = 1  # one retry absorbs a single transient blip; more attempts serve a
+# background job, not a person waiting. Worst case ~10s vs the cycle's ~30s.
 
 
 class VmUnavailable(Exception):
@@ -50,6 +68,22 @@ class VmClient:
     def fetch_context(self) -> ContextEnvelope:
         """The context cache envelope from the VM — or ``VmUnavailable``."""
         return self._validated("/context", ContextEnvelope)
+
+    def fetch_series(self, ipo_id: str) -> SeriesEnvelope:
+        """ONE IPO's banked subscription trajectory (v3-DP DP-3a) — or ``VmUnavailable``.
+
+        Mirrors ``fetch_records`` exactly: same retry budget object, same envelope validation, same
+        "don't trust a 200". The ``ipo_id`` is URL-encoded — the VM refuses an unsafe id into an
+        empty envelope, but the client should not build a malformed URL to find that out.
+
+        AN IPO WITH NO SERIES IS NOT A FAILURE. The VM answers an empty-but-valid envelope and this
+        returns it with ``samples == []``; for months that is the honest, ordinary answer (nothing
+        was ever recorded). ``VmUnavailable`` means the VM could not be reached or sent a shape we
+        refuse to trust — a *different truth*, and the caller must keep the two apart.
+        """
+        return self._validated(
+            f"/subscription-series?ipo_id={quote(ipo_id, safe='')}", SeriesEnvelope
+        )
 
     def _validated(self, path: str, model: type[_Envelope]) -> _Envelope:
         payload = self._get_json(path)
