@@ -1,0 +1,1226 @@
+[
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T10:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 10:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.436,
+  "nii_sub": 0.2616,
+  "snii_sub": 0.3488,
+  "bnii_sub": 0.218,
+  "retail_sub": 0.1744,
+  "total_sub": 0.3052,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 976119.0,
+    "no_of_total_meant": 0.436,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 10:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000004315d466281cfcdc"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T10:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 10:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.4752,
+  "nii_sub": 0.2851,
+  "snii_sub": 0.3802,
+  "bnii_sub": 0.2376,
+  "retail_sub": 0.1901,
+  "total_sub": 0.3326,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1063880.0,
+    "no_of_total_meant": 0.4752,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 10:30:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000359037d416b40e20"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T11:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 11:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.518,
+  "nii_sub": 0.3108,
+  "snii_sub": 0.4144,
+  "bnii_sub": 0.259,
+  "retail_sub": 0.2072,
+  "total_sub": 0.3626,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1159701.0,
+    "no_of_total_meant": 0.518,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 11:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000048c20c34cdb728f5"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T11:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 11:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.5646,
+  "nii_sub": 0.3388,
+  "snii_sub": 0.4517,
+  "bnii_sub": 0.2823,
+  "retail_sub": 0.2258,
+  "total_sub": 0.3952,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1264029.0,
+    "no_of_total_meant": 0.5646,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 11:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000000ba0000543d75278"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T12:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 12:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.6154,
+  "nii_sub": 0.3692,
+  "snii_sub": 0.4923,
+  "bnii_sub": 0.3077,
+  "retail_sub": 0.2462,
+  "total_sub": 0.4308,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1377761.0,
+    "no_of_total_meant": 0.6154,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 12:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000749cc89c19a4e5a1"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T12:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 12:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.6708,
+  "nii_sub": 0.4025,
+  "snii_sub": 0.5366,
+  "bnii_sub": 0.3354,
+  "retail_sub": 0.2683,
+  "total_sub": 0.4696,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1501790.0,
+    "no_of_total_meant": 0.6708,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 12:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000001879059a0db24f1c"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T13:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 13:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.7312,
+  "nii_sub": 0.4387,
+  "snii_sub": 0.585,
+  "bnii_sub": 0.3656,
+  "retail_sub": 0.2925,
+  "total_sub": 0.5118,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1637014.0,
+    "no_of_total_meant": 0.7312,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 13:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000027801e84427db737"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T13:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 13:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.797,
+  "nii_sub": 0.4782,
+  "snii_sub": 0.6376,
+  "bnii_sub": 0.3985,
+  "retail_sub": 0.3188,
+  "total_sub": 0.5579,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1784328.0,
+    "no_of_total_meant": 0.797,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 13:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000001016ae4e7e0eaaf7"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T14:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 14:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.8687,
+  "nii_sub": 0.5212,
+  "snii_sub": 0.695,
+  "bnii_sub": 0.4344,
+  "retail_sub": 0.3475,
+  "total_sub": 0.6081,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 1944850.0,
+    "no_of_total_meant": 0.8687,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 14:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000017895e247fcd18e"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T14:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 14:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.9469,
+  "nii_sub": 0.5681,
+  "snii_sub": 0.7575,
+  "bnii_sub": 0.4734,
+  "retail_sub": 0.3788,
+  "total_sub": 0.6628,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2119924.0,
+    "no_of_total_meant": 0.9469,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 14:30:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000059b9cf6994a3d999"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T15:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 15:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.0321,
+  "nii_sub": 0.6193,
+  "snii_sub": 0.8257,
+  "bnii_sub": 0.5161,
+  "retail_sub": 0.4128,
+  "total_sub": 0.7225,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2310671.0,
+    "no_of_total_meant": 1.0321,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 15:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000032783cac8fcd71b4"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T15:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 15:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 1.125,
+  "nii_sub": 0.675,
+  "snii_sub": 0.9,
+  "bnii_sub": 0.5625,
+  "retail_sub": 0.45,
+  "total_sub": 0.7875,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 2518656.0,
+    "no_of_total_meant": 1.125,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 15:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000003ca153876182cbc2"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T22:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 22:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 3.4492,
+  "nii_sub": 2.0695,
+  "snii_sub": 2.7594,
+  "bnii_sub": 1.7246,
+  "retail_sub": 1.3797,
+  "total_sub": 2.4144,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 7722086.0,
+    "no_of_total_meant": 3.4492,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 22:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000002f54c0fe28248d06"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T22:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 22:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 3.7596,
+  "nii_sub": 2.2558,
+  "snii_sub": 3.0077,
+  "bnii_sub": 1.8798,
+  "retail_sub": 1.5038,
+  "total_sub": 2.6317,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 8417011.0,
+    "no_of_total_meant": 3.7596,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 22:30:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000025abe60d95119a77"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T23:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 23:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.098,
+  "nii_sub": 2.4588,
+  "snii_sub": 3.2784,
+  "bnii_sub": 2.049,
+  "retail_sub": 1.6392,
+  "total_sub": 2.8686,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 9174623.0,
+    "no_of_total_meant": 4.098,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 23:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000002ba28a1a4f093751"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-15T23:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 23:30:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 23:30:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000007829b2390292fd76"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T00:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000000070cc5ee8c125cf"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T00:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000002a735c273ec4d7a5"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T01:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000005cbea40ac98f3274"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T01:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000108a9ed0373ad0ca"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T02:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000698e600b29d46644"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T02:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000652b2faadfc2bd1a"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T03:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000535a74a7a5fd3561"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T03:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000007ae84c585d4c2e0"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T04:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000023809a989d06fb0"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T04:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000079b4264b4d868ece"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T05:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000063559bbc1b6baf1d"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T05:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000002c26e71a8042a377"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T06:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000797affe811c9f550"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T06:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000054e4d6944bd54c35"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T07:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000002b37bba842afd723"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T07:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000004b255fb0ebb0a801"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T08:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000484e874311375843"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T08:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000735a02a6ace83e04"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T09:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "00000000000000000000000000000000000000000000000078935d8b4d9c666b"
+ },
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-gapco",
+  "symbol": "FIXTURE-GAPCO",
+  "captured_at": "2026-05-16T09:30:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 17:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 4.4668,
+  "nii_sub": 2.6801,
+  "snii_sub": 3.5734,
+  "bnii_sub": 2.2334,
+  "retail_sub": 1.7867,
+  "total_sub": 3.1268,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 10000294.0,
+    "no_of_total_meant": 4.4668,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-GAPCO",
+   "updateTime": "Updated as on 15-May-2026 17:00:00"
+  },
+  "raw_response_hash": "000000000000000000000000000000000000000000000000278185ac8e6a0d82"
+ }
+]

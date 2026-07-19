@@ -1,0 +1,36 @@
+[
+ {
+  "schema_version": 1,
+  "ipo_id": "fixture-mockon",
+  "symbol": "FIXTURE-MOCKON",
+  "captured_at": "2026-05-15T10:00:00+05:30",
+  "source_update_time": "Updated as on 15-May-2026 10:00:00",
+  "source_update_time_parsed": null,
+  "qib_sub": 0.4,
+  "nii_sub": 0.24,
+  "snii_sub": 0.32,
+  "bnii_sub": 0.2,
+  "retail_sub": 0.16,
+  "total_sub": 0.28,
+  "categories": [
+   {
+    "category": "Qualified Institutional Buyers(QIBs)",
+    "no_of_shares_offered": 2238805.0,
+    "no_of_shares_bid": 895522.0,
+    "no_of_total_meant": 0.4,
+    "sr_no": 1
+   }
+  ],
+  "raw_response": {
+   "dataList": [
+    {
+     "category": "Qualified Institutional Buyers(QIBs)"
+    }
+   ],
+   "heading": "FIXTURE - not a real issue",
+   "symbol": "FIXTURE-MOCKON",
+   "updateTime": "Updated as on 15-May-2026 10:00:00"
+  },
+  "raw_response_hash": "0000000000000000000000000000000000000000000000006028768f8cee2c9c"
+ }
+]
