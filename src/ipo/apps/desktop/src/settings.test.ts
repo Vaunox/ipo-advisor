@@ -6,18 +6,21 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { test } from 'node:test'
+import { mock, test } from 'node:test'
 import {
   type AppSettings,
+  type SeenState,
   AUTOSTART_MARKER,
   DEFAULT_NOTIF,
   DEFAULT_STARTUP,
   type StartupPrefs,
   buildWebPreferences,
+  loadSeenState,
   loadSettings,
   loginItemSettings,
   normalizeUi,
   planStartupMigration,
+  saveSeenState,
   saveSettings,
   wasAutoLaunched,
 } from './settings'
@@ -180,4 +183,63 @@ test('buildWebPreferences locks the security posture; DevTools tracks dev (OP-6)
   assert.equal(dev.devTools, true)
   assert.equal(dev.contextIsolation, true) // posture identical in dev
   assert.equal(dev.nodeIntegration, false)
+})
+
+// --- OP-3: the seen-state durable store (seen-state.json) — separate from settings.json -----------
+
+test('seen-state round-trips through save/load (survives a simulated restart)', () => {
+  const dir = tmpUserDataDir()
+  try {
+    assert.equal(loadSeenState(dir), null) // absent -> null (the renderer then migrates its localStorage)
+    const seen: SeenState = {
+      alertsSeen: ['ipo-a', 'ipo-b'],
+      notifiedCrossings: ['ipo-a@2026-07-20'],
+      notifSeeded: true,
+      lastSeen: { 'ipo-a': 'APPLY', 'ipo-b': 'SKIP' },
+    }
+    saveSeenState(dir, seen)
+    // Reload from the same dir = app close + reopen: the seen-sets come back, not empty.
+    assert.deepEqual(loadSeenState(dir), seen)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a corrupt seen-state.json degrades to empty (never crashes boot/hydration)', () => {
+  const dir = tmpUserDataDir()
+  try {
+    fs.writeFileSync(path.join(dir, 'seen-state.json'), '{ this is not valid json', 'utf-8')
+    // Present-but-torn -> empty SeenState (start-fresh), NOT null and NOT a throw.
+    assert.deepEqual(loadSeenState(dir), {
+      alertsSeen: [],
+      notifiedCrossings: [],
+      notifSeeded: false,
+      lastSeen: {},
+    })
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('saveSeenState is ATOMIC: a failed rename leaves the last-good file intact (temp-then-rename)', () => {
+  const dir = tmpUserDataDir()
+  try {
+    saveSeenState(dir, { alertsSeen: ['keep'], notifiedCrossings: [], notifSeeded: true, lastSeen: {} })
+    // Force the rename to fail: a DIRECT writeFileSync(target) would have already truncated+replaced
+    // the target (reintroducing OP-3's torn-write bug); the atomic temp-then-rename must NOT — so this
+    // also fails loudly if a future refactor drops the atomic idiom back to a direct write.
+    const m = mock.method(fs, 'renameSync', () => {
+      throw new Error('EPERM: simulated external lock (AV/indexer) on rename')
+    })
+    try {
+      saveSeenState(dir, { alertsSeen: ['new'], notifiedCrossings: ['x'], notifSeeded: false, lastSeen: {} })
+    } finally {
+      m.mock.restore()
+    }
+    // The target still holds the last-good data — the failed write did not corrupt/replace it.
+    assert.deepEqual(loadSeenState(dir)?.alertsSeen, ['keep'])
+    assert.equal(loadSeenState(dir)?.notifSeeded, true)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })
