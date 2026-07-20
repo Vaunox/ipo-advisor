@@ -208,7 +208,7 @@ export function Settings() {
         </div>
         <div className="set-row">
           <div className="k">
-            Start minimized<small>launch to the tray, no window</small>
+            Start minimized<small>only when Windows starts it — a manual open shows the window</small>
           </div>
           <Switch on={startup.startMinimized} onToggle={() => toggleStartup('startMinimized')} />
         </div>

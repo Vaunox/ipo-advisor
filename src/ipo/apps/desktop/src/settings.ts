@@ -18,6 +18,10 @@ export interface StartupPrefs {
   launchOnStartup: boolean
   minimizeToTray: boolean
   startMinimized: boolean
+  // OP-1 internal bookkeeping (NOT a user toggle): set true after the one-time login-item marker
+  // migration has run, so the app NEVER re-asserts auto-launch on later boots (a Windows
+  // Task-Manager disable must stick). Undefined on a pre-OP-1 config; the migration sets it once.
+  startupMigrated?: boolean
 }
 
 export interface AppSettings {
@@ -65,6 +69,39 @@ export const DEFAULT_STARTUP: StartupPrefs = {
   launchOnStartup: false,
   minimizeToTray: true,
   startMinimized: false,
+}
+
+// OP-1: distinguish a Windows auto-launch-at-login from a manual open. `getLoginItemSettings()
+// .wasOpenedAtLogin` is macOS-only, so the robust Windows signal is a marker arg we register on the
+// login item — Electron passes it in `process.argv` only when Windows auto-launches the app.
+export const AUTOSTART_MARKER = '--ipoadvisor-autostart'
+
+/** True when the app was auto-launched at system startup (the marker arg is present in argv). Pure,
+ *  so `node --test` can exercise the argv-with/without-marker decision without a packaged app. */
+export function wasAutoLaunched(argv: readonly string[]): boolean {
+  return argv.includes(AUTOSTART_MARKER)
+}
+
+/** The login-item registration for the current prefs — ALWAYS carrying the marker so an auto-launch
+ *  stays detectable. `openAtLogin:false` unregisters the item (the marker is then moot). */
+export function loginItemSettings(startup: StartupPrefs): { openAtLogin: boolean; args: string[] } {
+  return { openAtLogin: startup.launchOnStartup, args: [AUTOSTART_MARKER] }
+}
+
+/** One-time OP-1 migration decision (pure). Existing "launch on startup" users have a login item
+ *  registered with NO marker; re-register it WITH the marker exactly once, then record it (via
+ *  `next.startupMigrated`) so we NEVER re-assert on later boots — a Windows Task-Manager disable must
+ *  stick. No-ops once migrated, and in dev (dev never registers a login item). */
+export function planStartupMigration(
+  startup: StartupPrefs,
+  dev: boolean,
+): { register: boolean; changed: boolean; next: StartupPrefs } {
+  if (dev || startup.startupMigrated) return { register: false, changed: false, next: startup }
+  return {
+    register: startup.launchOnStartup,
+    changed: true,
+    next: { ...startup, startupMigrated: true },
+  }
 }
 
 export const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }

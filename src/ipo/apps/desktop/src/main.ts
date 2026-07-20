@@ -15,8 +15,11 @@ import {
   type StartupPrefs,
   type UiPrefs,
   loadSettings,
+  loginItemSettings,
   normalizeUi,
+  planStartupMigration,
   saveSettings,
+  wasAutoLaunched,
 } from './settings'
 
 const DEV = !app.isPackaged
@@ -113,6 +116,19 @@ async function boot(): Promise<void> {
   repoRoot = findRepoRoot(__dirname)
   userDataDir = app.getPath('userData')
   settings = loadSettings(userDataDir)
+
+  // OP-1 one-time migration: existing "launch on startup" users have a login item registered
+  // WITHOUT the marker arg, so their auto-launch would no longer be detectable and start-minimized
+  // would silently stop working for them. Re-register once WITH the marker, then record it so we
+  // NEVER re-assert on later boots — a user who disables auto-launch via Windows Task Manager must
+  // have that stick (we do not override an OS-level choice every boot).
+  const migration = planStartupMigration(settings.startup, DEV)
+  if (migration.register) app.setLoginItemSettings(loginItemSettings(settings.startup))
+  if (migration.changed) {
+    settings.startup = migration.next
+    saveSettings(userDataDir, settings)
+  }
+
   enginePort = await freePort()
   engineBase = `http://127.0.0.1:${enginePort}`
   console.log(`[boot] engine base ${engineBase} (dev=${DEV})`)
@@ -152,9 +168,15 @@ async function boot(): Promise<void> {
   })
   if (saved?.maximized) win.maximize()
 
-  // Start minimized (to the tray if enabled, else to the taskbar) when the operator asked for it.
+  // Start minimized ONLY when Windows auto-launched us at login (the marker arg in argv) AND the
+  // operator asked for it — a manual open (double-click / Start menu / taskbar) always shows the
+  // window (OP-1). To the tray if minimize-to-tray is on, else to the taskbar.
+  // OP-5 NOTE: this marker->minimize decision belongs to THIS (primary) instance's own boot only.
+  // When the single-instance lock lands, a forwarded `second-instance` argv must NOT drive it — the
+  // user already has a window open by hand; that path should showWindow(), never minimize here.
+  const autoLaunched = wasAutoLaunched(process.argv)
   win.once('ready-to-show', () => {
-    if (settings.startup.startMinimized) {
+    if (autoLaunched && settings.startup.startMinimized) {
       if (!settings.startup.minimizeToTray) win?.minimize()
     } else {
       win?.show()
@@ -218,7 +240,9 @@ ipcMain.handle('startup:set', (_e, prefs: StartupPrefs): void => {
   settings.startup = { ...settings.startup, ...prefs }
   saveSettings(userDataDir, settings)
   // Registering a login item only makes sense for the installed app (not the dev electron.exe).
-  if (!DEV) app.setLoginItemSettings({ openAtLogin: settings.startup.launchOnStartup })
+  // Always carry the marker arg (loginItemSettings) so an auto-launch stays distinguishable from a
+  // manual open — see OP-1.
+  if (!DEV) app.setLoginItemSettings(loginItemSettings(settings.startup))
 })
 
 // UI/display preferences durable store. `prefs:get` returns null until the renderer has persisted
