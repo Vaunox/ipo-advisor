@@ -81,6 +81,10 @@ _SHIPPED_V3 = frozenset(
         "OP-1",
         "OP-5",
         "OP-2 Phase 1",
+        # Code-review findings (2026-07-20), non-blueprint. Each row must not vanish.
+        "Review #6",
+        "Review #5",
+        "Review #8",
     }
 )
 
