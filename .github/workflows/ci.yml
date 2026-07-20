@@ -33,3 +33,48 @@ jobs:
 
       - name: Tests (pytest)
         run: pytest
+
+  # The TypeScript half of the tree — previously unenforced (Ground Rule 6 / the header above claimed
+  # full enforcement, but this workflow ran Python only). A separate job so it reports red/green
+  # independently of `quality`. Runs on Linux, which also surfaces case-sensitivity bugs (e.g. the
+  # boundary.ts / ErrorBoundary.tsx class) that a case-insensitive dev box can hide.
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 is REQUIRED, not cosmetic: the PWA suite runs .ts files directly, which needs Node's
+      # default type-stripping (>= 22.18 / >= 24). An older LTS (e.g. 20) would hard-fail the PWA tests.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            src/ipo/apps/pwa/package-lock.json
+            src/ipo/apps/desktop/package-lock.json
+
+      # PWA: type-check (catches the case-collision / type class on Linux) + the ~75 unit tests
+      # (syncChip, seedMissingBaselines/hasChanged, the error-boundary seam, isAllowedNavigation).
+      - name: PWA install
+        working-directory: src/ipo/apps/pwa
+        run: npm ci
+      - name: PWA type-check
+        working-directory: src/ipo/apps/pwa
+        run: npm run typecheck
+      - name: PWA tests
+        working-directory: src/ipo/apps/pwa
+        run: npm test
+
+      # Desktop: its `test` script runs `tsc` (whole-package build) then node --test on the compiled
+      # files — incl. the fail-closed isAllowedExternalUrl / isAllowedRhpUrl phishing allowlist.
+      # ELECTRON_SKIP_BINARY_DOWNLOAD: tsc needs only Electron's types, and the tests are pure logic
+      # that never launch Electron, so the ~150 MB runtime binary is skipped (faster, no flaky download).
+      - name: Desktop install
+        working-directory: src/ipo/apps/desktop
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - name: Desktop tests (tsc + node --test)
+        working-directory: src/ipo/apps/desktop
+        run: npm test
