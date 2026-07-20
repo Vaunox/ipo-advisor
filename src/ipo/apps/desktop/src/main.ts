@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { type ChildProcess } from 'node:child_process'
 import path from 'node:path'
-import { isAllowedExternalUrl, isAllowedRhpUrl } from './external'
+import { pathToFileURL } from 'node:url'
+import { isAllowedExternalUrl, isAllowedNavigation, isAllowedRhpUrl } from './external'
 import {
   findRepoRoot,
   freePort,
@@ -167,6 +168,26 @@ async function boot(): Promise<void> {
     },
   })
   if (saved?.maximized) win.maximize()
+
+  // Review #5 — navigation lockdown (defense-in-depth): the window only ever shows the app's own
+  // dashboard. Deny every popup/new-window (the app opens none; approved external links go out via
+  // shell.openExternal — an OS-browser open, NOT an in-window nav). Allow in-window navigation ONLY
+  // to the app's own origin (the dev server in dev, the loaded PWA file in prod); block + log
+  // anything else, so injected/compromised content can't turn the trusted frame into a browser
+  // pointed elsewhere. The splash + PWA loads are programmatic (loadFile/loadURL) so they do NOT fire
+  // will-navigate, and there is no in-app router — so this trips zero times in normal use.
+  const navPolicy = {
+    devServerUrl: DEV ? 'http://localhost:5173' : null,
+    appFileUrl: DEV ? '' : pathToFileURL(path.join(process.resourcesPath, 'pwa', 'index.html')).href,
+  }
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  const blockForeignNav = (e: Electron.Event, url: string): void => {
+    if (isAllowedNavigation(url, navPolicy)) return
+    e.preventDefault()
+    console.warn('[nav] blocked', url)
+  }
+  win.webContents.on('will-navigate', blockForeignNav)
+  win.webContents.on('will-redirect', blockForeignNav)
 
   // Start minimized ONLY when Windows auto-launched us at login (the marker arg in argv) AND the
   // operator asked for it — a manual open (double-click / Start menu / taskbar) always shows the

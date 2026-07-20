@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { isAllowedExternalUrl, isAllowedRhpUrl } from './external'
+import { isAllowedExternalUrl, isAllowedNavigation, isAllowedRhpUrl } from './external'
 
 test('allows the pinned registrar hosts and their subdomains (PAN pages)', () => {
   for (const url of [
@@ -67,4 +67,36 @@ test('isAllowedRhpUrl refuses non-https and non-URLs', () => {
   ]) {
     assert.equal(isAllowedRhpUrl(url), false, url)
   }
+})
+
+// --- Navigation lockdown (review #5): allow only the app's own origin, deny everything else --------
+
+const DEV_POLICY = { devServerUrl: 'http://localhost:5173', appFileUrl: '' }
+const PROD_POLICY = { devServerUrl: null, appFileUrl: 'file:///C:/app/resources/pwa/index.html' }
+
+test('nav lockdown (dev): allows the app\'s own dev-server origin, denies everything else', () => {
+  assert.equal(isAllowedNavigation('http://localhost:5173/', DEV_POLICY), true)
+  // a same-origin reload carrying a client route + query is still the app's own origin
+  assert.equal(isAllowedNavigation('http://localhost:5173/x?a=1#/live', DEV_POLICY), true)
+  assert.equal(isAllowedNavigation('https://evil.example.com/', DEV_POLICY), false) // external
+  assert.equal(isAllowedNavigation('http://localhost:6006/', DEV_POLICY), false) // different port
+  assert.equal(isAllowedNavigation('file:///C:/evil.html', DEV_POLICY), false) // a file, not the dev origin
+  assert.equal(isAllowedNavigation('not a url', DEV_POLICY), false)
+})
+
+test('nav lockdown (prod): allows only the loaded PWA file path (incl. a #route/query reload)', () => {
+  assert.equal(isAllowedNavigation('file:///C:/app/resources/pwa/index.html', PROD_POLICY), true)
+  // a reload carrying a client route/query keeps the same pathname → still allowed
+  assert.equal(
+    isAllowedNavigation('file:///C:/app/resources/pwa/index.html#/history?tab=x', PROD_POLICY),
+    true,
+  )
+  assert.equal(
+    isAllowedNavigation('file:///C:/app/resources/pwa/evil.html', PROD_POLICY),
+    false, // any OTHER file path is denied
+  )
+  assert.equal(isAllowedNavigation('file:///etc/passwd', PROD_POLICY), false)
+  assert.equal(isAllowedNavigation('https://evil.example.com/', PROD_POLICY), false) // external
+  assert.equal(isAllowedNavigation('http://localhost:5173/', PROD_POLICY), false) // dev origin off in prod
+  assert.equal(isAllowedNavigation('not a url', PROD_POLICY), false)
 })
