@@ -7,7 +7,19 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
-import { type AppSettings, DEFAULT_NOTIF, loadSettings, normalizeUi, saveSettings } from './settings'
+import {
+  type AppSettings,
+  AUTOSTART_MARKER,
+  DEFAULT_NOTIF,
+  DEFAULT_STARTUP,
+  type StartupPrefs,
+  loadSettings,
+  loginItemSettings,
+  normalizeUi,
+  planStartupMigration,
+  saveSettings,
+  wasAutoLaunched,
+} from './settings'
 
 function tmpUserDataDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'ipoadv-settings-'))
@@ -54,6 +66,76 @@ test('a changed UI setting survives a simulated restart (write -> reload -> reta
     assert.equal(reopened.ui?.costs.dp, 22)
     assert.equal(reopened.ui?.awaitingCollapsed, true) // the "awaiting" fold survived the reopen
     assert.equal(reopened.ui?.devConsole, true) // the console-enable survived the reopen
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// --- OP-1: start-minimized applies only on auto-launch (marker arg + one-time migration) ---------
+
+test('wasAutoLaunched detects the marker arg only when present in argv', () => {
+  // A packaged manual open: no marker -> a manual launch always shows the window.
+  assert.equal(wasAutoLaunched(['C:/Program Files/IPO Advisor/IPO Advisor.exe']), false)
+  // Windows auto-launch at login: Electron passes the registered marker arg.
+  assert.equal(
+    wasAutoLaunched(['C:/Program Files/IPO Advisor/IPO Advisor.exe', AUTOSTART_MARKER]),
+    true,
+  )
+  // Order/other args don't matter; it's a membership test, not positional.
+  assert.equal(wasAutoLaunched(['electron', '.', AUTOSTART_MARKER, '--other']), true)
+  assert.equal(wasAutoLaunched([]), false)
+})
+
+test('loginItemSettings always carries the marker; openAtLogin mirrors the pref', () => {
+  const on = loginItemSettings({ ...DEFAULT_STARTUP, launchOnStartup: true })
+  assert.equal(on.openAtLogin, true)
+  assert.deepEqual(on.args, [AUTOSTART_MARKER]) // an auto-launch stays detectable
+
+  const off = loginItemSettings({ ...DEFAULT_STARTUP, launchOnStartup: false })
+  assert.equal(off.openAtLogin, false) // unregister
+  assert.deepEqual(off.args, [AUTOSTART_MARKER]) // marker still present (moot when off, but consistent)
+})
+
+test('planStartupMigration re-registers an existing launch-on-startup user exactly once', () => {
+  const existing: StartupPrefs = { ...DEFAULT_STARTUP, launchOnStartup: true } // pre-OP-1: no flag
+
+  const first = planStartupMigration(existing, false)
+  assert.equal(first.register, true) // re-register the login item WITH the marker
+  assert.equal(first.changed, true) // prefs changed -> persist
+  assert.equal(first.next.startupMigrated, true) // and record that it ran
+
+  // Second boot (already migrated): a strict no-op — no re-register, no change.
+  const second = planStartupMigration(first.next, false)
+  assert.equal(second.register, false)
+  assert.equal(second.changed, false)
+  assert.equal(second.next, first.next) // same reference back — nothing to persist
+})
+
+test('planStartupMigration records-only for a user who never enabled launch-on-startup', () => {
+  const first = planStartupMigration({ ...DEFAULT_STARTUP, launchOnStartup: false }, false)
+  assert.equal(first.register, false) // nothing to register
+  assert.equal(first.changed, true) // but still mark migrated so we never re-check on boot
+  assert.equal(first.next.startupMigrated, true)
+})
+
+test('planStartupMigration never touches the login item in dev', () => {
+  const dev = planStartupMigration({ ...DEFAULT_STARTUP, launchOnStartup: true }, true)
+  assert.equal(dev.register, false)
+  assert.equal(dev.changed, false) // dev never registers a login item, and never persists the flag
+})
+
+test('the migration flag survives a save -> reload (never re-runs after first boot)', () => {
+  const dir = tmpUserDataDir()
+  try {
+    // Simulate the migration having run: persist startup with the flag set.
+    const migrated: AppSettings = {
+      startup: { ...DEFAULT_STARTUP, launchOnStartup: true, startupMigrated: true },
+    }
+    saveSettings(dir, migrated)
+
+    const reloaded = loadSettings(dir)
+    assert.equal(reloaded.startup.startupMigrated, true) // flag persisted
+    assert.equal(planStartupMigration(reloaded.startup, false).changed, false) // -> no re-run
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
