@@ -90,6 +90,13 @@ _SHIPPED_V3 = frozenset(
         "Review #10",
         "Review #11",
         "Baseline retirement",
+        # The lows track (2026-07-20). L1 is dropped-as-obsolete but its row carries the
+        # do-not-re-propose reasoning, so it persists like V3-7/V3-10 above.
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L5",
     }
 )
 
