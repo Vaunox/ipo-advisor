@@ -13,13 +13,18 @@ other fields are columnar scalars. Round-tripping is exact.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+from pydantic import ValidationError
 
+from ipo.core.logging import get_logger
 from ipo.core.types import IPORecord, ListingLabel
+
+_log = get_logger("ipo.data.store.repository")
 
 _RECORDS_FILE = "ipo_records.parquet"
 _LABELS_FILE = "listing_labels.parquet"
@@ -48,20 +53,53 @@ def _read_rows(path: Path) -> list[dict[str, Any]]:
     return cast(list[dict[str, Any]], table.to_pylist())
 
 
+def _write_rows_atomic(rows: list[dict[str, Any]], path: Path) -> None:
+    """Write ``rows`` as Parquet via tmp + ``os.replace`` — a crash never leaves a torn file.
+
+    The old direct ``pq.write_table`` onto the live path is the torn-parquet corruption the code
+    review raised as #2: an interrupted write truncated the whole store, which ``vm/server.py`` then
+    failed to read on every request. ``os.replace`` swaps atomically, so a concurrent reader / a
+    crash sees either the whole old file or the whole new one — never a partial.
+    """
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    pq.write_table(pa.Table.from_pylist(rows), tmp)  # type: ignore[no-untyped-call]
+    os.replace(tmp, path)
+
+
 class ParquetRepository:
     """Idempotent Parquet store for ``IPORecord``s plus a listing-label table."""
 
     def __init__(self, data_dir: Path) -> None:
-        """Open (or create) the store under ``data_dir`` and load records into memory."""
+        """Open (or create) the store under ``data_dir`` and load records into memory.
+
+        A corrupt/torn records file must not crash the reader: ``vm/server.py`` builds a fresh
+        ``ParquetRepository`` per request, so an unguarded read would turn one torn write into a
+        permanent per-request outage (the code review's #2). Instead the load degrades to an empty
+        store, sets ``records_degraded`` (so the caller can tell corruption from genuine absence),
+        and logs loudly; the next atomic write heals the file. The read stays side-effect-free — no
+        quarantine — because the records store is reproducible (re-scraped every ingest cycle).
+        """
         self._dir = data_dir
         self._dir.mkdir(parents=True, exist_ok=True)
         self._records_path = data_dir / _RECORDS_FILE
         self._labels_path = data_dir / _LABELS_FILE
         self._records: dict[str, IPORecord] = {}
+        # True ONLY when a corrupt records file forced an empty load — NEVER on a genuinely empty
+        # store. Lets the /records route null a stale ``refreshed_at`` on corruption while keeping
+        # it for a real-but-empty ingest (freshness honesty — composes with the parked review #6).
+        self.records_degraded: bool = False
         if self._records_path.is_file():
-            for row in _read_rows(self._records_path):
-                record = _row_to_record(row)
-                self._records[record.ipo_id] = record
+            try:
+                for row in _read_rows(self._records_path):
+                    record = _row_to_record(row)
+                    self._records[record.ipo_id] = record
+            except (OSError, ValueError, ValidationError) as exc:
+                self._records = {}  # drop any partial load — degrade to a clean, empty store
+                self.records_degraded = True
+                _log.warning(
+                    "records_read_failed",
+                    extra={"path": str(self._records_path), "error": str(exc)},
+                )
 
     # --- Repository protocol ------------------------------------------------
 
@@ -87,17 +125,28 @@ class ParquetRepository:
         self._flush_records()
 
     def save_labels(self, labels: list[ListingLabel]) -> None:
-        """Persist the listing-label table (full rewrite)."""
+        """Persist the listing-label table (full rewrite, atomic)."""
         rows = [label.model_dump(mode="json") for label in labels]
         if not rows:
             return
-        pq.write_table(pa.Table.from_pylist(rows), self._labels_path)  # type: ignore[no-untyped-call]
+        _write_rows_atomic(rows, self._labels_path)
 
     def load_labels(self) -> list[ListingLabel]:
-        """Load the listing-label table (empty if none persisted)."""
+        """Load the listing-label table (empty if none persisted or unreadable).
+
+        A corrupt labels table degrades to empty + a loud WARN, like the records read — never a
+        crash. Labels carry no freshness stamp, so there is no ``refreshed_at`` to null here.
+        """
         if not self._labels_path.is_file():
             return []
-        return [ListingLabel.model_validate(row) for row in _read_rows(self._labels_path)]
+        try:
+            return [ListingLabel.model_validate(row) for row in _read_rows(self._labels_path)]
+        except (OSError, ValueError, ValidationError) as exc:
+            _log.warning(
+                "labels_read_failed",
+                extra={"path": str(self._labels_path), "error": str(exc)},
+            )
+            return []
 
     # --- Internals ----------------------------------------------------------
 
@@ -105,4 +154,4 @@ class ParquetRepository:
         rows = [_record_to_row(record) for record in self._records.values()]
         if not rows:
             return
-        pq.write_table(pa.Table.from_pylist(rows), self._records_path)  # type: ignore[no-untyped-call]
+        _write_rows_atomic(rows, self._records_path)

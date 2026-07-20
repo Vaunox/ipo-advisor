@@ -135,10 +135,17 @@ def create_vm_app(data_dir: Path) -> FastAPI:
 
         Read fresh from disk each call so a fetch job's write is served immediately. The app pulls
         these and scores LOCALLY — the VM never runs the model.
+
+        A corrupt/torn records store degrades to an empty list (``ParquetRepository`` logs it as
+        ``records_read_failed`` and sets ``records_degraded``); when that happens ``refreshed_at``
+        is nulled so a stale success time is never presented as current — the same honest-empty
+        discipline as ``/context``. A genuinely empty-but-fresh ingest keeps its real
+        ``last_success``.
         """
         repo = ParquetRepository(data_dir)
         state = IngestStateStore(data_dir / "ingest_state.json").current()
-        return RecordsEnvelope(refreshed_at=state.last_success, records=repo.list_all())
+        refreshed_at = None if repo.records_degraded else state.last_success
+        return RecordsEnvelope(refreshed_at=refreshed_at, records=repo.list_all())
 
     @app.get("/context")
     def context() -> dict[str, Any]:
