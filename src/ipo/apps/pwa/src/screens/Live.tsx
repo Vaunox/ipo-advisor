@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBoard } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { Loading } from '../components/Loading'
+import { formatDateOnly } from '../dates'
 import { getPinned, hasChanged, seedLastSeen, togglePinned, useLastSeen } from '../state/prefs'
 import { midnight, statusLabel, today } from '../status'
 import { toast } from '../toast'
@@ -221,11 +222,7 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
     .filter((r) => r.listing_date == null && midnight(r.open_date) > today())
     .sort((a, b) => +midnight(a.open_date) - +midnight(b.open_date))[0]
   const fmtOpen = (iso: string) =>
-    new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    })
+    formatDateOnly(iso, { weekday: 'short', day: 'numeric', month: 'short' })
 
   return (
     <>
