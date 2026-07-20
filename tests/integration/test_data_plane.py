@@ -115,6 +115,40 @@ def test_vm_healthy_serves_both_stores_from_vm(tmp_path: Path) -> None:
     assert json.loads(ctx_path.read_text())["ipos"]["ACME"]["isin"] == "INE0X"  # context written
 
 
+def test_vm_null_freshness_does_not_stamp_now(tmp_path: Path) -> None:
+    """Review #6: a VM envelope with refreshed_at=None must NOT record success stamped `now`.
+
+    The VM responded but carries no confirmed freshness (never ingested, or durability #2's honest
+    degraded null). The old `refreshed_at or clock()` stamped now — a false "just refreshed" that
+    also undid #2's server-side honesty. Now: last_success is NEVER advanced, but the reachable call
+    is recorded honestly (not a failure).
+    """
+    vm = _FakeVm(
+        records=RecordsEnvelope(refreshed_at=None, records=[]),
+        context=ContextEnvelope(refreshed_at=_VM_TIME, ipos={}),
+    )
+    _repo, state, _ = _run(tmp_path, vm)
+    snap = state.current()
+    assert snap.last_success is None  # never advanced — no false "just refreshed"
+    assert snap.last_attempt is not None  # the reachable attempt WAS recorded
+    assert snap.last_attempt_ok is True  # reachable, NOT flipped to a failure (so no "retrying")
+    assert snap.source == "vm"  # the VM did serve
+
+
+def test_vm_null_freshness_keeps_prior_last_success(tmp_path: Path) -> None:
+    """A null-freshness VM cycle leaves a genuine prior `last_success` untouched (last-known)."""
+    prior = datetime(2026, 7, 10, 9, 0, tzinfo=IST)
+    IngestStateStore(tmp_path / "ingest_state.json").record_success(prior, source="vm")  # seed
+    vm = _FakeVm(
+        records=RecordsEnvelope(refreshed_at=None, records=[]),
+        context=ContextEnvelope(refreshed_at=_VM_TIME, ipos={}),
+    )
+    _repo, state, _ = _run(tmp_path, vm)
+    snap = state.current()
+    assert snap.last_success == prior  # kept last-known, NOT advanced to now
+    assert snap.last_attempt_ok is True
+
+
 def test_vm_down_falls_back_records_local_fresh_context_lastknown(tmp_path: Path) -> None:
     # Seed a last-known context cache; a VM outage must NOT overwrite it (can't self-refresh).
     ctx_path = tmp_path / "context" / "ipo_context.json"

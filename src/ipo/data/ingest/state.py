@@ -121,6 +121,28 @@ class IngestStateStore:
             )
             self._flush()
 
+    def record_no_freshness(self, when: datetime, *, source: str = "vm") -> None:
+        """Record a REACHABLE cycle that carried NO fresh data (``last_success`` left untouched).
+
+        The VM-primary path calls this when the VM responds but its envelope has ``refreshed_at``
+        None — the VM never ingested, or served a degraded/empty envelope (durability #2's honest
+        null). The data is NOT fresh, so ``last_success`` must not advance to now: stamping now was
+        review #6's freshness lie, and it silently undid #2's server-side honesty. But the call WAS
+        reachable, so this is NOT a failure — ``last_attempt_ok`` stays True and ``last_error``
+        clears, so the chip reads "awaiting first update" / last-known, never "retrying" (which
+        ``record_failure`` would wrongly show). ``source`` is recorded since the VM did serve.
+        """
+        with self._lock:
+            self._state = self._state.model_copy(
+                update={
+                    "last_attempt": when,
+                    "last_attempt_ok": True,
+                    "last_error": None,
+                    "source": source,
+                }
+            )
+            self._flush()
+
     def current(self) -> IngestState:
         """The current freshness snapshot (a copy — safe to serialize on the API thread)."""
         with self._lock:

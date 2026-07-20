@@ -55,10 +55,18 @@ def _refresh_records(
         try:
             envelope = vm_client.fetch_records()
             repo.upsert_many(envelope.records)
-            # Freshness travels with the data: use the VM's refreshed_at (fall to now only if the VM
-            # has never had a confirmed ingest). source="vm" is the provenance label.
-            ingest_state.record_success(envelope.refreshed_at or clock(), source="vm")
-            _log.info("records_from_vm", extra={"count": len(envelope.records)})
+            if envelope.refreshed_at is not None:
+                # The VM's own refreshed_at travels with the data — never stamped "now" (review #6).
+                ingest_state.record_success(envelope.refreshed_at, source="vm")
+                _log.info("records_from_vm", extra={"count": len(envelope.records)})
+            else:
+                # The VM responded but carries NO confirmed freshness — it never ingested, or served
+                # a degraded/empty envelope (durability #2's honest refreshed_at=None). Stamping
+                # success-at-now here was review #6's lie, and it silently undid #2's server-side
+                # honesty. Record reachable-but-not-fresh: last_success stays honest (last-known /
+                # awaiting), with no false "just refreshed" and no false "retrying".
+                ingest_state.record_no_freshness(clock(), source="vm")
+                _log.warning("vm_records_no_freshness", extra={"count": len(envelope.records)})
             return
         except VmUnavailable as exc:
             _log.warning("vm_records_fallback_local", extra={"error": str(exc)})
