@@ -7,13 +7,16 @@ tagging.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
-from ipo.core.types import Segment
+from ipo.core.calendar import now_ist
+from ipo.core.types import PartialRecord, RawResponse, Segment
 from ipo.data.hygiene.clean import is_mainboard
 from ipo.data.ingest.pipeline import IngestPipeline
+from ipo.data.sources.base import RawCache, SourceError, compute_hash
 from ipo.data.sources.csv_seed import CsvSeedSource
 from ipo.data.store.repository import ParquetRepository
 
@@ -92,6 +95,65 @@ def test_rerun_is_idempotent(tmp_path: Path) -> None:
     count_after_first = len(repo.list_all())
     _pipeline(repo, source).run(source.ipo_ids())  # re-run
     assert len(repo.list_all()) == count_after_first  # no duplicates
+
+
+class _PoisonedCacheSource:
+    """A DataSource that reads a RawCache entry — a poisoned entry makes ``get`` raise SourceError.
+
+    This is the exact #7 shape: a corrupt cache read must degrade THIS source (a caught
+    SourceError), not escape pipeline.py's per-source isolation as a raw ValueError-family
+    exception and abort the whole run.
+    """
+
+    name = "poisoned"
+
+    def __init__(self, cache: RawCache) -> None:
+        self._cache = cache
+
+    def fetch(self, ipo_id: str) -> RawResponse:
+        cached = self._cache.get(self.name, ipo_id)  # raises SourceError on a poisoned entry
+        if cached is None:
+            raise SourceError(f"no cache entry for {ipo_id}")
+        return cached
+
+    def parse(self, raw: RawResponse) -> PartialRecord:  # pragma: no cover - fetch degrades first
+        raise AssertionError("parse must not run when fetch degraded")
+
+
+def test_poisoned_cache_entry_degrades_one_source_but_run_completes(tmp_path: Path) -> None:
+    """Headline #7 proof: a poisoned entry degrades ITS source; the run finishes on the good one."""
+    cache = RawCache(root=tmp_path / "cache")
+    seed = CsvSeedSource(_SEED)
+    ids = seed.ipo_ids()
+    target = ids[0]
+
+    # Store then poison the entry the poisoned source will read for `target`.
+    cache.store(
+        RawResponse(
+            source="poisoned",
+            url=target,
+            fetched_at=now_ist(),
+            content="x",
+            content_hash=compute_hash("x"),
+        ),
+        request_id=target,
+    )
+    entry = next((tmp_path / "cache").glob("**/*.json"))
+    entry.write_bytes(os.urandom(64))  # torn/garbage -> the #7 poisoned read
+
+    repo = ParquetRepository(tmp_path / "store")
+    pipeline = IngestPipeline(
+        [seed, _PoisonedCacheSource(cache)],
+        repo,
+        cross_check_fields=_OFFICIAL_FIELDS,
+        source_priority=["csv_seed", "poisoned"],
+    )
+    report = pipeline.run(ids)  # must NOT raise — before #7 a UnicodeDecodeError aborted here
+
+    assert report.records_ingested == len(ids)  # the good source carried the whole run
+    assert report.per_source["poisoned"] == 0  # the poisoned source degraded, contributed nothing
+    assert report.bad_records == []  # no id lost — isolation, not collapse
+    assert entry.with_suffix(entry.suffix + ".corrupt").is_file()  # poisoned entry quarantined
 
 
 def test_incremental_update_adds_new_ipo(tmp_path: Path) -> None:
