@@ -20,6 +20,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Protocol
 
 from fastapi import FastAPI
 
@@ -189,7 +190,30 @@ class Service:
 _FAILSAFE_CADENCE_MIN = 5
 
 
-def _run_cycle_guarded(service: Service, cycle_lock: threading.Lock) -> int:
+class _CadenceScheduler(Protocol):
+    """The one scheduler member the guard reads: minutes until the next cycle should run."""
+
+    def next_cadence_minutes(self) -> int: ...
+
+
+class _GuardableService(Protocol):
+    """The narrow slice ``_run_cycle_guarded`` actually uses: run a cycle, read the next cadence.
+
+    Deliberately NOT the full composed ``Service`` — the guard is generic over anything
+    cycle-runnable, so both the real ``Service`` and the B1/B2 test doubles satisfy it
+    structurally (interface segregation: ask for exactly what you use). ``scheduler`` is a
+    read-only property so a concrete ``ScoringScheduler`` (a subtype of ``_CadenceScheduler``)
+    is accepted covariantly, and ``run_cycle`` returns ``object`` because the guard ignores the
+    return — a tuple-returning real method and a ``None``-returning double both match.
+    """
+
+    @property
+    def scheduler(self) -> _CadenceScheduler: ...
+
+    def run_cycle(self) -> object: ...
+
+
+def _run_cycle_guarded(service: _GuardableService, cycle_lock: threading.Lock) -> int:
     """Run one scheduler cycle under the lock and return the next cadence — never raising (v3 B1).
 
     On success returns the scheduler's windowed cadence. On ANY exception it logs
