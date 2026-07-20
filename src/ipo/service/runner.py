@@ -29,7 +29,7 @@ from ipo.core.calendar import now_ist
 from ipo.core.config import AppConfig, load_config
 from ipo.core.interfaces import Calibrator, Notifier, Repository
 from ipo.core.logging import configure_logging, get_logger
-from ipo.data.ingest.state import IngestStateStore
+from ipo.data.ingest.state import IngestState, IngestStateStore
 from ipo.data.store.repository import ParquetRepository
 from ipo.model.scorer import WeightedScorer
 from ipo.service.api import create_app
@@ -61,6 +61,36 @@ _STDIN_REFRESH_COMMAND = "refresh"
 # window. Measured against ``last_attempt`` (not ``last_success``) so a burst is coalesced and a
 # down-NSE isn't hammered, while a genuine reopen minutes later still triggers a fresh pull.
 _STDIN_REFRESH_DEBOUNCE_SEC = 15.0
+
+
+def classify_refresh_outcome(before: IngestState, after: IngestState) -> dict[str, object]:
+    """Classify a manual-refresh cycle's effect on freshness, for the honest outcome log (OP-2).
+
+    A manual refresh is a VM RE-PULL (``data_plane._refresh_records``), NOT a forced NSE re-scrape:
+    on a VM pull ``record_success`` sets ``last_success`` to the VM's own ``refreshed_at``, so the
+    clock correctly does NOT move when the VM has nothing newer — that is working, not a bug. So
+    ``advanced`` alone is ambiguous; ``source`` + ``refreshed_at`` resolve the three cases Phase 2
+    needs kept apart:
+
+    * ``source=vm, advanced=false`` → the VM had nothing newer (working — the "feels dead but isn't"
+      case, the likely real situation); ``refreshed_at`` shows the VM's unchanged stamp.
+    * ``source=vm, advanced=true`` → the VM returned newer data and ``last_success`` moved to it; if
+      the chip still shows the old time, that is a display bug (chip not re-reading ``/status``).
+    * ``source=local`` (advanced=true) → the VM was unreachable and a real local NSE scrape ran.
+
+    (``attempt`` also tracks the served stamp, so a VM "nothing newer" pull leaves ``attempted``
+    false too; a genuine fetch failure shows ``attempted and not attempt_ok``.) The caller logs
+    these verbatim in ``extra`` so the console reading is unambiguous.
+    """
+    return {
+        # source is the KEY disambiguator: a VM re-pull vs a local NSE scrape.
+        "source": after.source,  # vm | local | None
+        "advanced": before.last_success != after.last_success,
+        "attempted": before.last_attempt != after.last_attempt,
+        "attempt_ok": after.last_attempt_ok,
+        "refreshed_at": after.last_success.isoformat() if after.last_success else None,
+        "refreshed_at_before": before.last_success.isoformat() if before.last_success else None,
+    }
 
 
 def _resource_root() -> Path:
@@ -445,9 +475,14 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
         for line in stream:
             if line.strip() != _STDIN_REFRESH_COMMAND:
                 continue
-            last = ingest_state.current().last_attempt if ingest_state is not None else None
-            if last is not None:
-                age = (now_ist() - last).total_seconds()
+            # OP-2: narrate the manual-refresh chain so a silently-failing button is visible (closes
+            # a V3-16 audit gap here). "requested" fires on receipt of the stdin trigger, BEFORE the
+            # debounce decision — its presence splits "button does nothing" (no log at all → the
+            # shell/IPC/preload chain broke) from "button fires".
+            log.info("stdin_refresh_requested")
+            before = ingest_state.current() if ingest_state is not None else None
+            if before is not None and before.last_attempt is not None:
+                age = (now_ist() - before.last_attempt).total_seconds()
                 if age < _STDIN_REFRESH_DEBOUNCE_SEC:
                     log.info("stdin_refresh_debounced", extra={"age_sec": round(age, 1)})
                     continue
@@ -457,10 +492,16 @@ def main() -> None:  # pragma: no cover - runtime entrypoint (live loop + server
                     service.run_cycle()
             except Exception as exc:  # noqa: BLE001 — a failed on-open pull must not end the loop
                 log.error("stdin_refresh_failed", exc_info=exc, extra={"error": str(exc)})
+            # OP-2: the outcome log. A failed/no-op pull degrades silently (refresh_from_nse never
+            # raises), so stdin_refresh_failed above almost never fires; without this, "fetched but
+            # the clock is stuck" (a display bug) is indistinguishable from "fetch failed". The
+            # classifier keeps the three cases distinct.
             if ingest_state is not None:
-                ingest_state.set_next_refresh(
-                    None
-                )  # a manual pull perturbs the schedule → hide next
+                after = ingest_state.current()
+                if before is not None:
+                    log.info("stdin_refresh_outcome", extra=classify_refresh_outcome(before, after))
+                # a manual pull perturbs the schedule → hide the next-refresh hint
+                ingest_state.set_next_refresh(None)
 
     threading.Thread(target=loop, daemon=True).start()
     threading.Thread(target=stdin_refresh_loop, daemon=True).start()
