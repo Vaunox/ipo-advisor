@@ -124,9 +124,21 @@ interface UiPrefs {
   awaitingCollapsed: boolean
   devConsole: boolean
 }
+// OP-3: the notification seen-sets get their OWN durable store (seen-state.json), separate from the
+// UiPrefs config file — they advance frequently (notifiedCrossings on every board update), so routing
+// them through the low-frequency config file would thrash it. Bounding stays upstream (alerts.ts); this
+// only persists what it's handed.
+interface SeenState {
+  alertsSeen: string[]
+  notifiedCrossings: string[]
+  notifSeeded: boolean
+  lastSeen: Record<string, VerdictType>
+}
 interface DesktopBridge {
   getPrefs?: () => Promise<UiPrefs | null>
   setPrefs?: (ui: UiPrefs) => Promise<void>
+  getSeen?: () => Promise<SeenState | null>
+  setSeen?: (seen: SeenState) => Promise<void>
 }
 const desktop: DesktopBridge | null =
   typeof window !== 'undefined' ? ((window as { ipoDesktop?: DesktopBridge }).ipoDesktop ?? null) : null
@@ -140,6 +152,16 @@ function uiSnapshot(): UiPrefs {
     pinned: prefs.pinned,
     awaitingCollapsed: prefs.awaitingCollapsed,
     devConsole: prefs.devConsole,
+  }
+}
+
+// OP-3: the seen-sets snapshot written to the SEPARATE seen-state store (never uiSnapshot/settings.json).
+function seenSnapshot(): SeenState {
+  return {
+    alertsSeen: prefs.alertsSeen,
+    notifiedCrossings: prefs.notifiedCrossings,
+    notifSeeded: prefs.notifSeeded,
+    lastSeen: prefs.lastSeen,
   }
 }
 
@@ -164,13 +186,31 @@ function save() {
   if (desktop?.setPrefs) void desktop.setPrefs(uiSnapshot())
 }
 
+// OP-3 durable save for the notification seen-sets: the localStorage mirror PLUS a write-through to
+// the SEPARATE seen-state store (seen-state.json) — never the config file. Used by the three seen-sets
+// (alertsSeen, notifiedCrossings, lastSeen) so they survive a desktop restart without the file://
+// localStorage loss, while settings.json stays a low-frequency deliberate-settings store.
+function saveSeen() {
+  saveLocal()
+  // Fire-and-forget — a failed IPC must never break the UI (the localStorage mirror still holds).
+  if (desktop?.setSeen) void desktop.setSeen(seenSnapshot())
+}
+
 /**
- * Desktop only: hydrate the in-memory prefs from the durable config file before first paint, so a
- * restart shows the saved settings rather than defaults. On first run after upgrade the config file
- * has no UI prefs yet (getPrefs resolves null); we then migrate the current localStorage prefs into
- * it, so an existing user keeps their theme/density/costs. No-op in the browser / preview.
+ * Desktop only: hydrate the in-memory prefs from the durable stores before first paint, so a restart
+ * shows the saved settings AND the persisted notification seen-sets rather than defaults/empty. Two
+ * stores: the UI-prefs config file (settings.json) and the OP-3 seen-state file (seen-state.json).
+ * Each uses the first-run null->migrate pattern (config file has no data yet on first upgrade, so we
+ * migrate the current localStorage in). No-op in the browser / preview (no bridge).
  */
 export async function hydrateFromDesktop(): Promise<void> {
+  if (!desktop) return
+  await hydrateUiPrefs()
+  await hydrateSeenState()
+}
+
+// UI prefs (theme/density/costs/notifications/pinned/awaitingCollapsed/devConsole) <- settings.json.
+async function hydrateUiPrefs(): Promise<void> {
   if (!desktop?.getPrefs) return
   try {
     const ui = await desktop.getPrefs()
@@ -195,6 +235,36 @@ export async function hydrateFromDesktop(): Promise<void> {
     }
   } catch {
     /* IPC failed — keep the localStorage-loaded prefs already in memory */
+  }
+}
+
+// OP-3: the notification seen-sets <- seen-state.json. Same first-run null->migrate pattern. On a
+// restart this reloads the durable seen-sets so the bell doesn't re-fire already-seen crossings and
+// the unread/CHANGED badges don't re-light (the file:// localStorage having been lost on the shell).
+async function hydrateSeenState(): Promise<void> {
+  if (!desktop?.getSeen) return
+  try {
+    const seen = await desktop.getSeen()
+    if (seen === null) {
+      if (desktop.setSeen) void desktop.setSeen(seenSnapshot()) // migrate localStorage -> seen-state.json
+      return
+    }
+    prefs = {
+      ...prefs,
+      alertsSeen: Array.isArray(seen.alertsSeen) ? seen.alertsSeen : prefs.alertsSeen,
+      notifiedCrossings: Array.isArray(seen.notifiedCrossings)
+        ? seen.notifiedCrossings
+        : prefs.notifiedCrossings,
+      notifSeeded: typeof seen.notifSeeded === 'boolean' ? seen.notifSeeded : prefs.notifSeeded,
+      lastSeen: seen.lastSeen && typeof seen.lastSeen === 'object' ? seen.lastSeen : prefs.lastSeen,
+    }
+    try {
+      localStorage.setItem(KEY, JSON.stringify(prefs)) // keep the mirror fresh for next cold start
+    } catch {
+      /* ignore */
+    }
+  } catch {
+    /* IPC failed — keep the localStorage-loaded seen-sets already in memory */
   }
 }
 
@@ -345,7 +415,7 @@ export function seedLastSeen(board: Record<string, VerdictType>): void {
   const next = seedMissingBaselines(prefs.lastSeen, board)
   if (next !== prefs.lastSeen) {
     prefs = { ...prefs, lastSeen: next }
-    saveLocal()
+    saveSeen() // OP-3: durable seen-state store (survives restart), not localStorage-only
   }
 }
 
@@ -354,7 +424,7 @@ export function markSeen(id: string, verdict: VerdictType): void {
   const next = withSeen(prefs.lastSeen, id, verdict)
   if (next !== prefs.lastSeen) {
     prefs = { ...prefs, lastSeen: next }
-    saveLocal()
+    saveSeen() // OP-3: durable seen-state store (survives restart), not localStorage-only
   }
 }
 
@@ -392,17 +462,17 @@ export function setNotifications(notifications: NotifPrefs): void {
 export const getAlertsSeen = (): string[] => prefs.alertsSeen
 export function setAlertsSeen(ids: string[]): void {
   prefs = { ...prefs, alertsSeen: ids }
-  saveLocal()
+  saveSeen() // OP-3: durable seen-state store (survives restart), not localStorage-only
 }
 
 /* ---- native notifications (which APPLY crossings have already fired an OS toast) ---- */
 export const getNotifiedCrossings = (): string[] => prefs.notifiedCrossings
 export function setNotifiedCrossings(keys: string[]): void {
   prefs = { ...prefs, notifiedCrossings: keys }
-  saveLocal()
+  saveSeen() // OP-3: durable seen-state store (survives restart), not localStorage-only
 }
 export const isNotifSeeded = (): boolean => prefs.notifSeeded
 export function markNotifSeeded(): void {
   prefs = { ...prefs, notifSeeded: true }
-  saveLocal()
+  saveSeen() // OP-3: durable seen-state store (survives restart), not localStorage-only
 }

@@ -13,13 +13,16 @@ import {
 } from './sidecar'
 import {
   type AppSettings,
+  type SeenState,
   type StartupPrefs,
   type UiPrefs,
   buildWebPreferences,
+  loadSeenState,
   loadSettings,
   loginItemSettings,
   normalizeUi,
   planStartupMigration,
+  saveSeenState,
   saveSettings,
   wasAutoLaunched,
 } from './settings'
@@ -277,6 +280,15 @@ ipcMain.handle('prefs:set', (_e, ui: UiPrefs): void => {
   settings.ui = normalizeUi(ui)
   saveSettings(userDataDir, settings)
 })
+
+// OP-3: the notification seen-sets live in a SEPARATE durable file (seen-state.json), NOT settings.json
+// — `notifiedCrossings` advances on every board update, so these high-frequency writes must never
+// thrash the low-frequency deliberate-settings store. `seen:get` returns null when not yet persisted
+// (the renderer then migrates its localStorage in); a torn file degrades to empty in loadSeenState,
+// never crashing. Like the prefs store, nothing here can touch a verdict (PWA/OS bookkeeping only).
+ipcMain.handle('seen:get', (): SeenState | null => loadSeenState(userDataDir))
+
+ipcMain.handle('seen:set', (_e, seen: SeenState): void => saveSeenState(userDataDir, seen))
 
 ipcMain.handle('engine:restart', (): Promise<boolean> => restartEngine())
 

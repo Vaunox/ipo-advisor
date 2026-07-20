@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { UiPrefs } from './settings'
+import type { SeenState, UiPrefs } from './settings'
 
 // The main process passes the engine's chosen base URL via --engine-base=<url> (the sidecar's free
 // port). Expose it read-only so the renderer's API client targets the sidecar directly
@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('ipoDesktop', {
   // Durable UI-prefs store (the app config file). getPrefs resolves null until first persisted.
   getPrefs: (): Promise<UiPrefs | null> => ipcRenderer.invoke('prefs:get'),
   setPrefs: (ui: UiPrefs): Promise<void> => ipcRenderer.invoke('prefs:set', ui),
+  // OP-3: the notification seen-sets, a SEPARATE durable store (seen-state.json) so the high-frequency
+  // seen writes never rewrite the low-frequency config file. getSeen resolves null until first persisted.
+  getSeen: (): Promise<SeenState | null> => ipcRenderer.invoke('seen:get'),
+  setSeen: (seen: SeenState): Promise<void> => ipcRenderer.invoke('seen:set', seen),
   restartEngine: (): Promise<boolean> => ipcRenderer.invoke('engine:restart'),
   // Ask the engine for a real NSE pull (v3 BUG 1 / Defect 1). The renderer stays read-only: this is
   // a request routed through the trusted shell, not a mutating call to the engine's GET-only API.

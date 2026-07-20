@@ -177,3 +177,65 @@ export function saveSettings(userDataDir: string, settings: AppSettings): void {
     /* ignore — settings are a convenience, not correctness */
   }
 }
+
+// --- OP-3: the notification seen-sets, a SEPARATE durable store (seen-state.json) ------------------
+// The bell's seen-sets (unread badge, native-toast dedup, the #8 CHANGED badge) were localStorage-only,
+// which the shell's file:// origin does not persist across restart → the bell re-fired already-seen
+// crossings. They live in their OWN file, NOT settings.json, ON PURPOSE: `notifiedCrossings` advances
+// on every board update (high-frequency), and routing that through the config file would thrash the
+// low-frequency deliberate-settings store. `lastSeen` values are opaque verdict strings here (the
+// renderer owns the VerdictType enum). Bounding stays upstream (alerts.ts) — this only persists.
+
+export interface SeenState {
+  alertsSeen: string[]
+  notifiedCrossings: string[]
+  notifSeeded: boolean
+  lastSeen: Record<string, string>
+}
+
+function seenStateFile(userDataDir: string): string {
+  return path.join(userDataDir, 'seen-state.json')
+}
+
+/** Load the seen-sets. `null` when the file is ABSENT (not yet persisted → the renderer migrates its
+ *  localStorage in); a defensively-parsed `SeenState` otherwise. A torn/corrupt file DEGRADES TO EMPTY
+ *  (start-fresh) — never a crash on boot/hydration (worst case: one seen item re-shows next restart). */
+export function loadSeenState(userDataDir: string): SeenState | null {
+  const file = seenStateFile(userDataDir)
+  if (!fs.existsSync(file)) return null
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf-8'))
+    return {
+      alertsSeen: Array.isArray(raw.alertsSeen) ? raw.alertsSeen : [],
+      notifiedCrossings: Array.isArray(raw.notifiedCrossings) ? raw.notifiedCrossings : [],
+      notifSeeded: raw.notifSeeded === true,
+      lastSeen:
+        raw.lastSeen && typeof raw.lastSeen === 'object' && !Array.isArray(raw.lastSeen)
+          ? raw.lastSeen
+          : {},
+    }
+  } catch {
+    return { alertsSeen: [], notifiedCrossings: [], notifSeeded: false, lastSeen: {} }
+  }
+}
+
+/** Persist the seen-sets ATOMICALLY (temp write → rename), best-effort. Atomic NOT for the
+ *  concurrency reason electron-store's conf-atomically fork targets (the single-threaded main process
+ *  serializes these sync IPC writes — there is no self-concurrent write) but because a torn NON-atomic
+ *  write would reintroduce OP-3's own bug: writeFileSync truncates-then-writes, so a crash mid-write
+ *  leaves a corrupt file → loadSeenState degrades to empty → the bell re-fires. `fs.renameSync` is an
+ *  atomic replace-over-existing on Windows (MoveFileExW REPLACE_EXISTING), mirroring the durability
+ *  cluster's tmp-then-os.replace idiom. A failed rename keeps the last-good file (never a torn target);
+ *  the whole thing is swallowed (convenience bookkeeping) and self-heals next cycle. Fixed `.tmp` is
+ *  safe given the serialized writes. */
+export function saveSeenState(userDataDir: string, seen: SeenState): void {
+  try {
+    fs.mkdirSync(userDataDir, { recursive: true })
+    const target = seenStateFile(userDataDir)
+    const tmp = `${target}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify(seen), 'utf-8')
+    fs.renameSync(tmp, target)
+  } catch {
+    /* ignore — seen-state is convenience bookkeeping, not correctness */
+  }
+}
