@@ -47,3 +47,41 @@ export function isAllowedRhpUrl(url: string): boolean {
     return false
   }
 }
+
+// Navigation lockdown (review #5). The app window only ever shows its OWN dashboard: approved
+// external links open in the OS browser via shell.openExternal (a separate path), never in-window.
+// So in-window navigation is fail-closed — allow ONLY the app's own origin, deny everything else.
+// Electron-free so it is unit-tested via `node --test`, like the allowlists above.
+export interface NavPolicy {
+  /** Dev: the app's own dev-server URL (its origin is the allow key, e.g. 'http://localhost:5173').
+   *  Null in prod. */
+  devServerUrl: string | null
+  /** Prod: the file:// URL the app loads; navigation is allowed only to its pathname. Empty in dev. */
+  appFileUrl: string
+}
+
+/** True only for a navigation that stays inside the app's own origin — the dev server in dev, or the
+ *  loaded PWA file's pathname in prod. ``file://`` origins are all ``"null"``, so pathname is the
+ *  identity there (a reload carrying a ``#route``/query is still allowed); any OTHER file path is
+ *  denied. External https, a different localhost port, and non-URLs are all denied. Fail-closed. */
+export function isAllowedNavigation(target: string, policy: NavPolicy): boolean {
+  let t: URL
+  try {
+    t = new URL(target)
+  } catch {
+    return false // not a parseable URL → deny
+  }
+  if (policy.devServerUrl) {
+    try {
+      return t.origin === new URL(policy.devServerUrl).origin // dev: the app's own origin only
+    } catch {
+      return false
+    }
+  }
+  if (t.protocol !== 'file:') return false // prod: only local files
+  try {
+    return t.pathname === new URL(policy.appFileUrl).pathname // ...and only the loaded PWA's own path
+  } catch {
+    return false
+  }
+}
