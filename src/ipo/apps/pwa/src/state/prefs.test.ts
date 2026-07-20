@@ -12,6 +12,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import type { VerdictType } from '../api/types'
 
 function installShims(): void {
   const store = new Map<string, string>()
@@ -55,6 +56,56 @@ test('every write notifies subscribers (what makes useSyncExternalStore consumer
   unsub()
   P.setThemeMode('system')
   assert.equal(hits, frozen)
+})
+
+// --- CHANGED badge (review #8): the pure seed / changed / seen rules ------------------------------
+
+const A: VerdictType = 'APPLY'
+const S: VerdictType = 'SKIP'
+
+test('a new IPO seeds a baseline silently — NOT changed (the mis-fire this kills)', () => {
+  const seeded = P.seedMissingBaselines({}, { x: A }) // x first appears on Live
+  assert.deepEqual(seeded, { x: A })
+  assert.equal(P.hasChanged(seeded, 'x', A), false) // just seeded → no badge
+})
+
+test('a missing baseline is never "changed" (no undefined !== verdict false-light)', () => {
+  assert.equal(P.hasChanged({}, 'x', A), false)
+})
+
+test('a verdict move lights CHANGED; opening Detail advances the baseline and clears it', () => {
+  const seeded = P.seedMissingBaselines({}, { x: A })
+  assert.equal(P.hasChanged(seeded, 'x', S), true) // A -> S is a real move
+  const advanced = P.withSeen(seeded, 'x', S) // Detail-open marks it seen at S
+  assert.equal(P.hasChanged(advanced, 'x', S), false) // cleared
+  assert.equal(P.hasChanged(advanced, 'x', A), true) // a SUBSEQUENT move (S -> A) re-fires
+})
+
+test('per-IPO + incremental: a second IPO appearing does not reset the first', () => {
+  const one = P.seedMissingBaselines({}, { x: A }) // x seeded at A
+  const two = P.seedMissingBaselines(one, { x: S, y: S }) // y appears; x already has a baseline
+  assert.equal(two.x, A) // x's baseline is UNTOUCHED (not reseeded to S)
+  assert.equal(two.y, S) // y seeded silently
+  assert.equal(P.hasChanged(two, 'x', S), true) // x's real move A->S still detected against A
+})
+
+test('leaves-and-returns: an IPO that left Live and returns unchanged does NOT false-light', () => {
+  const seeded = P.seedMissingBaselines({}, { x: A }) // x on Live at A
+  const away = P.seedMissingBaselines(seeded, { y: S }) // x leaves; seeding only ADDS, baseline stays
+  assert.equal(away.x, A) // baseline persisted (unpruned)
+  assert.equal(P.hasChanged(away, 'x', A), false) // returns unchanged → no badge (no false-light)
+  assert.equal(P.hasChanged(away, 'x', S), true) // a genuine move while away still lights
+})
+
+test('not frozen to install: seeding is incremental, so a later change is still detected', () => {
+  const seeded = P.seedMissingBaselines({ x: A }, { x: A }) // baseline set earlier; no-op here
+  assert.equal(P.hasChanged(seeded, 'x', S), true) // a change after the snapshot IS detected
+})
+
+test('ref-stability: seed/withSeen return the SAME map when nothing changed (no needless re-render)', () => {
+  const prev = { x: A }
+  assert.equal(P.seedMissingBaselines(prev, { x: S }), prev) // x present → no reseed → same ref
+  assert.equal(P.withSeen(prev, 'x', A), prev) // already A → same ref
 })
 
 test('a change from ANY writer is visible to a reader that reads through the store', () => {

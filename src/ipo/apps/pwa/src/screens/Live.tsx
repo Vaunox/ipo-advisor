@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBoard } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
 import { Loading } from '../components/Loading'
-import { getLastSeen, getPinned, seedLastSeen, togglePinned } from '../state/prefs'
+import { getPinned, hasChanged, seedLastSeen, togglePinned, useLastSeen } from '../state/prefs'
 import { midnight, statusLabel, today } from '../status'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
@@ -132,12 +132,9 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
   const [pinned, setPinned] = useState<Set<string>>(getPinned)
   const [attnDismissed, setAttnDismissed] = useState(false)
 
-  // seed last-seen verdicts once, so the CHANGED badge lights up on a *real* future change
-  useEffect(() => {
-    if (data) seedLastSeen(Object.fromEntries(data.map((r) => [r.ipo_id, r.verdict])))
-  }, [data])
-
-  const lastSeen = getLastSeen()
+  // Review #8: reactive read so the CHANGED badge actually drops when a baseline advances on
+  // Detail-open (BUG-3 pattern — a plain snapshot would go stale), not the old frozen `getLastSeen()`.
+  const lastSeen = useLastSeen()
   const ordered = useMemo(() => {
     if (!data) return []
     // Live signals = currently bidding: opened, not yet closed, not yet listed. Retires on
@@ -164,6 +161,14 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
       return x < y ? -sort.dir : x > y ? sort.dir : 0
     })
   }, [data, sort, pinned])
+
+  // Review #8: give each LIVE row a baseline the first time it appears here — silently, so a new row
+  // is never "changed" — and incrementally per-IPO (kills the old write-once snapshot). Scoped to the
+  // Live rows (the badge is Live-only), never the whole board, so an upcoming/closed verdict can't
+  // seed a baseline that later false-lights. `seedLastSeen` no-ops when nothing is missing.
+  useEffect(() => {
+    seedLastSeen(Object.fromEntries(ordered.map((r) => [r.ipo_id, r.verdict])))
+  }, [ordered])
 
   // FLIP: animate rows to their new position when the ORDER changes (sort/pin). Keyed on the id
   // sequence so it only runs on a real reorder — never on scroll or the countdown tick. Measures
@@ -260,7 +265,7 @@ export function Live({ onOpen }: { onOpen: (id: string) => void }) {
               key={row.ipo_id}
               row={row}
               pinned={pinned.has(row.ipo_id)}
-              changed={!!lastSeen[row.ipo_id] && lastSeen[row.ipo_id] !== row.verdict}
+              changed={hasChanged(lastSeen, row.ipo_id, row.verdict)}
               onPin={onPin}
               onOpen={onOpen}
               setEl={(el) => {

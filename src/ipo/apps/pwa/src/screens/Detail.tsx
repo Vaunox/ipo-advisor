@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useIpo, useIpoContext, useSubscriptionSeries, useTransitionsFor } from '../api/hooks'
 import type { IPODetail, IPOFeatures, IpoContextView, VerdictType } from '../api/types'
 import { IconAlert } from '../components/Icons'
 import { Loading } from '../components/Loading'
 import { SeriesChart } from '../components/SeriesChart'
 import { chartState } from '../series'
+import { markSeen } from '../state/prefs'
 import { isAllowedRhpUrl, openExternalUrl } from '../external'
 import { toast } from '../toast'
 import { VMETA } from '../verdict'
@@ -265,6 +266,14 @@ export function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   // its mind — the engine's VM call can take up to ~10s before it answers "unavailable".
   const series = useSubscriptionSeries(id)
   const [copied, setCopied] = useState(false)
+
+  // Review #8: opening an IPO's Detail marks it seen — advance its CHANGED-badge baseline to the
+  // verdict shown here, so the badge on Live drops. Placed in Detail (not a Live-row handler) so ANY
+  // open path clears it (Live / History / Upcoming / Allotment / search / alert). Runs once the
+  // verdict loads; `markSeen` no-ops when the baseline is already at this verdict.
+  useEffect(() => {
+    if (d) markSeen(id, d.verdict.verdict)
+  }, [id, d])
 
   if (isLoading) return <Loading label="Loading verdict…" />
   if (isError || !d)
