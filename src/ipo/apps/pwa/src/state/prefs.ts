@@ -285,13 +285,86 @@ export function togglePinned(id: string): Set<string> {
   return set
 }
 
-/* ---- last-seen verdicts (CHANGED badge) ---- */
+/* ---- last-seen verdicts (CHANGED badge) — review #8 ---- */
+
+// The badge lights when an IPO's VERDICT CATEGORY (never its probability) has moved since the user
+// last saw it. Three PURE rules over the lastSeen map, so the logic is node --test'd and can't drift:
+//
+// * MISSING BASELINE = NOT CHANGED. An IPO with no baseline (never seen, or it left Live and came
+//   back) seeds SILENTLY → no badge. This single rule kills both the new-IPO false-light and the
+//   leaves-and-returns false-light; the badge lights only on a SUBSEQUENT real move. It is `id in
+//   lastSeen`, NOT `undefined !== verdict` (the un-guarded form the review described — see #8).
+// * hasChanged: a baseline exists AND the current verdict differs.
+// * withSeen: advance one IPO's baseline (on Detail-open).
+//
+// Each returns the SAME map reference when nothing changed, so `useLastSeen`'s useSyncExternalStore
+// re-renders on a real change only — never on a no-op, and never in a loop.
+
+/** Seed a baseline for every incoming IPO that lacks one; leave existing baselines untouched
+ *  (per-IPO + incremental — NOT one write-once snapshot). Same ref back if nothing was missing. */
+export function seedMissingBaselines(
+  prev: Record<string, VerdictType>,
+  incoming: Record<string, VerdictType>,
+): Record<string, VerdictType> {
+  const additions: Record<string, VerdictType> = {}
+  let any = false
+  for (const [id, verdict] of Object.entries(incoming)) {
+    if (!(id in prev)) {
+      additions[id] = verdict
+      any = true
+    }
+  }
+  return any ? { ...prev, ...additions } : prev
+}
+
+/** CHANGED iff a baseline EXISTS and the current verdict differs from it. A missing baseline is
+ *  never "changed" — the load-bearing rule that kills the new-IPO / leaves-and-returns false-lights. */
+export function hasChanged(
+  lastSeen: Record<string, VerdictType>,
+  id: string,
+  verdict: VerdictType,
+): boolean {
+  return id in lastSeen && lastSeen[id] !== verdict
+}
+
+/** Advance ONE IPO's baseline to `verdict` (marks it seen). Same ref back if already at `verdict`. */
+export function withSeen(
+  lastSeen: Record<string, VerdictType>,
+  id: string,
+  verdict: VerdictType,
+): Record<string, VerdictType> {
+  if (lastSeen[id] === verdict) return lastSeen
+  return { ...lastSeen, [id]: verdict }
+}
+
 export const getLastSeen = (): Record<string, VerdictType> => prefs.lastSeen
-export function seedLastSeen(seed: Record<string, VerdictType>): void {
-  if (Object.keys(prefs.lastSeen).length === 0) {
-    prefs = { ...prefs, lastSeen: seed }
+
+/** Seed baselines for the IPOs on the LIVE board that lack one — silently, no badge. Runs each data
+ *  load (kills the old `length === 0` write-once snapshot that froze at first launch). */
+export function seedLastSeen(board: Record<string, VerdictType>): void {
+  const next = seedMissingBaselines(prefs.lastSeen, board)
+  if (next !== prefs.lastSeen) {
+    prefs = { ...prefs, lastSeen: next }
     saveLocal()
   }
+}
+
+/** Mark one IPO seen — advance its baseline to the current verdict (called on Detail-open). */
+export function markSeen(id: string, verdict: VerdictType): void {
+  const next = withSeen(prefs.lastSeen, id, verdict)
+  if (next !== prefs.lastSeen) {
+    prefs = { ...prefs, lastSeen: next }
+    saveLocal()
+  }
+}
+
+/** Reactive read of the last-seen map (BUG-3 pattern, like `useThemeMode`): Live re-renders when a
+ *  baseline advances, so the CHANGED badge actually drops on Detail-open — never a stale cached read.
+ *  lastSeen accretes one small verdict-enum entry per IPO; left UNPRUNED on purpose (bounded and tiny,
+ *  and pruning would only reintroduce a reseed-on-return we want silent anyway). OP-3 will upgrade the
+ *  durability of all these seen-sets later; #8 rides on it for free. */
+export function useLastSeen(): Record<string, VerdictType> {
+  return useSyncExternalStore(subscribe, getLastSeen, getLastSeen)
 }
 
 /* ---- broker cost assumptions ---- */
