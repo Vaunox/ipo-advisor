@@ -171,9 +171,10 @@ async function boot(): Promise<void> {
   // Start minimized ONLY when Windows auto-launched us at login (the marker arg in argv) AND the
   // operator asked for it — a manual open (double-click / Start menu / taskbar) always shows the
   // window (OP-1). To the tray if minimize-to-tray is on, else to the taskbar.
-  // OP-5 NOTE: this marker->minimize decision belongs to THIS (primary) instance's own boot only.
-  // When the single-instance lock lands, a forwarded `second-instance` argv must NOT drive it — the
-  // user already has a window open by hand; that path should showWindow(), never minimize here.
+  // OP-5 (as implemented): the single-instance `second-instance` handler restores the window via
+  // showWindow() and IGNORES the forwarded argv, so a forwarded `--ipoadvisor-autostart` marker can
+  // never drive minimize. This marker->minimize decision belongs to THIS (primary) boot only — it
+  // reads the primary's OWN process.argv, never a forwarded one.
   const autoLaunched = wasAutoLaunched(process.argv)
   win.once('ready-to-show', () => {
     if (autoLaunched && settings.startup.startMinimized) {
@@ -276,7 +277,24 @@ ipcMain.handle('shell:openExternal', (_e, url: unknown, kind: unknown): boolean 
   return true
 })
 
-app.whenReady().then(boot).catch((e) => console.error('[boot] failed', e))
+// OP-5 single-instance lock: exactly one instance runs. Acquired synchronously HERE — before
+// whenReady fires boot(), which spawns the engine (startEngine) and creates the window — so a second
+// launch quits before it can start a second engine writing the shared per-user data dir (two racing
+// writers is a corruption door the durability cluster's single-writer atomic writes can't close) or
+// a second window. requestSingleInstanceLock() works pre-ready; that ordering is the guarantee.
+if (!app.requestSingleInstanceLock()) {
+  // Second instance: quit immediately — boot() never runs here, so no engine and no window are ever
+  // created. Its teardown calls killEngine(null), a safe no-op, and never touches the primary.
+  app.quit()
+} else {
+  // A second launch restores the ALREADY-running window through the one restore home (showWindow —
+  // the same routine the tray "Open" uses). It IGNORES the forwarded argv on purpose: a second
+  // launch carrying OP-1's `--ipoadvisor-autostart` marker must not drive minimize; the primary is
+  // already user-visible, so it restores + focuses. showWindow() no-ops if `win` is still null (a
+  // second launch racing the primary's own boot), so the fast-double-launch is safe.
+  app.on('second-instance', () => showWindow())
+  app.whenReady().then(boot).catch((e) => console.error('[boot] failed', e))
+}
 
 // Clean teardown on every exit path — no orphaned python (the classic Electron+sidecar bug).
 app.on('window-all-closed', () => {
