@@ -104,6 +104,25 @@ export function planStartupMigration(
   }
 }
 
+/** The BrowserWindow security posture in ONE lockable place (the "sealed shell" family: OP-6 + review
+ *  #5). Context-isolated, no node integration, and — OP-6 — Chromium DevTools OFF in the packaged
+ *  build (``dev=false`` makes ``Ctrl+Shift+I`` / the default-menu accelerator / ``openDevTools()`` all
+ *  inert) and ON in dev. Unrelated to the V3-16 backtick console, which is a renderer React component
+ *  + engine ``/logs`` fetch, a different layer entirely. Typed via the AMBIENT ``Electron.WebPreferences``
+ *  (no runtime electron import — the type is erased), so this stays trivially testable under node --test. */
+export function buildWebPreferences(
+  dev: boolean,
+  opts: { preload: string; engineBase: string },
+): Electron.WebPreferences {
+  return {
+    preload: opts.preload,
+    contextIsolation: true,
+    nodeIntegration: false,
+    additionalArguments: [`--engine-base=${opts.engineBase}`],
+    devTools: dev,
+  }
+}
+
 export const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
 export const DEFAULT_NOTIF: NotifPrefs = {
   native: true,

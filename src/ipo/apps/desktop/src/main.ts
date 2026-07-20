@@ -15,6 +15,7 @@ import {
   type AppSettings,
   type StartupPrefs,
   type UiPrefs,
+  buildWebPreferences,
   loadSettings,
   loginItemSettings,
   normalizeUi,
@@ -160,12 +161,12 @@ async function boot(): Promise<void> {
     icon: iconPath,
     autoHideMenuBar: true,
     show: false,
-    webPreferences: {
+    // OP-6: DevTools off in the packaged build (Ctrl+Shift+I inert), on in dev — see
+    // buildWebPreferences. The window's whole security posture lives there so it's headlessly lockable.
+    webPreferences: buildWebPreferences(DEV, {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      additionalArguments: [`--engine-base=${engineBase}`],
-    },
+      engineBase,
+    }),
   })
   if (saved?.maximized) win.maximize()
 
