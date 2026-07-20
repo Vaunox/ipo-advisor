@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAllotment } from '../api/hooks'
 import type { AllotmentRow, RegistrarInfo } from '../api/types'
 import { Loading } from '../components/Loading'
+import { formatDateOnly } from '../dates'
 import { openExternalUrl, registrarAllotmentUrl } from '../external'
 
 // v3 V3-6 — the Allotment tab. Routing convenience only: for each IPO past its close, show the
@@ -10,7 +11,7 @@ import { openExternalUrl, registrarAllotmentUrl } from '../external'
 // Registrar data is display-only and comes from a store entirely separate from the model.
 
 const fmtDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  formatDateOnly(iso, { day: 'numeric', month: 'short', year: 'numeric' })
 
 const fmtWhen = (iso: string): string =>
   new Date(iso).toLocaleString('en-IN', {
