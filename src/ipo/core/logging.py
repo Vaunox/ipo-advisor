@@ -8,7 +8,8 @@ every handler runs to produce its output — not at the call site. So it is *imp
 writing a new log call that forgets to sanitize: any record, whatever key it used, is scrubbed on
 the way out. A value under a known secret key (``token``/``authorization``/``pan``/…) is dropped
 whole; a secret smuggled under an innocuous key (``extra={"detail": "<the raw token>"}``) is caught
-by the pattern scrub (JWT / Bearer / PAN shapes). Covers the message, every extra (recursively), and
+by the pattern scrub (JWT / Bearer / PAN / Telegram-bot-token shapes). Covers the message, every
+extra (recursively), and
 exception text. Verified in tests/unit/test_logging_and_secrets.py.
 """
 
@@ -64,6 +65,12 @@ _SECRET_PATTERNS = (
     re.compile(r"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b"),  # JWT (Upstox)
     re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{12,}"),  # "Bearer <token>"
     re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b"),  # Indian PAN
+    # Telegram bot token `<bot_id>:<secret>` — caught even glued inside a /bot<token>/ URL, so a
+    # (?<!\d) lead, NOT \b (a word boundary fails at `t`->digit). The {34,45} secret length is
+    # EMPIRICAL (observed 34-35 + margin), not Telegram-specced — widen if tokens ever lengthen.
+    # The 34-char min is the false-positive guard: 34 URL-safe chars after `<digits>:` is the
+    # token shape, never innocent colon text like `127.0.0.1:58145` or an ISO `13:02:41`.
+    re.compile(r"(?<!\d)\d{5,}:[A-Za-z0-9_-]{34,45}(?![A-Za-z0-9_-])"),  # Telegram bot token
 )
 _REDACTED = "[REDACTED]"
 

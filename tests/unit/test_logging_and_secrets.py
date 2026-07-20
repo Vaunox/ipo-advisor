@@ -78,6 +78,10 @@ def test_missing_secret_returns_default() -> None:
 # A realistic (fake) JWT, the shape an Upstox access token takes.
 _FAKE_JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
 
+# A realistic (fake) Telegram bot token: `<bot_id>:<secret>`, the secret 35 URL-safe chars (in the
+# {34,45} band the pattern matches). This is the shape logged inside a /bot<token>/ Bot-API URL.
+_FAKE_TG = "987654321:ABCdef1234GHIjkl5678MNOpqr9012_-XYZ"
+
 
 def _record(msg: str, **extra: object) -> logging.LogRecord:
     record = logging.LogRecord("ipo.test", logging.INFO, __file__, 1, msg, (), None)
@@ -120,6 +124,37 @@ def test_redaction_recurses_into_nested_extras() -> None:
     line = JsonFormatter().format(_record("ok", registrar={"name": "KFin", "pan": "ABCDE1234F"}))
     assert "ABCDE1234F" not in line
     assert "[REDACTED]" in line
+
+
+def test_redaction_scrubs_a_telegram_token_inside_a_bot_url() -> None:
+    """A Telegram bot token under an innocuous key — even glued inside a /bot<token>/ URL — is
+    redacted, and SURGICALLY (only the token is masked; the URL context survives for debugging).
+
+    This is the exact careless-instrumentation case L5 closes: the app builds
+    ``/bot<token>/sendMessage`` URLs (service/telegram.py) and URLs get logged; the key denylist
+    wouldn't catch ``url``, so the pattern scrub must.
+    """
+    url = f"https://api.telegram.org/bot{_FAKE_TG}/sendMessage"
+    line = JsonFormatter().format(_record("alert delivered", url=url))
+    payload = json.loads(line)
+    assert _FAKE_TG not in line  # the raw token survives NOWHERE in the serialized line
+    assert "[REDACTED]" in payload["url"]
+    assert "api.telegram.org" in payload["url"]  # surgical: host preserved
+    assert "/sendMessage" in payload["url"]  # surgical: path preserved
+
+
+def test_redaction_leaves_innocent_colon_text_untouched() -> None:
+    """The false-positive guard (load-bearing): the Telegram pattern must NOT eat ordinary
+    colon-separated log text — a local URL with a port, an ISO timestamp, a ratio, and a key:value
+    pair all survive verbatim. A redaction pattern that redacts innocent text is its own bug.
+    """
+    innocent = (
+        "engine http://127.0.0.1:58145/health up at 2026-07-20T13:02:41 ratio 1000000:1 count:42"
+    )
+    line = JsonFormatter().format(_record(innocent))
+    payload = json.loads(line)
+    assert payload["message"] == innocent  # byte-identical — nothing matched, nothing masked
+    assert "[REDACTED]" not in line
 
 
 def test_every_configured_sink_redacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
