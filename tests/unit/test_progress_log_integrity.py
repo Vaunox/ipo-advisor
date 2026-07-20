@@ -73,6 +73,14 @@ _SHIPPED_V3 = frozenset(
         # found after the plan was written and is tracked in docs/PROJECT_LOG.md §6.
         "Finding-④",
         "BUG-4",
+        # Post-v3 operational work (2026-07-20), non-blueprint like the two above: the code-review
+        # durability cluster (#2/#3/#7) and the OP-series shell/UX fixes. Each row must not vanish.
+        "Durability #3",
+        "Durability #2",
+        "Durability #7",
+        "OP-1",
+        "OP-5",
+        "OP-2 Phase 1",
     }
 )
 
