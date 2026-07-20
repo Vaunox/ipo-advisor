@@ -25,16 +25,33 @@ from pathlib import Path
 
 import requests
 
+from ipo.core.constants import IST
+
 _ROOT = Path(__file__).resolve().parents[1]
 _OUT = _ROOT / "data" / "backfill" / "vix.csv"
 _URL = "https://query1.finance.yahoo.com/v8/finance/chart/%5EINDIAVIX"
 _START_YEAR = 2008  # India VIX history on Yahoo begins Apr 2008
 
 
+def _ist_date(stamp: int) -> dt.date:
+    """The IST trading day a Yahoo daily-bar epoch belongs to — machine-tz-independent.
+
+    Every India-VIX daily bar is stamped within the 09:15–15:30 IST session, and IST is a fixed
+    +5:30 with no DST, so converting the epoch in IST and taking the date yields the trading day
+    regardless of the runner's local zone (a naive read mis-dates on machines west of IST). This is
+    the day `VixSeries` keys against IPO close-dates, so it must match the market day, not the
+    machine's calendar day.
+    """
+    return dt.datetime.fromtimestamp(stamp, tz=IST).date()
+
+
 def _fetch_year(year: int) -> list[tuple[dt.date, float]]:
     """Fetch one calendar year of daily (date, close) points from Yahoo (empty on failure)."""
-    p1 = int(dt.datetime(year, 1, 1).timestamp())
-    p2 = int(dt.datetime(year + 1, 1, 1).timestamp())
+    # IST-anchored window bounds so the fetch is machine-tz-independent. Anchoring is hygiene, not a
+    # correctness fix: the bounds cannot drop or duplicate a bar — consecutive years' windows are
+    # contiguous (p2_year == p1_{year+1}) and every year is merged by date. The row date below is.
+    p1 = int(dt.datetime(year, 1, 1, tzinfo=IST).timestamp())
+    p2 = int(dt.datetime(year + 1, 1, 1, tzinfo=IST).timestamp())
     params: dict[str, int | str] = {"period1": p1, "period2": p2, "interval": "1d"}
     resp = requests.get(
         _URL,
@@ -50,7 +67,7 @@ def _fetch_year(year: int) -> list[tuple[dt.date, float]]:
     for stamp, close in zip(stamps, closes, strict=False):
         if close is None:
             continue
-        out.append((dt.datetime.fromtimestamp(stamp).date(), round(float(close), 2)))
+        out.append((_ist_date(stamp), round(float(close), 2)))
     return out
 
 
