@@ -87,14 +87,25 @@ def create_app(
     """
     app = FastAPI(title="IPO Listing-Gains Advisor", version="0.1.0")
 
-    # The engine is a local sidecar bound to 127.0.0.1 and read-only (GET only, no credentials),
-    # so permissive CORS is safe and lets the Electron renderer (file:// / dev localhost) reach it
-    # cross-origin on the sidecar's chosen free port. It is NOT a public server.
+    # Permissive CORS here is a DELIBERATE, considered accept (code-review #10 — won't-fix), not
+    # an oversight. This engine is a LOCAL sidecar: bound to 127.0.0.1 (not network-reachable),
+    # GET-only (it cannot mutate anything — Invariant 4), and credential-less (no cookies/auth, so
+    # no CSRF or session surface). The packaged app loads from file://, whose Origin serializes to
+    # the literal "null" — there is no clean origin to allowlist, so "*" is the honest value, not a
+    # lazy one. The only residual vector is a local browser page reading non-secret, public IPO
+    # data — negligible. If results are ever paywalled, the plan is to move the engine SERVER-SIDE
+    # behind real auth (cf. vm/server.py, a genuinely public server); CORS was never a sufficient
+    # paywall boundary, so it is not the lever to tighten here.
+    #
+    # allow_headers is narrowed to the one header the client sends (client.ts: `accept`). This is
+    # truthful config, not a functional gate: a GET carrying only `accept` is a CORS "simple"
+    # request, so no preflight fires and allow_headers is never consulted for a real request — the
+    # packaged app is unaffected.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["*"],  # file:// Origin is "null" — no clean origin to pin (see note above)
         allow_methods=["GET"],
-        allow_headers=["*"],
+        allow_headers=["accept"],
     )
 
     @app.get("/health")
