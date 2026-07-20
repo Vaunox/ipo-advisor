@@ -16,6 +16,8 @@ import { Settings } from './screens/Settings'
 import { Upcoming } from './screens/Upcoming'
 import { getDevConsole, setThemeMode, useDevConsole } from './state/prefs'
 import { Toaster } from './components/Toaster'
+import { ContentErrorBoundary } from './components/ErrorBoundary'
+import { contentBoundaryKey } from './components/boundary'
 
 // How long a backtick press must be held before it counts as a "hold" (peek) rather than a click.
 const BACKTICK_HOLD_MS = 350
@@ -221,22 +223,27 @@ export function App() {
           onSearch={() => setPaletteOpen(true)}
         />
         <div className="content">
-          {!engineDown && calibration.data && !calibration.data.gate_passed && <UncalBanner />}
-          {engineDown ? (
-            <EngineDown onRetry={() => void health.refetch()} />
-          ) : detailId ? (
-            <Detail id={detailId} onBack={() => setDetailId(null)} />
-          ) : view === 'live' ? (
-            <Live onOpen={setDetailId} />
-          ) : view === 'history' ? (
-            <History onOpen={setDetailId} />
-          ) : view === 'upcoming' ? (
-            <Upcoming onOpen={setDetailId} />
-          ) : view === 'allotment' ? (
-            <Allotment onOpen={setDetailId} />
-          ) : (
-            <Settings />
-          )}
+          <ContentErrorBoundary
+            key={contentBoundaryKey(view, detailId)}
+            onGoLive={() => navigate('live')}
+          >
+            {!engineDown && calibration.data && !calibration.data.gate_passed && <UncalBanner />}
+            {engineDown ? (
+              <EngineDown onRetry={() => void health.refetch()} />
+            ) : detailId ? (
+              <Detail id={detailId} onBack={() => setDetailId(null)} />
+            ) : view === 'live' ? (
+              <Live onOpen={setDetailId} />
+            ) : view === 'history' ? (
+              <History onOpen={setDetailId} />
+            ) : view === 'upcoming' ? (
+              <Upcoming onOpen={setDetailId} />
+            ) : view === 'allotment' ? (
+              <Allotment onOpen={setDetailId} />
+            ) : (
+              <Settings />
+            )}
+          </ContentErrorBoundary>
         </div>
       </main>
       {paletteOpen && (
