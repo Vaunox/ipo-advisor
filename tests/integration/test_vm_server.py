@@ -59,6 +59,36 @@ def test_records_envelope_carries_freshness_and_records(tmp_path: Path) -> None:
     assert [r["ipo_id"] for r in body["records"]] == ["acme"]
 
 
+def test_records_route_nulls_refreshed_at_on_corrupt_store(tmp_path: Path) -> None:
+    """A torn records store must not 500, nor present a stale success time as current."""
+    _seed(tmp_path)  # valid store + last_success set...
+    (tmp_path / "ipo_records.parquet").write_bytes(b"not a parquet file")  # ...then corrupt it
+
+    resp = TestClient(create_vm_app(tmp_path)).get("/records")
+
+    assert resp.status_code == 200  # degraded, not a permanent per-request outage
+    body = resp.json()
+    assert body["records"] == []  # honest empty
+    assert body["refreshed_at"] is None  # the corrupt read null's freshness — like /context
+
+
+def test_records_route_keeps_refreshed_at_when_genuinely_empty_but_fresh(tmp_path: Path) -> None:
+    """M2 must not over-null: a real ingest that found no open IPOs is honestly fresh + empty.
+
+    ``_flush_records`` skips writing an empty table, so a genuine empty-but-fresh state is "no
+    records file + last_success set" — indistinguishable on the wire from corruption unless the flag
+    keeps them apart. Here the flag is False, so ``refreshed_at`` survives.
+    """
+    IngestStateStore(tmp_path / "ingest_state.json").record_success(
+        datetime(2026, 7, 14, 9, 0, tzinfo=IST)
+    )
+
+    body = TestClient(create_vm_app(tmp_path)).get("/records").json()
+
+    assert body["records"] == []
+    assert body["refreshed_at"].startswith("2026-07-14T09:00:00")  # real freshness kept, not nulled
+
+
 def test_context_served_verbatim(tmp_path: Path) -> None:
     _seed(tmp_path)
     body = TestClient(create_vm_app(tmp_path)).get("/context").json()
