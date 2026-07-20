@@ -243,3 +243,25 @@ test('saveSeenState is ATOMIC: a failed rename leaves the last-good file intact 
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('saveSettings is ATOMIC: a failed rename leaves the last-good settings.json intact (temp-then-rename)', () => {
+  const dir = tmpUserDataDir()
+  try {
+    saveSettings(dir, { startup: { ...DEFAULT_STARTUP, launchOnStartup: true } }) // known-good config
+    // Force the rename to fail: a DIRECT writeFileSync(target) would have already truncated+replaced
+    // the target; the atomic temp-then-rename must NOT — same fence as saveSeenState against a refactor
+    // back to a direct write.
+    const m = mock.method(fs, 'renameSync', () => {
+      throw new Error('EPERM: simulated external lock (AV/indexer) on rename')
+    })
+    try {
+      saveSettings(dir, { startup: { ...DEFAULT_STARTUP, launchOnStartup: false, minimizeToTray: false } })
+    } finally {
+      m.mock.restore()
+    }
+    // The target still holds the last-good config — the failed write did not corrupt/replace it.
+    assert.equal(loadSettings(dir).startup.launchOnStartup, true)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})

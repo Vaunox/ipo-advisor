@@ -168,11 +168,19 @@ export function loadSettings(userDataDir: string): AppSettings {
   }
 }
 
-/** Persist settings (best-effort; a write failure must never crash the app). */
+/** Persist settings ATOMICALLY (temp write → rename), best-effort. Mirrors saveSeenState (OP-3) and
+ *  the durability cluster's tmp-then-os.replace idiom, so settings.json is never left torn by a crash
+ *  mid-write (which loadSettings would otherwise degrade to defaults). Called from persistBounds
+ *  (window move/resize) + the OP-1 boot migration, so not purely low-frequency. `fs.renameSync` is an
+ *  atomic replace-over-existing on Windows (MoveFileExW REPLACE_EXISTING). A failed rename keeps the
+ *  last-good file; the fixed `.tmp` is safe (main-process saveSettings calls are serialized). */
 export function saveSettings(userDataDir: string, settings: AppSettings): void {
   try {
     fs.mkdirSync(userDataDir, { recursive: true })
-    fs.writeFileSync(settingsFile(userDataDir), JSON.stringify(settings, null, 2), 'utf-8')
+    const target = settingsFile(userDataDir)
+    const tmp = `${target}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf-8')
+    fs.renameSync(tmp, target)
   } catch {
     /* ignore — settings are a convenience, not correctness */
   }
