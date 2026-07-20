@@ -13,6 +13,7 @@ import {
   DEFAULT_NOTIF,
   DEFAULT_STARTUP,
   type StartupPrefs,
+  buildWebPreferences,
   loadSettings,
   loginItemSettings,
   normalizeUi,
@@ -160,4 +161,23 @@ test('a partial / hand-edited config falls back to defaults field-by-field', () 
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+// --- OP-6: the sealed-shell BrowserWindow posture (DevTools off in prod, on in dev) --------------
+
+test('buildWebPreferences locks the security posture; DevTools tracks dev (OP-6)', () => {
+  const opts = { preload: '/app/dist/preload.js', engineBase: 'http://127.0.0.1:5000' }
+
+  const prod = buildWebPreferences(false, opts) // the packaged build
+  assert.equal(prod.devTools, false) // OP-6: Chromium DevTools OFF in production (Ctrl+Shift+I inert)
+  assert.equal(prod.contextIsolation, true) // sealed shell — must not regress
+  assert.equal(prod.nodeIntegration, false) // sealed shell — must not regress
+  // Behaviour-identical relocation: the fields that were inline before pass through unchanged.
+  assert.equal(prod.preload, '/app/dist/preload.js')
+  assert.deepEqual(prod.additionalArguments, ['--engine-base=http://127.0.0.1:5000'])
+
+  const dev = buildWebPreferences(true, opts) // dev: developers still need DevTools
+  assert.equal(dev.devTools, true)
+  assert.equal(dev.contextIsolation, true) // posture identical in dev
+  assert.equal(dev.nodeIntegration, false)
 })
