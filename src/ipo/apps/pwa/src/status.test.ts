@@ -156,6 +156,31 @@ test('a VM fallback composes the honest per-store suffix and turns the dot amber
   assert.equal(chip.state, 'warn') // an ok state degrades to warn on a local fallback
 })
 
+test('review #6: a reachable VM with no fresh data reads "awaiting", never "retrying" or "refreshed"', () => {
+  // The state `record_no_freshness` produces (last_success null, last_attempt_ok true) must render
+  // as awaiting — no false "Refreshing…", no false "· retrying". Proves the chip end of the fix.
+  const chip = syncChip(
+    {
+      isError: false,
+      refreshInFlight: false,
+      status: status({ last_successful_ingest: null, last_attempt_ok: true }),
+    },
+    FMT,
+  )
+  assert.equal(chip.text, 'Awaiting first update…')
+  assert.equal(chip.state, 'ok') // NOT warn — the VM was reachable, this is not "retrying"
+  assert.doesNotMatch(chip.text, /Refreshing|retrying/)
+})
+
+test('review #6: with a prior success + no fresh data, the chip keeps last-known, no "retrying"', () => {
+  const chip = syncChip(
+    { isError: false, refreshInFlight: false, status: status({ last_attempt_ok: true }) },
+    FMT,
+  )
+  assert.equal(chip.text, 'Updated 10:29 AM') // last-known, never "· retrying"
+  assert.equal(chip.state, 'ok')
+})
+
 // --- OP-2: the manual-refresh min-duration hold (pure decision, no flaky timer test) ---
 
 test('refreshHold: still pulling → keep waiting, do not clear', () => {
