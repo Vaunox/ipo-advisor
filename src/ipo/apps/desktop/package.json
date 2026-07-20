@@ -13,9 +13,9 @@
     "dist": "tsc -p tsconfig.json && electron-builder --win --publish never"
   },
   "devDependencies": {
-    "@types/node": "^22.10.1",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
+    "@types/node": "^24",
+    "electron": "^41",
+    "electron-builder": "^26",
     "typescript": "^5.7.2"
   },
   "build": {
