@@ -85,6 +85,11 @@ _SHIPPED_V3 = frozenset(
         "Review #6",
         "Review #5",
         "Review #8",
+        # The CI-enforcement track (2026-07-20): #9/#10/#11 + the mypy-baseline retirement.
+        "Review #9",
+        "Review #10",
+        "Review #11",
+        "Baseline retirement",
     }
 )
 
