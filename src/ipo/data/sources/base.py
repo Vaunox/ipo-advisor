@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 import urllib.robotparser
 from collections.abc import Callable, Mapping
@@ -24,6 +25,7 @@ from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import requests
+from pydantic import ValidationError
 
 from ipo.core.calendar import now_ist
 from ipo.core.logging import get_logger
@@ -60,20 +62,66 @@ class RawCache:
         return self.root / source / f"{self._key(source, request_id)}.json"
 
     def get(self, source: str, request_id: str) -> RawResponse | None:
-        """Return the cached response for this request, or ``None`` if absent."""
+        """Return the cached response for this request, or ``None`` if absent.
+
+        Raises ``SourceError`` if the entry EXISTS but is unreadable (torn / garbage / poisoned):
+        the poisoned file is quarantined aside (``.corrupt``) and a ``SourceError`` is raised so the
+        failure re-enters the pipeline's per-source fault isolation and degrades ONE field instead
+        of aborting the whole run. Today a raw ``UnicodeDecodeError`` / ``JSONDecodeError`` escapes
+        that isolation (the code review's #7). Quarantining lets the next run miss, re-fetch, and
+        self-heal — the write-once-immutable ``store`` can write again once the poison is moved.
+
+        The quarantine-on-read (a write side-effect) is DELIBERATE, and deliberately unlike #2's
+        ``repository``: this is an internal, reproducible ingest cache where self-heal is the goal —
+        not a GET-only public read path that must stay side-effect-free.
+        """
         path = self._path(source, request_id)
         if not path.is_file():
             return None
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return RawResponse.model_validate(data)
+        try:
+            # UnicodeDecodeError (torn/garbage bytes fail the utf-8 decode, BEFORE json.loads) is
+            # the non-obvious case the probe surfaced; it is a ValueError subclass, already covered.
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return RawResponse.model_validate(data)
+        except (OSError, ValueError, ValidationError) as exc:
+            self._quarantine_corrupt(path, exc)
+            raise SourceError(f"poisoned cache entry for {source} ({request_id}): {exc}") from exc
+
+    def _quarantine_corrupt(self, path: Path, exc: Exception) -> None:
+        """Move a poisoned entry aside (best-effort) so the next ``store`` self-heals, and WARN.
+
+        Best-effort: if the move itself fails, ``get`` still raises ``SourceError`` — a quarantine
+        failure must never downgrade to a raw exception that re-aborts the run.
+        """
+        quarantine = path.with_suffix(path.suffix + ".corrupt")
+        moved: str | None = None
+        try:
+            os.replace(path, quarantine)  # overwrites any prior quarantine; newest wins
+            moved = str(quarantine)
+        except OSError as move_exc:
+            _log.warning(
+                "raw_cache_quarantine_failed", extra={"path": str(path), "error": str(move_exc)}
+            )
+        _log.warning(
+            "raw_cache_entry_corrupt",
+            extra={"path": str(path), "error": str(exc), "quarantined_to": moved},
+        )
 
     def store(self, response: RawResponse, *, request_id: str) -> None:
-        """Persist ``response`` immutably. A second store for the same key is a no-op."""
+        """Persist ``response`` immutably (atomic). A second store for the same key is a no-op.
+
+        Atomic tmp + ``os.replace``: a crash mid-write used to leave a torn file that the
+        ``path.exists()`` guard then treated as "already stored" FOREVER — a permanent poison (the
+        code review's #7 write side). The swap leaves either no entry or the whole entry, never a
+        partial.
+        """
         path = self._path(response.source, request_id)
         if path.exists():
             return  # immutable: never overwrite
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(response.model_dump_json(), encoding="utf-8")
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(response.model_dump_json(), encoding="utf-8")
+        os.replace(tmp, path)  # atomic — a crash never leaves a torn, permanently-poisoning entry
 
 
 class PoliteClient:
