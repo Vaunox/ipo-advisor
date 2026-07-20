@@ -3,7 +3,7 @@
 // everywhere: a second, drifting copy of "is this IPO still relevant" is exactly how retention bugs
 // are born.
 
-import type { IPOListRow } from './api/types'
+import type { IPOListRow, StatusView } from './api/types'
 
 export const midnight = (d: string): Date => new Date(d + 'T00:00:00')
 export const today = (): Date => {
@@ -96,4 +96,108 @@ export function fallbackStatus(
       ? 'context is last-known and aging (cannot refresh without the VM)'
       : 'context still served from the VM')
   return { text, title }
+}
+
+// v3 BUG 1 / OP-2 — the ONE data-state chip's state+text+title, as a PURE decision so it is
+// node --test'd and can never drift from the shipped chip. The load-bearing OP-2 change: "Refreshing…"
+// is bound to `refreshInFlight` — a GENUINE, client-knowable manual pull (the shell-triggered
+// refresh) — NEVER `useIsFetching()`. A 5s background /status re-poll is a local read, not an NSE
+// pull, and must not read as one; an automatic pull the client cannot observe stays silent and just
+// advances "Updated HH:MM". "Updated …" freshness (BUG-1) is untouched — it is still the last
+// *successful* pull.
+export type SyncState = 'err' | 'busy' | 'ok' | 'warn'
+export interface SyncChipInput {
+  isError: boolean // health query errored (engine unreachable)
+  refreshInFlight: boolean // a manual, min-duration-held refresh is genuinely in flight
+  status: StatusView | undefined
+}
+export interface SyncChip {
+  state: SyncState
+  text: string
+  title: string
+  dot: string
+}
+
+export const istTimeOf = (iso: string): string =>
+  new Date(iso).toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour12: true,
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+
+export function syncChip(
+  { isError, refreshInFlight, status: s }: SyncChipInput,
+  fmt: (iso: string) => string = istTimeOf,
+): SyncChip {
+  const updated = s?.last_successful_ingest ? fmt(s.last_successful_ingest) : null
+  let state: SyncState
+  let text: string
+  let title: string
+  if (isError) {
+    state = 'err'
+    text = 'Reconnecting…'
+    title = "Couldn't reach the engine — retrying automatically"
+  } else if (refreshInFlight) {
+    state = 'busy'
+    text = 'Refreshing…'
+    title = 'Refreshing from the live feed…'
+  } else if (s && s.live_ingest === false) {
+    state = 'ok'
+    text = 'Live'
+    title = 'No live NSE feed configured in this build'
+  } else if (updated && s?.last_attempt_ok === false) {
+    state = 'warn'
+    text = `Updated ${updated} · retrying`
+    title = `Last successful NSE pull ${updated} IST — a newer pull failed; retrying automatically`
+  } else if (updated) {
+    state = 'ok'
+    text = `Updated ${updated}`
+    title = `Last successful NSE pull ${updated} IST`
+  } else {
+    state = s?.last_attempt_ok === false ? 'warn' : 'ok'
+    text = 'Awaiting first update…'
+    title = 'No successful NSE pull yet — fetching'
+  }
+
+  // Compose the data-plane fallback into THIS one chip (never a second, contradicting chip): silent
+  // unless a store fell back from a configured VM, then the honest per-store suffix + amber dot.
+  const fb = s ? fallbackStatus(s.records_source, s.context_source) : null
+  if (fb) {
+    if (state === 'ok') state = 'warn'
+    text = `${text} · ${fb.text}`
+    title = `${title} · ${fb.title}`
+  }
+  // Tooltip-only next-refresh hint (only when the engine can honestly predict it).
+  if (s?.next_refresh_at) title = `${title} · next refresh ~${fmt(s.next_refresh_at)} IST`
+
+  const dot =
+    state === 'err'
+      ? 'sync err'
+      : state === 'warn'
+        ? 'sync warn'
+        : state === 'busy'
+          ? 'sync on'
+          : 'sync'
+  return { state, text, title, dot }
+}
+
+// OP-2: the manual-refresh feedback beat. "Refreshing…" holds for at least this even if the pull
+// resolves faster (never a sub-perceptible flash); a slower pull holds until it resolves. A named
+// constant so the beat is tunable in one place.
+export const REFRESH_MIN_VISIBLE_MS = 600
+
+// Pure min-duration decision the RefreshContext drives (kept out of a flaky setTimeout test): given
+// ms since the manual click and whether the pull has resolved, may "Refreshing…" clear now, or how
+// long to hold. Not-resolved → keep waiting (on the resolve, not a timer); resolved-after-beat →
+// clear; resolved-within-beat → hold out the remainder.
+export function refreshHold(
+  elapsedMs: number,
+  resolved: boolean,
+  minMs: number = REFRESH_MIN_VISIBLE_MS,
+): { clear: boolean; waitMs: number } {
+  if (!resolved) return { clear: false, waitMs: 0 }
+  const remaining = minMs - elapsedMs
+  if (remaining <= 0) return { clear: true, waitMs: 0 }
+  return { clear: false, waitMs: remaining }
 }

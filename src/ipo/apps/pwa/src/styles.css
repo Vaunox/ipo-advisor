@@ -409,7 +409,12 @@ body.compact .meter { margin-top:6px; }
    detail always in the title tooltip) instead of shoving Clock/Theme off-screen — the honest
    worst case "Updated … · retrying · on local — context aging" overflows the 1040px min window. */
 .syncstat { display:flex; align-items:center; gap:7px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; min-width:0; }
-.syncstat-t { font-family:'Fira Code'; font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* OP-2: reserve width for the longest COMMON label ("Updated 10:29 AM") so the ok<->busy flip
+   ("Updated HH:MM" <-> "Refreshing…") never resizes the chip or nudges its neighbours. The rarer
+   degraded suffixes ("· retrying", the VM-fallback "· on local — context aging") are wider still and
+   will grow the chip when they occur — but those are stable states, not the 5s flicker, so they are
+   deliberately not reserved for here. */
+.syncstat-t { font-family:'Fira Code'; font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:16ch; }
 .syncstat.err { border-color:color-mix(in srgb, var(--skip) 45%, transparent); }
 .syncstat.err .syncstat-t { color:var(--skip); }
 .syncstat.warn { border-color:color-mix(in srgb, var(--marginal) 45%, transparent); }

@@ -4,8 +4,14 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { IPOListRow } from './api/types'
-import { awaitingLabel, fallbackStatus } from './status.ts'
+import type { IPOListRow, StatusView } from './api/types'
+import {
+  REFRESH_MIN_VISIBLE_MS,
+  awaitingLabel,
+  fallbackStatus,
+  refreshHold,
+  syncChip,
+} from './status.ts'
 
 function ymd(offsetDays: number): string {
   const d = new Date()
@@ -79,4 +85,89 @@ test('VM down → the honest per-store split (records fresh vs context aging)', 
 test('partial fallback names the one store that fell back', () => {
   assert.equal(fallbackStatus('local', 'vm')?.text, 'records on local')
   assert.equal(fallbackStatus('vm', 'local')?.text, 'context aging')
+})
+
+// --- OP-2: the freshness chip shows "Refreshing…" ONLY for a genuine, client-knowable manual pull ---
+
+// Deterministic time-format so text assertions don't depend on the runtime's Intl/timezone.
+const FMT = (_iso: string): string => '10:29 AM'
+
+function status(over: Partial<StatusView> = {}): StatusView {
+  return {
+    live_ingest: true,
+    last_successful_ingest: '2026-07-20T10:29:00+05:30',
+    last_attempt: '2026-07-20T10:29:00+05:30',
+    last_attempt_ok: true,
+    records_source: null,
+    context_source: null,
+    next_refresh_at: null,
+    ...over,
+  }
+}
+
+test('THE FLICKER BUG: a background poll (no manual refresh) reads Updated, NOT Refreshing', () => {
+  // The exact OP-2 regression: bound to a real in-flight pull, a 5s /status re-poll (inFlight:false)
+  // must read the honest freshness, never "Refreshing…". This is what useIsFetching() got wrong.
+  const chip = syncChip({ isError: false, refreshInFlight: false, status: status() }, FMT)
+  assert.equal(chip.text, 'Updated 10:29 AM')
+  assert.equal(chip.state, 'ok')
+  assert.doesNotMatch(chip.text, /Refreshing/)
+})
+
+test('a genuine manual refresh in flight reads Refreshing (busy)', () => {
+  const chip = syncChip({ isError: false, refreshInFlight: true, status: status() }, FMT)
+  assert.equal(chip.text, 'Refreshing…')
+  assert.equal(chip.state, 'busy')
+})
+
+test('an in-flight manual pull shows Refreshing even over a failed newer pull', () => {
+  const chip = syncChip(
+    { isError: false, refreshInFlight: true, status: status({ last_attempt_ok: false }) },
+    FMT,
+  )
+  assert.equal(chip.text, 'Refreshing…')
+})
+
+test('engine unreachable reads Reconnecting (err), and error wins over manual state', () => {
+  const chip = syncChip({ isError: true, refreshInFlight: true, status: status() }, FMT)
+  assert.equal(chip.text, 'Reconnecting…')
+  assert.equal(chip.state, 'err')
+})
+
+test('a failed newer pull reads Updated … · retrying (warn), NOT Refreshing', () => {
+  const chip = syncChip(
+    { isError: false, refreshInFlight: false, status: status({ last_attempt_ok: false }) },
+    FMT,
+  )
+  assert.equal(chip.text, 'Updated 10:29 AM · retrying')
+  assert.equal(chip.state, 'warn')
+})
+
+test('a VM fallback composes the honest per-store suffix and turns the dot amber', () => {
+  const chip = syncChip(
+    {
+      isError: false,
+      refreshInFlight: false,
+      status: status({ records_source: 'local', context_source: 'local' }),
+    },
+    FMT,
+  )
+  assert.match(chip.text, /Updated 10:29 AM · on local — context aging/)
+  assert.equal(chip.state, 'warn') // an ok state degrades to warn on a local fallback
+})
+
+// --- OP-2: the manual-refresh min-duration hold (pure decision, no flaky timer test) ---
+
+test('refreshHold: still pulling → keep waiting, do not clear', () => {
+  assert.deepEqual(refreshHold(50, false), { clear: false, waitMs: 0 })
+})
+
+test('refreshHold: resolved after the beat → clear now', () => {
+  assert.deepEqual(refreshHold(REFRESH_MIN_VISIBLE_MS + 10, true), { clear: true, waitMs: 0 })
+})
+
+test('refreshHold: resolved within the beat → hold out the remainder (never a sub-perceptible flash)', () => {
+  const r = refreshHold(200, true, 600)
+  assert.equal(r.clear, false)
+  assert.equal(r.waitMs, 400) // 600 - 200
 })
