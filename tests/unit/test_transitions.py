@@ -13,9 +13,12 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from datetime import date, datetime
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from ipo.core.config import load_config
@@ -126,6 +129,81 @@ def test_store_roundtrips_most_recent_first(tmp_path: Path) -> None:
     assert [(t.ipo_id, t.to_verdict) for t in ordered] == [("a", SKIP), ("b", SKIP), ("a", APPLY)]
     assert [t.ipo_id for t in reloaded.for_ipo("a")] == ["a", "a"]
     assert reloaded.latest_by_ipo() == {"a": SKIP, "b": SKIP}  # a's newest is 2021-03-01 SKIP
+
+
+# --- Store durability (code review #3: atomic write + crash-safe read) -------
+
+
+def _tmp_siblings(path: Path) -> list[str]:
+    return sorted(p.name for p in path.parent.glob("*.tmp"))
+
+
+def test_atomic_flush_leaves_no_tmp(tmp_path: Path) -> None:
+    path = tmp_path / "transitions.json"
+    store = TransitionStore(path)
+    store.record(_t("a", _dt(2021, 1, 1), INSUFF, APPLY, True))
+
+    assert path.is_file()  # the real file was written via os.replace
+    assert _tmp_siblings(path) == []  # no lingering .tmp after a successful atomic flush
+
+
+def test_corrupt_log_does_not_crash_boot_and_is_quarantined(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / "transitions.json"
+    path.write_text('[{"ipo_id": "a", "asof"', encoding="utf-8")  # truncated mid-array
+
+    with caplog.at_level(logging.WARNING):
+        store = TransitionStore(path)  # must NOT raise out of the constructor (the #3 defect)
+
+    assert store.all() == []  # degraded to empty rather than crashing engine boot
+    quarantine = path.with_suffix(path.suffix + ".corrupt")
+    assert quarantine.is_file()  # corrupt bytes preserved, not silently dropped
+    assert quarantine.read_text(encoding="utf-8") == '[{"ipo_id": "a", "asof"'  # original, intact
+
+    warned = [r for r in caplog.records if r.getMessage() == "verdict_transition_log_corrupt"]
+    assert len(warned) == 1  # loud, not silent
+    rec = warned[0].__dict__
+    assert rec["quarantined_to"] == str(quarantine)
+    assert "OP-3" in rec["impact"]  # the scheduler-re-prime caveat is made loud
+    # The WARN tells the truth: this file has no backup, so pre-corruption history is gone. It must
+    # NOT point at the V3-2 archive (that archive mirrors only records + context, not this file).
+    assert "unrecoverable" in rec["recoverability"].lower()
+    assert "read_archive" not in " ".join(str(v) for v in rec.values())
+
+
+def test_corrupt_quarantine_survives_the_next_flush(tmp_path: Path) -> None:
+    path = tmp_path / "transitions.json"
+    path.write_text("not json at all", encoding="utf-8")
+    store = TransitionStore(path)  # quarantines + starts empty
+
+    store.record(_t("a", _dt(2021, 1, 1), INSUFF, APPLY, True))  # first real write after recovery
+
+    quarantine = path.with_suffix(path.suffix + ".corrupt")
+    assert quarantine.read_text(encoding="utf-8") == "not json at all"  # NOT clobbered by _flush
+    assert [t.ipo_id for t in TransitionStore(path).all()] == ["a"]  # fresh log is valid + reloads
+
+
+def test_non_list_json_is_treated_as_corrupt(tmp_path: Path) -> None:
+    path = tmp_path / "transitions.json"
+    path.write_text(json.dumps({"not": "an array"}), encoding="utf-8")  # valid JSON, wrong shape
+
+    store = TransitionStore(path)  # must not raise (no TypeError from iterating a dict)
+
+    assert store.all() == []
+    assert path.with_suffix(path.suffix + ".corrupt").is_file()
+
+
+def test_bom_prefixed_log_reloads(tmp_path: Path) -> None:
+    path = tmp_path / "transitions.json"
+    TransitionStore(path).record(_t("a", _dt(2021, 1, 1), INSUFF, APPLY, True))
+    body = path.read_text(encoding="utf-8")
+    path.write_text("\ufeff" + body, encoding="utf-8")  # a UTF-8 BOM, as some editors emit
+
+    reloaded = TransitionStore(path)  # utf-8-sig tolerates the BOM — reads, does not quarantine
+
+    assert [t.ipo_id for t in reloaded.all()] == ["a"]
+    assert not path.with_suffix(path.suffix + ".corrupt").is_file()  # a BOM is not corruption
 
 
 # --- Scheduler recording ----------------------------------------------------
