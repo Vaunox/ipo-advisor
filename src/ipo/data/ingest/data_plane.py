@@ -56,8 +56,10 @@ def _refresh_records(
             envelope = vm_client.fetch_records()
             repo.upsert_many(envelope.records)
             if envelope.refreshed_at is not None:
-                # The VM's own refreshed_at travels with the data — never stamped "now" (review #6).
-                ingest_state.record_success(envelope.refreshed_at, source="vm")
+                # The VM's own refreshed_at travels with the data as the freshness clock — never
+                # stamped "now" (review #6). ``pulled_at=clock()`` is the SEPARATE OP-2 "checked"
+                # clock: when the app pulled, which is now, even when refreshed_at is minutes old.
+                ingest_state.record_success(envelope.refreshed_at, source="vm", pulled_at=clock())
                 _log.info("records_from_vm", extra={"count": len(envelope.records)})
             else:
                 # The VM responded but carries NO confirmed freshness — it never ingested, or served

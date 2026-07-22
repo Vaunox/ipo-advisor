@@ -136,6 +136,7 @@ def create_app(
             last_successful_ingest=s.last_success,
             last_attempt=s.last_attempt,
             last_attempt_ok=s.last_attempt_ok,
+            checked_at=s.last_pull_ok,
             records_source=s.source,
             context_source=s.context_source,
             next_refresh_at=ingest_state.next_refresh(),

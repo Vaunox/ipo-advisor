@@ -3,7 +3,8 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useHealth, useStatus } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
-import { refreshHold, syncChip } from '../status'
+import type { AckSnapshot, RefreshAck } from '../status'
+import { REFRESH_ACK_MS, refreshAck, refreshHold, syncChip } from '../status'
 import { AlertCenter } from './AlertCenter'
 import { Clock } from './Clock'
 import { IconRefresh } from './Icons'
@@ -17,9 +18,10 @@ import { ThemeToggle } from './ThemeToggle'
 // OP-2 diagnosis — `useIsFetching()` pulsing on every 5s /status re-poll was the old flicker).
 interface RefreshCtx {
   inFlight: boolean
+  ack: RefreshAck // OP-2 Phase 2: the transient post-refresh acknowledgment the chip shows
   trigger: () => void
 }
-const RefreshContext = createContext<RefreshCtx>({ inFlight: false, trigger: () => {} })
+const RefreshContext = createContext<RefreshCtx>({ inFlight: false, ack: 'none', trigger: () => {} })
 const useRefresh = () => useContext(RefreshContext)
 
 // v3 V3-13 + OP-2: the manual-refresh busy/baseline/clear logic (formerly inside RefreshButton),
@@ -34,41 +36,69 @@ const useRefresh = () => useContext(RefreshContext)
 function RefreshProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
   const status = useStatus()
-  const updatedAt = status.data?.last_successful_ingest ?? null
-  const attemptedAt = status.data?.last_attempt ?? null
+  // OP-2 Phase 2: the full freshness snapshot the resolve/ack decision reads. `latest` mirrors it
+  // every render so the deferred setTimeout/effect callbacks always compute the ack from the freshest
+  // values, while `before` freezes the press-moment snapshot to diff against.
+  const snap: AckSnapshot = {
+    checked_at: status.data?.checked_at ?? null,
+    last_successful_ingest: status.data?.last_successful_ingest ?? null,
+    last_attempt: status.data?.last_attempt ?? null,
+    last_attempt_ok: status.data?.last_attempt_ok ?? null,
+  }
   const [inFlight, setInFlight] = useState(false)
-  const baselineSuccess = useRef<string | null>(null)
-  const baselineAttempt = useRef<string | null>(null)
+  const [ack, setAck] = useState<RefreshAck>('none')
+  const latest = useRef<AckSnapshot>(snap)
+  latest.current = snap
+  const before = useRef<AckSnapshot | null>(null)
   const startedAt = useRef<number>(0)
 
   useEffect(() => {
     if (!inFlight) return
     const elapsed = Date.now() - startedAt.current
-    const resolved = updatedAt !== baselineSuccess.current || attemptedAt !== baselineAttempt.current
+    const b = before.current
+    // Resolved = the app-pull clock advanced (a successful check — the common case, incl. a VM
+    // "nothing newer" re-pull), OR a fetch attempt/success moved (a failure, or newer data). A
+    // debounced press moves none of these and just times out at the 10s bound.
+    const resolved =
+      b != null &&
+      (snap.checked_at !== b.checked_at ||
+        snap.last_successful_ingest !== b.last_successful_ingest ||
+        snap.last_attempt !== b.last_attempt)
     const { clear, waitMs } = refreshHold(elapsed, resolved)
     if (clear) {
       setInFlight(false)
+      setAck(refreshAck(before.current, latest.current))
       return
     }
-    // Not clearing yet: if resolved-within-beat, hold out the remaining beat; if still pulling, fall
-    // back at the 10s bound (a debounced-away click has nothing to observe, so it just times out).
     const delay = resolved ? waitMs : Math.max(0, 10_000 - elapsed)
-    const t = window.setTimeout(() => setInFlight(false), delay)
+    const t = window.setTimeout(() => {
+      setInFlight(false)
+      setAck(refreshAck(before.current, latest.current))
+    }, delay)
     return () => window.clearTimeout(t)
-  }, [inFlight, updatedAt, attemptedAt])
+  }, [inFlight, snap.checked_at, snap.last_successful_ingest, snap.last_attempt])
+
+  // OP-2 Phase 2: hold the acknowledgment for a readable beat, then settle back to the steady chip.
+  useEffect(() => {
+    if (ack === 'none') return
+    const t = window.setTimeout(() => setAck('none'), REFRESH_ACK_MS)
+    return () => window.clearTimeout(t)
+  }, [ack])
 
   const trigger = () => {
     if (inFlight) return
-    baselineSuccess.current = updatedAt
-    baselineAttempt.current = attemptedAt
+    before.current = latest.current // freeze the press-moment snapshot to diff the outcome against
     startedAt.current = Date.now()
+    setAck('none') // a fresh press supersedes any lingering acknowledgment
     setInFlight(true)
     const api = (window as unknown as { ipoDesktop?: { refresh?: () => Promise<boolean> } }).ipoDesktop
     if (api?.refresh) void api.refresh()
     else void qc.invalidateQueries() // browser/dev without the shell: re-read the engine, no live pull
   }
 
-  return <RefreshContext.Provider value={{ inFlight, trigger }}>{children}</RefreshContext.Provider>
+  return (
+    <RefreshContext.Provider value={{ inFlight, ack, trigger }}>{children}</RefreshContext.Provider>
+  )
 }
 
 // v3 V3-13: a header Refresh control beside the alert bell. In-flight state: disabled + spinning
@@ -95,10 +125,10 @@ function RefreshButton() {
 // so the shipped chip can't drift from the tested one. OP-2: "Refreshing…" shows ONLY for a genuine
 // manual pull (RefreshContext.inFlight), never `useIsFetching()`.
 function SyncStatus() {
-  const { inFlight } = useRefresh()
+  const { inFlight, ack } = useRefresh()
   const health = useHealth()
   const status = useStatus()
-  const chip = syncChip({ isError: health.isError, refreshInFlight: inFlight, status: status.data })
+  const chip = syncChip({ isError: health.isError, refreshInFlight: inFlight, ack, status: status.data })
   return (
     <div className={`syncstat ${chip.state}`} role="status" aria-live="polite" title={chip.title}>
       <span className={chip.dot} />

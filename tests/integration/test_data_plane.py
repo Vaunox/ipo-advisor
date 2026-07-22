@@ -111,6 +111,9 @@ def test_vm_healthy_serves_both_stores_from_vm(tmp_path: Path) -> None:
     assert repo.get("acme") is not None  # the VM's records were upserted
     snap = state.current()
     assert snap.source == "vm" and snap.last_success == _VM_TIME  # freshness = the VM's timestamp
+    # OP-2 Phase 2: the app's-pull clock is set AND distinct from the data clock — the VM's stamp is
+    # the fixed past _VM_TIME, the pull happened now, so the two must not be conflated.
+    assert snap.last_pull_ok is not None and snap.last_pull_ok != snap.last_success
     assert snap.context_source == "vm"
     assert json.loads(ctx_path.read_text())["ipos"]["ACME"]["isin"] == "INE0X"  # context written
 
@@ -133,6 +136,9 @@ def test_vm_null_freshness_does_not_stamp_now(tmp_path: Path) -> None:
     assert snap.last_attempt is not None  # the reachable attempt WAS recorded
     assert snap.last_attempt_ok is True  # reachable, NOT flipped to a failure (so no "retrying")
     assert snap.source == "vm"  # the VM did serve
+    # OP-2 Phase 2: reachable + served records IS a successful check — the pull clock advances even
+    # though the data clock stays null. "I checked at HH:MM" is honest; "Data is fresh" is not.
+    assert snap.last_pull_ok is not None
 
 
 def test_vm_null_freshness_keeps_prior_last_success(tmp_path: Path) -> None:

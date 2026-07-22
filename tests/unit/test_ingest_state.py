@@ -52,6 +52,58 @@ def test_failure_before_any_success_leaves_success_none(tmp_path: Path) -> None:
     assert s.last_attempt_ok is False
 
 
+# --- OP-2 Phase 2: the app's-last-successful-PULL clock (last_pull_ok) — the honest "Checked" time.
+
+
+def test_success_advances_last_pull_ok_defaulting_to_when(tmp_path: Path) -> None:
+    # For the local scrape, the served-data time IS the pull time, so pulled_at defaults to `when`.
+    store = IngestStateStore(tmp_path / "ingest_state.json")
+    t = datetime(2026, 7, 14, 9, 0)
+    store.record_success(t)
+    assert store.current().last_pull_ok == t
+
+
+def test_success_pull_clock_is_distinct_from_the_data_clock(tmp_path: Path) -> None:
+    # The VM path: `when` is the VM's (older) refreshed_at; pulled_at is when the app pulled (now).
+    # The two clocks must NOT be conflated — last_success is the data time, last_pull_ok the pull.
+    store = IngestStateStore(tmp_path / "ingest_state.json")
+    data_ts = datetime(2026, 7, 14, 9, 0)
+    pulled = datetime(2026, 7, 14, 9, 27)
+    store.record_success(data_ts, source="vm", pulled_at=pulled)
+    s = store.current()
+    assert s.last_success == data_ts  # the served data's own timestamp (the VM's refreshed_at)
+    assert s.last_pull_ok == pulled  # the app's pull wall-clock — the "Checked HH:MM" the UI shows
+
+
+def test_no_freshness_advances_the_pull_clock_but_not_the_data_clock(tmp_path: Path) -> None:
+    # Reachable VM that served records with no fresh stamp: "I checked at HH:MM" is true, so the
+    # pull clock advances, while last_success stays honestly null (review #6). Endorsed in Phase 2.
+    store = IngestStateStore(tmp_path / "ingest_state.json")
+    checked = datetime(2026, 7, 14, 9, 30)
+    store.record_no_freshness(checked, source="vm")
+    s = store.current()
+    assert s.last_pull_ok == checked  # the app did successfully check
+    assert s.last_success is None  # but the data itself carried no fresh timestamp
+
+
+def test_failure_never_advances_the_pull_clock(tmp_path: Path) -> None:
+    # A failed pull must not overwrite the honest last-check time with a fresh lie (Checked 12:00
+    # when nothing was fetched). last_pull_ok stays at the prior success.
+    store = IngestStateStore(tmp_path / "ingest_state.json")
+    ok_t = datetime(2026, 7, 14, 9, 0)
+    store.record_success(ok_t)
+    store.record_failure(datetime(2026, 7, 14, 12, 0), "nse unreachable")
+    assert store.current().last_pull_ok == ok_t  # unchanged — never advances on failure
+
+
+def test_pull_clock_none_before_any_pull_then_persists(tmp_path: Path) -> None:
+    path = tmp_path / "ingest_state.json"
+    assert IngestStateStore(path).current().last_pull_ok is None  # honest — no check yet
+    t = datetime(2026, 7, 14, 9, 0)
+    IngestStateStore(path).record_success(t)
+    assert IngestStateStore(path).current().last_pull_ok == t  # survives a restart, like the rest
+
+
 def test_persists_across_reload(tmp_path: Path) -> None:
     path = tmp_path / "ingest_state.json"
     t = datetime(2026, 7, 14, 9, 0)

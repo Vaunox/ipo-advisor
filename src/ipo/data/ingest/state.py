@@ -42,6 +42,14 @@ class IngestState(BaseModel):
     last_attempt: datetime | None = None
     last_attempt_ok: bool | None = None
     last_error: str | None = None
+    # OP-2 Phase 2: the app's-last-successful-PULL wall-clock — a DIFFERENT clock from
+    # ``last_success`` (the served data's own timestamp, e.g. the VM's ``refreshed_at``). A manual
+    # refresh is a VM re-pull, not an NSE re-scrape, so on a "nothing newer" pull ``last_success``
+    # does not move — but the app DID successfully check, and this records when. It advances on any
+    # cycle that reached a source and got records (``record_success`` + ``record_no_freshness``) and
+    # NEVER on ``record_failure`` (a failed pull must not overwrite the honest last-check time). The
+    # UI shows it as "Checked HH:MM"; persisted like the rest, so it survives a restart honestly.
+    last_pull_ok: datetime | None = None
     # v3 V3-1: which path served each store this cycle — "vm" | "local" | None (no VM configured).
     # Provenance labels only; freshness still lives on ``last_success`` (records) and the context
     # cache's own ``refreshed_at`` (one staleness rule, not a second freshness path). They differ in
@@ -79,12 +87,17 @@ class IngestStateStore:
             except (ValueError, OSError) as exc:  # corrupt/partial file → start clean, don't crash
                 _log.warning("ingest_state_load_failed", extra={"error": str(exc)})
 
-    def record_success(self, when: datetime, *, source: str = "local") -> None:
+    def record_success(
+        self, when: datetime, *, source: str = "local", pulled_at: datetime | None = None
+    ) -> None:
         """Advance freshness to ``when`` — a good records fetch (``source``: vm | local).
 
         ``when`` is the served data's own timestamp: the VM's ``refreshed_at`` when the VM served,
         the local pull time when we scraped — one staleness rule reasons about both paths the same.
-        ``model_copy`` preserves ``context_source`` (recorded separately in the same cycle).
+        ``pulled_at`` (OP-2 Phase 2) is the wall-clock of THIS pull — the honest "checked" clock. It
+        defaults to ``when`` for the local scrape, where the scrape time IS the pull time; the VM
+        path passes ``clock()`` because there ``when`` is the VM's (possibly minutes-old) stamp, not
+        when we pulled it. ``model_copy`` preserves ``context_source`` (recorded in the same cycle).
         """
         with self._lock:
             self._state = self._state.model_copy(
@@ -94,6 +107,7 @@ class IngestStateStore:
                     "last_attempt_ok": True,
                     "last_error": None,
                     "source": source,
+                    "last_pull_ok": pulled_at if pulled_at is not None else when,
                 }
             )
             self._flush()
@@ -139,6 +153,10 @@ class IngestStateStore:
                     "last_attempt_ok": True,
                     "last_error": None,
                     "source": source,
+                    # OP-2 Phase 2: reachable + served records IS a successful check, even though
+                    # the data carried no fresh stamp — so the "checked" clock advances (``when``
+                    # here is already the wall-clock ``clock()``), while ``last_success`` stays put.
+                    "last_pull_ok": when,
                 }
             )
             self._flush()
