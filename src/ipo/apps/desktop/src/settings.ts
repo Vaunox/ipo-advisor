@@ -104,6 +104,38 @@ export function planStartupMigration(
   }
 }
 
+/** The window's intended visibility at boot — F1-rev's single end-state authority. Four outcomes:
+ *  stay hidden in the tray, minimized on the taskbar, shown maximized, or shown at normal size. */
+export type StartupWindowState =
+  | 'hidden-to-tray'
+  | 'minimized-to-taskbar'
+  | 'shown-maximized'
+  | 'shown-normal'
+
+/** Decide the boot window state in ONE place (F1-rev). Start-minimized applies ONLY on a real
+ *  auto-launch (the marker in argv, per `wasAutoLaunched`) AND when the user asked for it — a manual
+ *  open always shows (the OP-1 invariant). Crucially, `savedMaximized` is folded into the SHOWN
+ *  outcomes ONLY: it must NEVER pull a start-minimized launch into a visible state. The F1-rev bug was
+ *  a SEPARATE code path (`win.maximize()` before `ready-to-show`) doing exactly that — `maximize()`
+ *  "will also show … the window if it isn't being displayed" (Electron docs), so a restore-maximized
+ *  concern silently pre-empted start-minimized. Centralising the decision here, with maximize deferred
+ *  into the shown outcomes, closes that. "To the tray" also requires the tray to actually exist: if
+ *  `createTray()` failed, degrade to the taskbar rather than hide into nothing with no way to reopen.
+ *  Pure, so `node --test` fences all four outcomes + the degrade. */
+export function startupWindowState(opts: {
+  autoLaunched: boolean
+  startMinimized: boolean
+  minimizeToTray: boolean
+  savedMaximized: boolean
+  trayAvailable: boolean
+}): StartupWindowState {
+  if (opts.autoLaunched && opts.startMinimized) {
+    if (opts.minimizeToTray && opts.trayAvailable) return 'hidden-to-tray'
+    return 'minimized-to-taskbar' // tray off, OR tray creation failed → still reachable on the taskbar
+  }
+  return opts.savedMaximized ? 'shown-maximized' : 'shown-normal'
+}
+
 /** The BrowserWindow security posture in ONE lockable place (the "sealed shell" family: OP-6 + review
  *  #5). Context-isolated, no node integration, and — OP-6 — Chromium DevTools OFF in the packaged
  *  build (``dev=false`` makes ``Ctrl+Shift+I`` / the default-menu accelerator / ``openDevTools()`` all

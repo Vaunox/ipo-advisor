@@ -22,6 +22,7 @@ import {
   planStartupMigration,
   saveSeenState,
   saveSettings,
+  startupWindowState,
   wasAutoLaunched,
 } from './settings'
 
@@ -164,6 +165,60 @@ test('a partial / hand-edited config falls back to defaults field-by-field', () 
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+// --- F1-rev: the single window-visibility authority (startupWindowState) --------------------------
+// One pure decision replaces the split logic (a `maximize()` call BEFORE ready-to-show + the handler)
+// whose two disconnected authorities let a restore-maximized concern pre-empt start-minimized: on a
+// maximized auto-launch the window opened fully (config 1) or flashed then minimized (config 2).
+// All four outcomes fenced, plus the load-bearing invariants and the tray-failure degrade.
+
+function stState(
+  over: Partial<Parameters<typeof startupWindowState>[0]> = {},
+): ReturnType<typeof startupWindowState> {
+  // Base = config 1 (auto-launched, start-minimized, tray on, tray created). Each test overrides.
+  return startupWindowState({
+    autoLaunched: true,
+    startMinimized: true,
+    minimizeToTray: true,
+    savedMaximized: false,
+    trayAvailable: true,
+    ...over,
+  })
+}
+
+test('config 1 (auto + start-min + tray on) → hidden-to-tray, INDEPENDENT of savedMaximized', () => {
+  // The bug was a maximized window forcing "shown" here. The leak is closed iff `savedMaximized` does
+  // NOT change the outcome — both true and false must map to the same start-minimized outcome.
+  assert.equal(stState({ savedMaximized: false }), 'hidden-to-tray')
+  assert.equal(stState({ savedMaximized: true }), 'hidden-to-tray') // maximized no longer pre-empts it
+})
+
+test('config 2 (auto + start-min + tray OFF) → minimized-to-taskbar, INDEPENDENT of savedMaximized', () => {
+  assert.equal(stState({ minimizeToTray: false, savedMaximized: false }), 'minimized-to-taskbar')
+  assert.equal(stState({ minimizeToTray: false, savedMaximized: true }), 'minimized-to-taskbar')
+})
+
+test('regression guard: a maximized MANUAL open still reopens maximized', () => {
+  assert.equal(stState({ autoLaunched: false, savedMaximized: true }), 'shown-maximized')
+  assert.equal(stState({ autoLaunched: false, savedMaximized: false }), 'shown-normal')
+})
+
+test('OP-1 invariant: a manual open ALWAYS shows, even with start-minimized on', () => {
+  // Start-minimized is honored ONLY on a real auto-launch; a manual double-click always shows.
+  assert.equal(stState({ autoLaunched: false, startMinimized: true }), 'shown-normal')
+  assert.equal(stState({ autoLaunched: false, startMinimized: true, savedMaximized: true }), 'shown-maximized')
+})
+
+test('tray-failure degrade: hidden-to-tray falls back to the taskbar when the tray is gone', () => {
+  // If createTray() failed, hiding into the tray would leave the app unreachable — degrade to taskbar.
+  assert.equal(stState({ minimizeToTray: true, trayAvailable: false }), 'minimized-to-taskbar')
+  assert.equal(stState({ minimizeToTray: true, trayAvailable: true }), 'hidden-to-tray') // tray flips it
+})
+
+test('a normal (not start-minimized) auto-launch shows, maximize-aware', () => {
+  assert.equal(stState({ startMinimized: false, savedMaximized: false }), 'shown-normal')
+  assert.equal(stState({ startMinimized: false, savedMaximized: true }), 'shown-maximized')
 })
 
 // --- OP-6: the sealed-shell BrowserWindow posture (DevTools off in prod, on in dev) --------------
