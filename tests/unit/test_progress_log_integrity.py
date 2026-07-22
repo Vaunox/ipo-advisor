@@ -97,6 +97,16 @@ _SHIPPED_V3 = frozenset(
         "L3",
         "L4",
         "L5",
+        # OP-2 Phase 2 (2026-07-22) + the 2026-07-21 two-eyes `.exe` verification pass, and the
+        # 2026-07-20 operational cluster it live-proved: OP-6/OP-3 (shell), saveSettings-atomic
+        # (durability), and the EB26 signtoolOptions packaging migration. Non-blueprint; each row
+        # must not vanish.
+        "OP-6",
+        "OP-3",
+        "saveSettings atomic",
+        "EB26 sign migration",
+        ".exe verification pass",
+        "OP-2 Phase 2",
     }
 )
 
