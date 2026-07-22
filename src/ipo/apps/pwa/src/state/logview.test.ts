@@ -124,3 +124,43 @@ test('appendCapped appends new tail lines and keeps only the newest max', () => 
     ['b', 'c', 'd'], // capped to newest 3 (oldest dropped) — constant memory
   )
 })
+
+test('collapse keys are unique across a mixed ring+disk buffer — a disk index must not collide with a ring seq (F8c/d fence)', () => {
+  // Disk lines carry no `seq`. Under the OLD `${seq ?? rows.length}-${message}` scheme the disk 'X'
+  // below lands at collapse-index 3 -> "3-X", and the ring 'X' has seq 3 -> "3-X": a DUPLICATE key,
+  // which is what let React omit stale rows (F8c) and duplicate/misorder rows (F8d). Distinct ts so
+  // nothing folds; this is the exact class the operator captured (`6-records_from_vm`, `7-…`).
+  const disk = ['a', 'b', 'c', 'X', 'records_from_vm'].map((message, i) => ({
+    ts: `2026-07-22T14:40:0${i}.000+05:30`, logger: 'r', level: 'INFO', ipo_id: '', message,
+  }))
+  const ring = ['p', 'q', 'X'].map((message, i) => ({
+    ts: `2026-07-22T14:41:0${i}.000+05:30`, logger: 'r', level: 'INFO', ipo_id: '', message, seq: i + 1,
+  }))
+  const keys = collapse(disk.concat(ring)).map((r) => r.key)
+  assert.equal(new Set(keys).size, keys.length) // ALL unique (old scheme produced "3-X" twice)
+})
+
+test('collapse keys survive an older page prepending — even when it merges into the front run (stability)', () => {
+  // The front run is a single `start`; the older page ends with ANOTHER `start` that folds into it.
+  // A first-entry key anchor would change here (the churn the amendment guards against); a
+  // newest-entry anchor must not — only the count grows.
+  const mk = (ts: string, message: string, seq?: number) => ({
+    ts, logger: 'r', level: 'INFO', ipo_id: '', message, ...(seq != null ? { seq } : {}),
+  })
+  const current = [mk('2026-07-22T10:03:00.000+05:30', 'start'), mk('2026-07-22T10:04:00.000+05:30', 'done'), mk('2026-07-22T10:05:00.000+05:30', 'start', 1)]
+  const beforeKeys = collapse(current).map((r) => r.key)
+  const older = [mk('2026-07-22T10:01:00.000+05:30', 'boot'), mk('2026-07-22T10:02:00.000+05:30', 'start')]
+  const afterKeys = new Set(collapse(prependOlder(older, current)).map((r) => r.key))
+  for (const k of beforeKeys) assert.ok(afterKeys.has(k), `pre-existing key ${k} must survive the prepend`)
+})
+
+test('prependOlder de-dupes exact twins but keeps distinct same-ms events (over-dedup fix)', () => {
+  const cur = [{ ts: 'T', logger: 'r', level: 'INFO', ipo_id: '', message: 'records_from_vm', count: 3, seq: 9 }]
+  // a true twin: same payload as cur[0] except it has no `seq` (the disk copy) -> dropped, same ref
+  const twin = [{ ts: 'T', logger: 'r', level: 'INFO', ipo_id: '', message: 'records_from_vm', count: 3 }]
+  assert.equal(prependOlder(twin, cur), cur)
+  // a DISTINCT event: identical ts/logger/message/ipo_id but a different extra (count) -> must be KEPT.
+  // The old ts|logger|message|ipo_id seam key wrongly dropped it (silent loss).
+  const distinct = [{ ts: 'T', logger: 'r', level: 'INFO', ipo_id: '', message: 'records_from_vm', count: 7 }]
+  assert.equal(prependOlder(distinct, cur).length, 2)
+})

@@ -57,6 +57,26 @@ export interface ConsoleRow {
   key: string
 }
 
+// The FULL payload identity of an entry, EXCLUDING `seq` (ring-only — a disk twin of the same line
+// carries no seq, so including it would make a line and its disk twin look different and defeat the
+// seam de-dup). Keys are sorted so a ring payload and its disk twin (parsed back from JSON) serialize
+// identically. This is BOTH the seam de-dup identity (prependOlder) AND the base for a disk row's
+// React key — so two genuinely-distinct same-millisecond events (they differ in some extra) are
+// neither merged at the seam nor collapsed onto one key.
+function identity(e: LogEntry): string {
+  const ordered: Record<string, unknown> = {}
+  for (const k of Object.keys(e).sort()) if (k !== 'seq') ordered[k] = e[k]
+  return JSON.stringify(ordered)
+}
+
+// The base React key for a collapsed row, namespaced by source so a ring `seq` can NEVER collide with
+// a disk row — the F8c/d bug was `${seq ?? rows.length}`, which let a disk array-index equal a ring
+// seq (and shifted every prepend). Ring rows key off their intrinsic monotonic `seq`; disk rows (no
+// seq) off their full identity.
+function rowKeyBase(e: LogEntry): string {
+  return e.seq != null ? `r:${e.seq}` : `d:${identity(e)}`
+}
+
 // Repeat-suppression: fold a RUN of consecutive entries with the same event identity (level +
 // message + ipo_id) into ONE row carrying the count — so a failure loop is one counted line, not a
 // 47-line flood that evicts history. Different interleaved events break the run. The latest entry's
@@ -72,10 +92,23 @@ export function collapse(entries: LogEntry[]): ConsoleRow[] {
       (last.entry.ipo_id ?? '') === (entry.ipo_id ?? '')
     if (same) {
       last.count += 1
-      last.entry = entry // keep the latest detail
+      last.entry = entry // keep the latest detail — and the run's key anchor (see below)
     } else {
-      rows.push({ entry, count: 1, key: `${entry.seq ?? rows.length}-${entry.message ?? ''}` })
+      rows.push({ entry, count: 1, key: '' })
     }
+  }
+  // Assign keys AFTER the runs are complete, anchored on each run's NEWEST entry (`row.entry`).
+  // Anchoring on the newest (not the first) keeps a row's key STABLE when an older page prepends and
+  // merges into the run's front: only `count` grows, the key doesn't, so React never remounts it. The
+  // Set makes the keys provably unique even in the (astronomically rare) two-identical-disk-payloads
+  // case; the suffix is a defensive net, never the routine path (distinct events → distinct identity).
+  const used = new Set<string>()
+  for (const row of rows) {
+    const base = rowKeyBase(row.entry)
+    let key = base
+    for (let n = 2; used.has(key); n++) key = `${base}#${n}`
+    used.add(key)
+    row.key = key
   }
   return rows
 }
@@ -97,20 +130,17 @@ export function appendCapped(prev: LogEntry[], next: LogEntry[], max: number): L
   return merged.length > max ? merged.slice(merged.length - max) : merged
 }
 
-// Identity used to stitch the ring→disk seam. NOT `seq` — that's ring-only (the same event on disk
-// has no seq), so a ring line and its disk twin would look different. ts+logger+message+ipo_id is
-// effectively unique at microsecond ts resolution, and matches across both sources.
-function entryKey(e: LogEntry): string {
-  return `${e.ts ?? ''}|${e.logger ?? ''}|${e.message ?? ''}|${e.ipo_id ?? ''}`
-}
-
 // Scroll-back stitch: prepend an older disk page ahead of the current buffer, dropping any entry
-// already shown (the boundary line overlaps because the `before` cursor is inclusive). So the one
-// continuous timeline — ring flowing into disk — has NO duplicate and NO gap at the seam. Returns
-// the same array reference when nothing new is older (lets the caller detect "history exhausted").
+// already shown (the boundary line overlaps because the `before` cursor is inclusive). De-dup is by
+// full `identity` (ts+logger+message+ipo_id + every extra, seq excluded) — NOT just
+// ts+logger+message+ipo_id, which merged two genuinely-distinct same-millisecond events and dropped
+// one (silent loss). Now only exact-payload twins (the same line seen on both ring and disk) collapse;
+// distinct events are both kept. So the one continuous timeline has NO duplicate and NO gap at the
+// seam. Returns the same array reference when nothing new is older (lets the caller detect
+// "history exhausted").
 export function prependOlder(older: LogEntry[], current: LogEntry[]): LogEntry[] {
   if (older.length === 0) return current
-  const seen = new Set(current.map(entryKey))
-  const fresh = older.filter((e) => !seen.has(entryKey(e)))
+  const seen = new Set(current.map(identity))
+  const fresh = older.filter((e) => !seen.has(identity(e)))
   return fresh.length === 0 ? current : fresh.concat(current)
 }
