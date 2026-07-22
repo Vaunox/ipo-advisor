@@ -24,6 +24,7 @@ import {
   planStartupMigration,
   saveSeenState,
   saveSettings,
+  startupWindowState,
   wasAutoLaunched,
 } from './settings'
 
@@ -81,6 +82,12 @@ async function restartEngine(): Promise<boolean> {
 function showWindow(): void {
   if (!win) return
   if (win.isMinimized()) win.restore()
+  // F1-rev: re-apply maximize when that's the saved state. `restore()` already brings a *minimized*
+  // window back to its prior maximized state, and `maximize()` is a no-op on an already-maximized
+  // window — so this is only load-bearing for the NEVER-shown path (a maximized window that started
+  // `hidden-to-tray` and is now opened from the tray), which would otherwise reopen at normal size.
+  // Unconditional (gated only on the saved preference) so no "was-shown" flag is needed.
+  if (settings.bounds?.maximized) win.maximize()
   win.show()
   win.focus()
 }
@@ -92,7 +99,10 @@ function persistBounds(): void {
   saveSettings(userDataDir, settings)
 }
 
-function createTray(): void {
+// F1-rev: returns whether the tray icon was actually created. The boot decision needs this — if the
+// tray failed, a `hidden-to-tray` start would hide the window with NO tray and (maybe) no taskbar
+// button = unreachable, so `startupWindowState` degrades to the taskbar when trayAvailable is false.
+function createTray(): boolean {
   try {
     const image = nativeImage.createFromPath(iconPath)
     tray = new Tray(image.isEmpty() ? iconPath : image)
@@ -112,8 +122,10 @@ function createTray(): void {
       ]),
     )
     tray.on('click', () => showWindow())
+    return true
   } catch (e) {
     console.error('[tray] failed', e)
+    return false
   }
 }
 
@@ -171,7 +183,10 @@ async function boot(): Promise<void> {
       engineBase,
     }),
   })
-  if (saved?.maximized) win.maximize()
+  // F1-rev: maximize is NO LONGER applied here. `win.maximize()` shows a `show:false` window (Electron
+  // docs: "will also show … the window if it isn't being displayed"), so restoring a maximized window
+  // here pre-empted the start-minimized decision at `ready-to-show` — the whole F1-rev bug. Maximize is
+  // now folded into the SHOWN outcomes of the single end-state switch below (startupWindowState).
 
   // Review #5 — navigation lockdown (defense-in-depth): the window only ever shows the app's own
   // dashboard. Deny every popup/new-window (the app opens none; approved external links go out via
@@ -193,22 +208,6 @@ async function boot(): Promise<void> {
   win.webContents.on('will-navigate', blockForeignNav)
   win.webContents.on('will-redirect', blockForeignNav)
 
-  // Start minimized ONLY when Windows auto-launched us at login (the marker arg in argv) AND the
-  // operator asked for it — a manual open (double-click / Start menu / taskbar) always shows the
-  // window (OP-1). To the tray if minimize-to-tray is on, else to the taskbar.
-  // OP-5 (as implemented): the single-instance `second-instance` handler restores the window via
-  // showWindow() and IGNORES the forwarded argv, so a forwarded `--ipoadvisor-autostart` marker can
-  // never drive minimize. This marker->minimize decision belongs to THIS (primary) boot only — it
-  // reads the primary's OWN process.argv, never a forwarded one.
-  const autoLaunched = wasAutoLaunched(process.argv)
-  win.once('ready-to-show', () => {
-    if (autoLaunched && settings.startup.startMinimized) {
-      if (!settings.startup.minimizeToTray) win?.minimize()
-    } else {
-      win?.show()
-    }
-  })
-
   // Close = minimize to tray (keep the engine warm) unless we're really quitting or the pref is off.
   win.on('close', (e) => {
     persistBounds()
@@ -226,7 +225,41 @@ async function boot(): Promise<void> {
   win.on('focus', () => triggerEngineRefresh(child))
   win.on('restore', () => triggerEngineRefresh(child))
 
-  createTray()
+  // F1-rev: the tray is created FIRST so its success feeds the boot visibility decision — a
+  // `hidden-to-tray` start with no tray would be unreachable, so we degrade to the taskbar instead.
+  const trayOk = createTray()
+
+  // F1-rev — the SINGLE window-visibility authority. `startupWindowState` (pure, node-tested) folds
+  // every input — auto-launch (the OP-1 marker in THIS primary's own argv, never a forwarded one; the
+  // OP-5 second-instance handler restores via showWindow and ignores forwarded argv), start-minimized,
+  // minimize-to-tray, saved-maximized, and tray availability — into ONE of four outcomes, applied
+  // atomically at ready-to-show (which fires with no visual flash — Electron docs). A manual open
+  // always shows (OP-1); maximize applies ONLY within the shown outcomes, never pre-empting a
+  // start-minimized launch. `minimize()` on a hidden window does not flash it (verified on E41.10.2).
+  const startupState = startupWindowState({
+    autoLaunched: wasAutoLaunched(process.argv),
+    startMinimized: settings.startup.startMinimized,
+    minimizeToTray: settings.startup.minimizeToTray,
+    savedMaximized: !!saved?.maximized,
+    trayAvailable: trayOk,
+  })
+  win.once('ready-to-show', () => {
+    if (!win) return
+    switch (startupState) {
+      case 'hidden-to-tray':
+        break // stay hidden (show:false) — the tray holds it
+      case 'minimized-to-taskbar':
+        win.minimize()
+        break
+      case 'shown-maximized':
+        win.maximize() // shows + maximizes (Electron docs: does NOT focus)…
+        win.show() // …so show() brings it to the foreground with focus
+        break
+      case 'shown-normal':
+        win.show()
+        break
+    }
+  })
 
   // Show the splash (the readiness gate, made visible) while we wait — the dashboard is NOT loaded.
   await win.loadFile(path.join(__dirname, '..', 'splash.html'))
