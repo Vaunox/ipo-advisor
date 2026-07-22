@@ -105,8 +105,29 @@ def test_scope_awaiting_and_recently_listed_included(tmp_path: Path) -> None:
 
 
 def test_scope_drops_long_listed(tmp_path: Path) -> None:
+    # Well past the 5-day post-listing window (F10, _LISTED_VISIBLE_DAYS): listed 10d ago → dropped.
     store = _store_reg(tmp_path, {})
     records = [_rec("old", close=date(2026, 6, 28), listing=date(2026, 7, 4))]  # listed 10d ago
+    assert build_allotment_view(records, store, clock=_CLOCK).rows == []
+
+
+def test_scope_listed_exactly_at_window_still_shown(tmp_path: Path) -> None:
+    # F10 boundary: `_stage` drops on `days > _LISTED_VISIBLE_DAYS` (=5), so listed EXACTLY 5 days
+    # ago is STILL shown (drops only on day 6). today = 2026-07-14, listing 2026-07-09 → 5 days.
+    store = _store_reg(tmp_path, {})
+    records = [
+        _rec("edge", close=date(2026, 7, 4), listing=date(2026, 7, 9))
+    ]  # listed exactly 5d ago
+    view = build_allotment_view(records, store, clock=_CLOCK)
+    assert [r.ipo_id for r in view.rows] == ["edge"]  # in scope at the boundary
+    assert view.rows[0].stage == "listed"
+
+
+def test_scope_drops_one_day_past_window(tmp_path: Path) -> None:
+    # F10 boundary+1: listed 6 days ago (2026-07-08) → dropped. Pins the near side of the window: a
+    # silent drift back to the old 7 (which still showed a 6-day-old card) fails this test.
+    store = _store_reg(tmp_path, {})
+    records = [_rec("gone", close=date(2026, 7, 2), listing=date(2026, 7, 8))]  # listed 6d ago
     assert build_allotment_view(records, store, clock=_CLOCK).rows == []
 
 

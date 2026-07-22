@@ -40,8 +40,10 @@ from ipo.service.views import AllotmentRow, AllotmentView, IpoContextView, Regis
 _log = get_logger("ipo.service.ipo_context")
 
 # How long after listing an IPO stays on the Allotment tab (allotment-status checking is only
-# relevant for a short window after listing; keeps the tab bounded).
-_LISTED_VISIBLE_DAYS = 7
+# relevant for a short window after listing; keeps the tab bounded). F10: 5 days. `_stage` uses
+# `days > _LISTED_VISIBLE_DAYS`, so a card listed EXACTLY N days ago is still shown and drops on day
+# N+1 — i.e. visible through day 5, gone on day 6.
+_LISTED_VISIBLE_DAYS = 5
 
 # Beyond this age the cache is "stale": an absent field is treated as unproven ("we haven't looked")
 # rather than "not published". One threshold for every field derived from the cache.
