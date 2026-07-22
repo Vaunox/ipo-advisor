@@ -187,6 +187,12 @@ export interface StatusView {
   last_successful_ingest: string | null
   last_attempt: string | null
   last_attempt_ok: boolean | null
+  // OP-2 Phase 2: the app's-last-successful-PULL wall-clock — a DIFFERENT clock from
+  // `last_successful_ingest` (the served data's own timestamp). The chip binds "Checked HH:MM" to
+  // THIS: when the app last reached a source and got data, whether or not the data itself moved. It
+  // advances on any reachable pull that got records (a VM "nothing newer" re-pull included) and
+  // never on a failed pull, so it is honest as the primary clock. `refreshed_at` is NOT shown.
+  checked_at: string | null
   // v3 V3-1: which path served each store — 'vm' | 'local' | null (no VM configured). Lets the sync
   // chip say the honest per-store truth on a VM outage (records fresh-local vs context last-known-
   // aging), not a blanket "VM unreachable". null (dark-ship) → no fallback indicator at all.

@@ -111,8 +111,41 @@ def test_vm_healthy_serves_both_stores_from_vm(tmp_path: Path) -> None:
     assert repo.get("acme") is not None  # the VM's records were upserted
     snap = state.current()
     assert snap.source == "vm" and snap.last_success == _VM_TIME  # freshness = the VM's timestamp
+    # OP-2 Phase 2: the app's-pull clock is set AND distinct from the data clock — the VM's stamp is
+    # the fixed past _VM_TIME, the pull happened now, so the two must not be conflated.
+    assert snap.last_pull_ok is not None and snap.last_pull_ok != snap.last_success
     assert snap.context_source == "vm"
     assert json.loads(ctx_path.read_text())["ipos"]["ACME"]["isin"] == "INE0X"  # context written
+
+
+def test_vm_pull_clock_is_the_pull_time_not_the_vm_stamp(tmp_path: Path) -> None:
+    """Fence for the ``record_success(pulled_at=…)`` footgun (OP-2 Phase 2).
+
+    ``pulled_at`` defaults to ``when`` — correct for the local scrape (scrape time IS pull time),
+    but the VM path MUST pass ``clock()`` because there ``when`` is the VM's (older) refreshed_at.
+    A future caller who drops ``pulled_at=clock()`` would silently get the data clock as the pull
+    clock — the exact "button feels dead" bug (the checked clock frozen at the data stamp)
+    reintroduced invisibly. Inject a clock distinct from the VM stamp and pin the two apart.
+    """
+    pull_time = datetime(2026, 7, 20, 15, 45, tzinfo=IST)  # distinct from _VM_TIME (the VM's stamp)
+    vm = _FakeVm(
+        records=RecordsEnvelope(refreshed_at=_VM_TIME, records=[_record("acme")]),
+        context=ContextEnvelope(refreshed_at=_VM_TIME, ipos={}),
+    )
+    repo = ParquetRepository(tmp_path)
+    state = IngestStateStore(tmp_path / "ingest_state.json")
+    refresh_data_plane(
+        repo,
+        cast(NseClient, _FakeNse()),
+        state,
+        tmp_path / "context" / "ipo_context.json",
+        vm_client=cast(VmClient, vm),
+        clock=lambda: pull_time,
+    )
+    snap = state.current()
+    assert snap.last_success == _VM_TIME  # the data clock = the VM's refreshed_at (unchanged)
+    assert snap.last_pull_ok == pull_time  # the pull clock = when the app pulled (injected clock)
+    assert snap.last_pull_ok != _VM_TIME  # ← the fence: the pull clock is NEVER the VM's stamp
 
 
 def test_vm_null_freshness_does_not_stamp_now(tmp_path: Path) -> None:
@@ -133,6 +166,9 @@ def test_vm_null_freshness_does_not_stamp_now(tmp_path: Path) -> None:
     assert snap.last_attempt is not None  # the reachable attempt WAS recorded
     assert snap.last_attempt_ok is True  # reachable, NOT flipped to a failure (so no "retrying")
     assert snap.source == "vm"  # the VM did serve
+    # OP-2 Phase 2: reachable + served records IS a successful check — the pull clock advances even
+    # though the data clock stays null. "I checked at HH:MM" is honest; "Data is fresh" is not.
+    assert snap.last_pull_ok is not None
 
 
 def test_vm_null_freshness_keeps_prior_last_success(tmp_path: Path) -> None:

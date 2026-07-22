@@ -253,6 +253,12 @@ class StatusView(BaseModel):
     last_successful_ingest: datetime | None
     last_attempt: datetime | None
     last_attempt_ok: bool | None
+    # OP-2 Phase 2: the app's-last-successful-PULL wall-clock (``IngestState.last_pull_ok``) — a
+    # DIFFERENT clock from ``last_successful_ingest`` (the served data's own timestamp). The chip
+    # shows this as "Checked HH:MM": when did the app last reach a source and get data, regardless
+    # of whether the data itself moved. Advances on any reachable pull that got records (a "nothing
+    # newer" re-pull included), never on a failed pull — so it is honest to bind the UI clock to.
+    checked_at: datetime | None = None
     records_source: str | None = None
     context_source: str | None = None
     # v3 QoL: when the next scheduled refresh fires — a tooltip-only hint. ``None`` whenever it

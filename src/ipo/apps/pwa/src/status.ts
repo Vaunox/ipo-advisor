@@ -106,9 +106,28 @@ export function fallbackStatus(
 // advances "Updated HH:MM". "Updated …" freshness (BUG-1) is untouched — it is still the last
 // *successful* pull.
 export type SyncState = 'err' | 'busy' | 'ok' | 'warn'
+
+// OP-2 Phase 2: the transient post-refresh acknowledgment. A manual refresh resolves into a brief,
+// HONEST confirmation keyed on what actually changed — and NEVER claims a check that didn't happen:
+//   * 'newdata'  → new NSE data arrived (the VM's data clock moved) → "New data ✓" then the new time
+//   * 'uptodate' → the app checked but the VM had nothing newer (the console's advanced=false case)
+//   * 'failed'   → a reachable pull errored (last_attempt moved, ok=false) → "Couldn't refresh"
+//   * 'none'     → nothing observable moved (a debounced/coalesced press ran no cycle) → NO ack
+export type RefreshAck = 'none' | 'newdata' | 'uptodate' | 'failed'
+
+// The minimal freshness fields the ack decision reads (a subset of StatusView), snapshotted at the
+// manual-press moment (`before`) and again when the pull resolves (`after`).
+export interface AckSnapshot {
+  checked_at: string | null
+  last_successful_ingest: string | null
+  last_attempt: string | null
+  last_attempt_ok: boolean | null
+}
+
 export interface SyncChipInput {
   isError: boolean // health query errored (engine unreachable)
   refreshInFlight: boolean // a manual, min-duration-held refresh is genuinely in flight
+  ack?: RefreshAck // OP-2 Phase 2: the transient post-refresh acknowledgment (default 'none')
   status: StatusView | undefined
 }
 export interface SyncChip {
@@ -126,11 +145,23 @@ export const istTimeOf = (iso: string): string =>
     minute: '2-digit',
   })
 
+// OP-2 Phase 2: the steady chip's tooltip is a STATIC market-data delay disclosure, not a second
+// clock. The VM re-scrapes NSE on a fixed ~30-min loop, so healthy data is at most that stale; the
+// real per-scrape refreshed_at stays in the V3-16 console (stdin_refresh_outcome), never duplicated
+// here — a second timestamp confuses more than it informs, and users have no VM model. A VM outage
+// is NOT hedged here: it flips to the local scraper and the chip says so via the fallbackStatus
+// suffix, so the app self-heals and announces it. Mirrors the standard market-data disclosure.
+export const DELAY_DISCLOSURE = 'Quotes data may be delayed up to 30 minutes'
+
 export function syncChip(
-  { isError, refreshInFlight, status: s }: SyncChipInput,
+  { isError, refreshInFlight, ack = 'none', status: s }: SyncChipInput,
   fmt: (iso: string) => string = istTimeOf,
 ): SyncChip {
-  const updated = s?.last_successful_ingest ? fmt(s.last_successful_ingest) : null
+  // OP-2 Phase 2: the primary clock is the app's-last-successful-PULL wall-clock ("Checked HH:MM"),
+  // NOT the served data's own timestamp. "When did my app last get data" maps onto the action the
+  // user just took (Refresh = re-pull); the data's refreshed_at is VM plumbing they have no model
+  // for, so it is deliberately NOT surfaced here (it stays in the V3-16 console).
+  const checked = s?.checked_at ? fmt(s.checked_at) : null
   let state: SyncState
   let text: string
   let title: string
@@ -142,34 +173,54 @@ export function syncChip(
     state = 'busy'
     text = 'Refreshing…'
     title = 'Refreshing from the live feed…'
+  } else if (ack === 'newdata') {
+    // The pull genuinely advanced — resolve to the updated time, not "up to date" (the steady chip
+    // below already shows the new "Checked HH:MM"); this is the brief positive confirmation.
+    state = 'ok'
+    text = 'New data ✓'
+    title = DELAY_DISCLOSURE
+  } else if (ack === 'uptodate') {
+    // The console's advanced=false case: the app DID check, the VM just had nothing newer. This is
+    // the whole point of Phase 2 — a successful "nothing new" pull now acknowledges instead of
+    // resolving silently and reading as a dead button.
+    state = 'ok'
+    text = 'Up to date ✓'
+    title = DELAY_DISCLOSURE
+  } else if (ack === 'failed') {
+    state = 'warn'
+    text = "Couldn't refresh"
+    title = 'A refresh attempt failed — retrying automatically'
   } else if (s && s.live_ingest === false) {
     state = 'ok'
     text = 'Live'
     title = 'No live NSE feed configured in this build'
-  } else if (updated && s?.last_attempt_ok === false) {
+  } else if (checked && s?.last_attempt_ok === false) {
     state = 'warn'
-    text = `Updated ${updated} · retrying`
-    title = `Last successful NSE pull ${updated} IST — a newer pull failed; retrying automatically`
-  } else if (updated) {
+    text = `Checked ${checked} · retrying`
+    title = 'A newer pull failed — retrying automatically'
+  } else if (checked) {
     state = 'ok'
-    text = `Updated ${updated}`
-    title = `Last successful NSE pull ${updated} IST`
+    text = `Checked ${checked}`
+    title = DELAY_DISCLOSURE
   } else {
     state = s?.last_attempt_ok === false ? 'warn' : 'ok'
     text = 'Awaiting first update…'
-    title = 'No successful NSE pull yet — fetching'
+    title = 'No successful pull yet — fetching'
   }
 
   // Compose the data-plane fallback into THIS one chip (never a second, contradicting chip): silent
-  // unless a store fell back from a configured VM, then the honest per-store suffix + amber dot.
-  const fb = s ? fallbackStatus(s.records_source, s.context_source) : null
+  // unless a store fell back from a configured VM, then the honest per-store suffix + amber dot. NOT
+  // composed onto a transient ack — the ack is a brief, clean confirmation, and the steady chip it
+  // settles back to already carries the per-store detail.
+  const isAck = ack !== 'none' && !isError && !refreshInFlight
+  const fb = s && !isAck ? fallbackStatus(s.records_source, s.context_source) : null
   if (fb) {
     if (state === 'ok') state = 'warn'
     text = `${text} · ${fb.text}`
     title = `${title} · ${fb.title}`
   }
-  // Tooltip-only next-refresh hint (only when the engine can honestly predict it).
-  if (s?.next_refresh_at) title = `${title} · next refresh ~${fmt(s.next_refresh_at)} IST`
+  // Tooltip-only next-refresh hint (only when the engine can honestly predict it; never over an ack).
+  if (s?.next_refresh_at && !isAck) title = `${title} · next refresh ~${fmt(s.next_refresh_at)} IST`
 
   const dot =
     state === 'err'
@@ -200,4 +251,26 @@ export function refreshHold(
   const remaining = minMs - elapsedMs
   if (remaining <= 0) return { clear: true, waitMs: 0 }
   return { clear: false, waitMs: remaining }
+}
+
+// OP-2 Phase 2: how long the post-refresh acknowledgment ("Up to date ✓" / "New data ✓") holds
+// before the chip settles back to its steady "Checked HH:MM" — long enough to read, short enough
+// not to linger. A named constant so the beat is tunable in one place (like REFRESH_MIN_VISIBLE_MS).
+export const REFRESH_ACK_MS = 2000
+
+// OP-2 Phase 2: classify what a resolved manual refresh should acknowledge, from before/after
+// freshness snapshots. PURE so it is node-testable and can never drift from the shipped chip. The
+// honesty rule: only the app's-pull clock (`checked_at`) advancing proves a check actually ran, so
+// a debounced/coalesced press (nothing moved) gets NO ack — we never claim a check that didn't
+// happen. See `RefreshAck` for the four outcomes.
+export function refreshAck(before: AckSnapshot | null, after: AckSnapshot | null): RefreshAck {
+  if (before == null || after == null) return 'none'
+  if (after.checked_at !== before.checked_at) {
+    // A successful check ran. New NSE data → the data clock also moved; else nothing was newer.
+    return after.last_successful_ingest !== before.last_successful_ingest ? 'newdata' : 'uptodate'
+  }
+  // No successful check. A genuine fetch FAILURE moved last_attempt and flipped ok=false → say so.
+  // Anything else (a coalesced press that ran no cycle) moved nothing → stay silent.
+  if (after.last_attempt_ok === false && after.last_attempt !== before.last_attempt) return 'failed'
+  return 'none'
 }

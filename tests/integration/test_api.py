@@ -224,6 +224,7 @@ def test_status_without_ingest_state_asserts_no_freshness() -> None:
     assert body["last_successful_ingest"] is None
     assert body["last_attempt"] is None
     assert body["last_attempt_ok"] is None
+    assert body["checked_at"] is None  # OP-2 Phase 2: no pull clock either, until a real pull
 
 
 def test_status_reports_last_successful_ingest(tmp_path: Path) -> None:
@@ -251,6 +252,9 @@ def test_status_reports_last_successful_ingest(tmp_path: Path) -> None:
     assert body["last_successful_ingest"].startswith("2026-07-14T09:00:00")  # stays at the success
     assert body["last_attempt"].startswith("2026-07-14T12:00:00")  # newer failed attempt shown
     assert body["last_attempt_ok"] is False  # → UI shows stale + retrying, not "fresh"
+    # OP-2 Phase 2: the app's-pull clock ("Checked HH:MM") stays at the last SUCCESSFUL pull — the
+    # 12:00 failure must not advance it (a failed check must not display a fresh "Checked" time).
+    assert body["checked_at"].startswith("2026-07-14T09:00:00")
 
 
 def test_allotment_without_store_is_honestly_unavailable() -> None:
