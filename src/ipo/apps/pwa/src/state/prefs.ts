@@ -444,6 +444,29 @@ export function setCosts(costs: Costs): void {
   save()
 }
 
+// F5: an absurdity ceiling for a committed cost. Its only job is to reject runaway/typo values; real
+// broker costs (STT ~0.1%, DP ~₹15, exchange+GST+SEBI ~0.05%) are orders of magnitude below it. One
+// generous guard, not a per-field bound.
+export const COST_MAX = 100_000
+
+// F5: commit a broker-cost field from its raw draft string — the PURE seam behind the Settings
+// inputs (node-tested, so the entry logic can't drift). ONE rule, no special cases: return the parsed
+// value ONLY if it is a valid, finite, non-negative decimal within `max`; otherwise return `fallback`
+// UNCHANGED. So a valid entry commits and everything invalid REVERTS — "" (empty), a lone ".", a
+// sign ("-5"), non-numeric ("5abc"), non-finite, or above-max — and nothing is ever silently
+// substituted (the old `parseFloat(v) || 0` committed 0 for all of those, so a cleared field became a
+// wrong 0% cost). `Number` (not `parseFloat`) is deliberate: it rejects trailing garbage
+// ("5abc" → NaN → revert) that `parseFloat` would accept as 5. An explicit "0" is a valid, deliberate
+// choice and commits 0; an empty field reverts. The shape gate accepts "5." (→5) and ".5" (→0.5) so a
+// mid-typed decimal that reaches blur still commits its numeric value.
+export function commitCost(raw: string, fallback: number, max = COST_MAX): number {
+  const s = raw.trim()
+  if (!/^\d+\.?\d*$|^\.\d+$/.test(s)) return fallback // digits + at most one dot; no sign/exp/garbage
+  const n = Number(s)
+  if (!Number.isFinite(n) || n > max) return fallback
+  return n
+}
+
 /* ---- startup & tray (applied by the desktop shell; persisted here) ---- */
 export const getStartup = (): Startup => prefs.startup
 export function setStartup(startup: Startup): void {

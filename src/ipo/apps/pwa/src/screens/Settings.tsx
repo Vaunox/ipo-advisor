@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCalibration, useHealth, useStatus } from '../api/hooks'
 import { recalibrationCount } from '../recalib'
 import { toast } from '../toast'
@@ -9,6 +9,7 @@ import {
   type NotifPrefs,
   type Startup,
   type ThemeMode,
+  commitCost,
   getCosts,
   getDensity,
   getNotifications,
@@ -64,15 +65,51 @@ export function Settings() {
   const [density, setDens] = useState<Density>(getDensity())
   const [notif, setNotifState] = useState<NotifPrefs>(getNotifications())
   const [costs, setCostsState] = useState<Costs>(getCosts())
+  // F5: the raw editing buffer, one string per cost field. Bound to the inputs so intermediate states
+  // ("0.", "", ".5") survive keystrokes — the old bug bound the input to the parsed NUMBER, so React
+  // rewrote "0." back to "0" and the decimal was unenterable. Committed to the number store only on
+  // blur/Enter via `commitCost`. `costs` is single-writer (this screen), so a local buffer is safe.
+  const [draft, setDraft] = useState<Record<keyof Costs, string>>({
+    stt: String(costs.stt),
+    dp: String(costs.dp),
+    oth: String(costs.oth),
+  })
   const [startup, setStartupState] = useState<Startup>(getStartup())
   const engineUp = health.data?.status === 'ok'
 
-  const updateCost = (k: keyof Costs, v: string) => {
-    const next = { ...costs, [k]: parseFloat(v) || 0 }
+  // F5: commit one field's draft — parse/validate via the pure `commitCost` (valid decimal → the
+  // number; anything invalid → the current value, i.e. revert). Normalize the visible text to the
+  // committed number, and persist ONCE (the old per-keystroke setCosts + history invalidate storm is
+  // gone). No store write / refetch when the value is unchanged.
+  const commitDraft = (k: keyof Costs) => {
+    const n = commitCost(draft[k], costs[k])
+    setDraft((d) => ({ ...d, [k]: String(n) }))
+    if (n === costs[k]) return
+    const next = { ...costs, [k]: n }
     setCostsState(next)
     setCosts(next)
     void qc.invalidateQueries({ queryKey: ['history'] })
   }
+
+  // F5 (navigate-away): a mouse click on a nav item blurs the input first (commits via onBlur), and
+  // the `g s` shortcuts are suppressed while an input is focused (App.tsx), so an in-progress edit
+  // normally commits before this screen unmounts. This flush is the belt-and-suspenders for the one
+  // no-blur path (e.g. Ctrl+K → palette → navigate): on unmount, commit any pending VALID edit. A ref
+  // holds the latest draft/costs so the cleanup isn't stale; `commitCost` reverts an invalid draft, so
+  // a half-typed value is never persisted. Store write only — no React state on an unmounting tree.
+  const flushRef = useRef({ draft, costs })
+  flushRef.current = { draft, costs }
+  useEffect(() => {
+    return () => {
+      const { draft: d, costs: c } = flushRef.current
+      let changed: Costs | null = null
+      for (const k of ['stt', 'dp', 'oth'] as (keyof Costs)[]) {
+        const n = commitCost(d[k], c[k])
+        if (n !== c[k]) changed = { ...(changed ?? c), [k]: n }
+      }
+      if (changed) setCosts(changed)
+    }
+  }, [])
 
   const toggleStartup = (k: keyof Startup) => {
     const next = { ...startup, [k]: !startup[k] }
@@ -150,17 +187,44 @@ export function Settings() {
           <div className="k">
             STT on sell (%)<small>listing-day delivery sell</small>
           </div>
-          <input className="num-in" value={costs.stt} onChange={(e) => updateCost('stt', e.target.value)} />
+          <input
+            className="num-in"
+            inputMode="decimal"
+            value={draft.stt}
+            onChange={(e) => setDraft((d) => ({ ...d, stt: e.target.value }))}
+            onBlur={() => commitDraft('stt')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitDraft('stt')
+            }}
+          />
         </div>
         <div className="set-row">
           <div className="k">
             DP charge (₹, flat)<small>per ISIN per sell-day</small>
           </div>
-          <input className="num-in" value={costs.dp} onChange={(e) => updateCost('dp', e.target.value)} />
+          <input
+            className="num-in"
+            inputMode="decimal"
+            value={draft.dp}
+            onChange={(e) => setDraft((d) => ({ ...d, dp: e.target.value }))}
+            onBlur={() => commitDraft('dp')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitDraft('dp')
+            }}
+          />
         </div>
         <div className="set-row">
           <div className="k">Exchange + GST + SEBI (%)</div>
-          <input className="num-in" value={costs.oth} onChange={(e) => updateCost('oth', e.target.value)} />
+          <input
+            className="num-in"
+            inputMode="decimal"
+            value={draft.oth}
+            onChange={(e) => setDraft((d) => ({ ...d, oth: e.target.value }))}
+            onBlur={() => commitDraft('oth')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitDraft('oth')
+            }}
+          />
         </div>
         <div className="set-row">
           <div className="k">Effect</div>

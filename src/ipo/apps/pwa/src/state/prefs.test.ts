@@ -139,3 +139,49 @@ test('devConsole is OFF by default and setDevConsole persists + notifies (v3 V3-
   assert.equal(P.getDevConsole(), false)
   unsub()
 })
+
+// --- F5: broker-cost input commit — the pure seam behind the Settings decimal inputs -------------
+// The bug: inputs were bound to the PARSED NUMBER with `parseFloat(v) || 0` per keystroke, so "0."
+// collapsed to 0 (decimal unenterable) and a cleared field committed a wrong 0% cost. commitCost is
+// the ONE rule the fix rests on: a valid decimal commits, everything else reverts to the fallback.
+
+test('commitCost: a valid decimal commits verbatim (0.05 was the unenterable case)', () => {
+  assert.equal(P.commitCost('0.05', 0.1), 0.05)
+  assert.equal(P.commitCost('5.5', 0.1), 5.5)
+  assert.equal(P.commitCost('15.34', 15.34), 15.34) // the DP default round-trips
+  assert.equal(P.commitCost('.5', 0.1), 0.5) // leading-dot decimal
+  assert.equal(P.commitCost('5.', 0.1), 5) // a mid-typed trailing dot commits its number
+  assert.equal(P.commitCost('007', 0.1), 7) // leading zeros normalize
+})
+
+test('commitCost: explicit "0" commits 0 (a real choice), but an empty field REVERTS', () => {
+  assert.equal(P.commitCost('0', 0.1), 0) // a deliberate zero commits — the design distinction
+  assert.equal(P.commitCost('', 0.1), 0.1) // empty → fallback, NEVER a silent 0 (the `|| 0` bug)
+})
+
+test('commitCost: every invalid draft reverts to fallback — one rule, no silent substitution', () => {
+  const fb = 0.1
+  assert.equal(P.commitCost('.', fb), fb) // a lone dot
+  assert.equal(P.commitCost('-5', fb), fb) // negative REVERTS (not clamped to 0 — a value never typed)
+  assert.equal(P.commitCost('abc', fb), fb) // non-numeric
+  assert.equal(P.commitCost('5abc', fb), fb) // trailing garbage (Number, not parseFloat, rejects it)
+  assert.equal(P.commitCost('1e5', fb), fb) // exponent form rejected
+  assert.equal(P.commitCost('   ', fb), fb) // whitespace trims to empty → fallback
+  assert.equal(P.commitCost('Infinity', fb), fb) // non-finite
+})
+
+test('commitCost: the value AT the ceiling commits; just above it reverts', () => {
+  assert.equal(P.commitCost(String(P.COST_MAX), 0.1), P.COST_MAX)
+  assert.equal(P.commitCost(String(P.COST_MAX + 1), 0.1), 0.1) // above the absurdity guard → revert
+})
+
+test('costs round-trip through save() — persist + reload (previously uncovered)', () => {
+  const c = { stt: 0.05, dp: 15.34, oth: 0.075 }
+  P.setCosts(c)
+  assert.deepEqual(P.getCosts(), c) // in-memory store holds the committed numbers
+  const raw = (
+    globalThis as unknown as { localStorage: { getItem(k: string): string | null } }
+  ).localStorage.getItem('ipoadv')
+  assert.ok(raw, 'setCosts → save() persisted prefs to the localStorage mirror')
+  assert.deepEqual(JSON.parse(raw as string).costs, c) // survives a reload (round-trip)
+})

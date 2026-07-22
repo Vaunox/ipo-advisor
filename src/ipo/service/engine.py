@@ -224,7 +224,11 @@ class VerdictEngine:
             costs = base
         else:
             # Map the 3 UI knobs onto SellCosts: STT% and a combined "other %" (exchange+GST+SEBI)
-            # as sell-value fractions, plus the flat DP charge.
+            # as sell-value fractions, plus the flat DP charge. The `oth`-gated zeroing of
+            # gst/sebi/stamp assumes `oth` bundles them (no double-count). The app always sends all
+            # three (see PWA `useHistory`), so the per-field `is not None` fallbacks matter only for
+            # a bare `/history?stt=…` partial override the UI never issues — harmless, documented so
+            # it won't surprise a future caller.
             costs = SellCosts(
                 brokerage=0.0,
                 stt_rate=(stt / 100.0) if stt is not None else base.stt_rate,
