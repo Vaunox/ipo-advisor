@@ -107,6 +107,16 @@ _SHIPPED_V3 = frozenset(
         "EB26 sign migration",
         ".exe verification pass",
         "OP-2 Phase 2",
+        # The 2026-07-22/23 findings from the .exe pass, now shipped (F1-rev, F5, F7, F8, F10). The
+        # four console fixes are ONE V3-16 arc but land as four rows; F8c+F8d were one bug, one row.
+        # Non-blueprint; each row must not vanish. All merged, none yet .exe-verified.
+        "F5",
+        "F10",
+        "F1-rev",
+        "F8(c) + F8(d)",
+        "F7",
+        "F8(a)",
+        "F8(b)",
     }
 )
 
