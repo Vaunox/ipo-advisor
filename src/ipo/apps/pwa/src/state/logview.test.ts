@@ -10,7 +10,9 @@ import {
   formatDetail,
   levelClass,
   levelCode,
+  levelParam,
   prependOlder,
+  resetForLevel,
   shortTs,
   shouldResetCursor,
 } from './logview.ts'
@@ -56,7 +58,7 @@ test('formatDetail keeps a multi-line exc_info traceback intact (F7 clamp is vis
   assert.ok(d.includes('error=boom'))
 })
 
-test('filterEntries filters by level chip and by ipo_id/event query', () => {
+test('filterEntries is MIN-level (warn keeps err) + the ipo_id/event query (F8b)', () => {
   const es = [
     { level: 'INFO', message: 'scheduler_cycle_start', ipo_id: '' },
     { level: 'WARN', message: 'overdue_listing_detected', ipo_id: 'vmm' },
@@ -64,7 +66,11 @@ test('filterEntries filters by level chip and by ipo_id/event query', () => {
   ]
   assert.deepEqual(
     filterEntries(es, { level: 'warn', query: '' }).map((e) => e.message),
-    ['overdue_listing_detected'],
+    ['overdue_listing_detected', 'scheduler_cycle_failed'], // MIN-level: warn AND err (never hides errors)
+  )
+  assert.deepEqual(
+    filterEntries(es, { level: 'err', query: '' }).map((e) => e.message),
+    ['scheduler_cycle_failed'], // err only (nothing above it)
   )
   assert.deepEqual(
     filterEntries(es, { level: 'all', query: 'vmm' }).map((e) => e.message),
@@ -195,4 +201,55 @@ test('prependOlder de-dupes exact twins but keeps distinct same-ms events (over-
   // The old ts|logger|message|ipo_id seam key wrongly dropped it (silent loss).
   const distinct = [{ ts: 'T', logger: 'r', level: 'INFO', ipo_id: '', message: 'records_from_vm', count: 7 }]
   assert.equal(prependOlder(distinct, cur).length, 2)
+})
+
+test('resetForLevel resets EXACTLY the re-pull state and touches nothing else (F8b hard fence)', () => {
+  const tail = {
+    entries: [
+      { ts: '2026-07-22T15:00:00.000+05:30', level: 'ERROR', logger: 'r', message: 'scheduler_cycle_failed', ipo_id: '', seq: 8 },
+      { ts: '2026-07-22T15:01:00.000+05:30', level: 'ERROR', logger: 'r', message: 'stdin_refresh_failed', ipo_id: '', seq: 9 },
+    ],
+    last_seq: 9,
+  }
+  const s = resetForLevel(tail, null) // ring not thin → no backfill
+  // every RESET field, asserted:
+  assert.equal(s.entries, tail.entries) // buffer ← the fresh tail
+  assert.equal(s.since, 9) // sinceRef ← ring last_seq
+  assert.equal(s.oldestTs, '2026-07-22T15:00:00.000+05:30') // oldestTsRef ← the tail's oldest
+  assert.equal(s.historyDone, false) // historyDoneRef reset (new level → new history to page)
+  assert.equal(s.pinned, true) // pinnedRef reset (re-open at the bottom)
+  // every PERSISTED field, asserted ABSENT — resetForLevel structurally cannot wipe the user's search,
+  // scroll-restore, or expanded row (a stray reset would change this key set and fail the test):
+  assert.deepEqual(Object.keys(s).sort(), ['entries', 'historyDone', 'oldestTs', 'pinned', 'since'])
+  assert.equal('query' in s, false)
+  assert.equal('restoreRef' in s, false)
+  assert.equal('openKey' in s, false)
+
+  // thin-ring backfill: the older disk page prepends; oldestTs follows it; the ring cursor is unchanged
+  const backfill = [{ ts: '2026-07-22T09:00:00.000+05:30', level: 'ERROR', logger: 'r', message: 'boot_fail', ipo_id: '' }]
+  const b = resetForLevel(tail, backfill)
+  assert.equal(b.entries.length, 3) // 1 disk + 2 ring
+  assert.equal(b.oldestTs, '2026-07-22T09:00:00.000+05:30')
+  assert.equal(b.since, 9)
+})
+
+test('collapse folds warn/err made adjacent once the filter drops the INFO between them (F8b)', () => {
+  // Two identical WARNs separated by INFO in the raw log; a warn+ filter removes the INFO, so they
+  // become consecutive and collapse SHOULD fold them into one ×2 row (correct repeat-suppression).
+  const raw = [
+    { ts: 't1', level: 'WARNING', logger: 'r', message: 'overdue_listing_detected', ipo_id: 'a' },
+    { ts: 't2', level: 'INFO', logger: 'r', message: 'scheduler_cycle_start', ipo_id: '' },
+    { ts: 't3', level: 'WARNING', logger: 'r', message: 'overdue_listing_detected', ipo_id: 'a' },
+  ]
+  const filtered = filterEntries(raw, { level: 'warn', query: '' })
+  assert.equal(filtered.length, 2) // the INFO dropped
+  const rows = collapse(filtered)
+  assert.equal(rows.length, 1) // the two WARNs, now adjacent, fold
+  assert.equal(rows[0].count, 2)
+})
+
+test('levelParam builds the &level= fetch fragment (all → none)', () => {
+  assert.equal(levelParam('all'), '')
+  assert.equal(levelParam('warn'), '&level=warn')
+  assert.equal(levelParam('err'), '&level=err')
 })

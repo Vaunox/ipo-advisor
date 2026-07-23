@@ -24,6 +24,12 @@ export function levelCode(level: string | undefined): string {
   return c === 'err' ? 'ERR!' : c === 'warn' ? 'WARN' : 'INFO'
 }
 
+// Numeric rank of a level bucket for the MIN-level filter (F8b) — mirrors the server's `level_rank`:
+// info=0 · warn=1 · err=2. "warn and above" is rank ≥ 1.
+export function levelRank(c: LevelClass): number {
+  return c === 'err' ? 2 : c === 'warn' ? 1 : 0
+}
+
 // Render an entry's `extra` fields as a legible "key=value · key=value" string — the specifics,
 // dimmed, with the columned/internal fields removed so the event name stays prominent.
 export function formatDetail(entry: LogEntry): string {
@@ -40,12 +46,15 @@ export interface FilterOpts {
   query: string
 }
 
-// Filter by level chip and a free-text query over the event name + ipo_id (the "filterable by
-// ipo_id / level / event" locked requirement). Empty query matches everything.
+// Filter by level chip (MIN-level: `warn` keeps WARN *and* ERROR — F8b, matching the server so the
+// chip never hides errors) and a free-text query over the event name + ipo_id. Empty query matches
+// everything. Kept client-side as well as server-side: instant feedback during a re-pull + defence if
+// the server param is ever dropped.
 export function filterEntries(entries: LogEntry[], { level, query }: FilterOpts): LogEntry[] {
   const q = query.trim().toLowerCase()
+  const floor = level === 'all' ? 0 : levelRank(level)
   return entries.filter((e) => {
-    if (level !== 'all' && levelClass(e.level) !== level) return false
+    if (level !== 'all' && levelRank(levelClass(e.level)) < floor) return false
     if (!q) return true
     return `${e.message ?? ''} ${e.ipo_id ?? ''}`.toLowerCase().includes(q)
   })
@@ -139,6 +148,39 @@ export function appendCapped(prev: LogEntry[], next: LogEntry[], max: number): L
 // can never re-trigger — at most one reset per actual restart, so it cannot loop/thrash.
 export function shouldResetCursor(lastSeq: number, since: number): boolean {
   return lastSeq < since
+}
+
+// The `&level=` query fragment for a chip selection ('all' → none; the server reads warn/err as
+// min-level). Kept here so the fetch sites and the tests share one source of truth.
+export function levelParam(level: 'all' | LevelClass): string {
+  return level === 'all' ? '' : `&level=${level}`
+}
+
+// F8b: a level is now a FETCH dimension — changing it RE-PULLS the tail at the new min-level (server-
+// filtered across the whole ring), back-filled from a disk page when the ring is thin. This pure
+// helper computes EXACTLY the state that resets on that re-pull. Everything NOT returned here is
+// deliberately left untouched: `query` (the orthogonal text filter), `restoreRef` (prepend-only), and
+// `openKey` (an expanded row stays open if it survives the new filter, else dangles harmlessly).
+export interface LevelPull {
+  entries: LogEntry[]
+  since: number // → sinceRef (the ring's global last_seq)
+  oldestTs: string | null // → oldestTsRef (the scroll-back cursor)
+  historyDone: boolean // → historyDoneRef (false: a new level has its own history to page)
+  pinned: boolean // → pinnedRef (true: re-open stuck to the bottom)
+}
+export function resetForLevel(
+  tail: { entries: LogEntry[]; last_seq: number },
+  backfill: LogEntry[] | null,
+): LevelPull {
+  const entries =
+    backfill && backfill.length > 0 ? prependOlder(backfill, tail.entries) : tail.entries
+  return {
+    entries,
+    since: tail.last_seq,
+    oldestTs: entries[0]?.ts ?? null,
+    historyDone: false,
+    pinned: true,
+  }
 }
 
 // Scroll-back stitch: prepend an older disk page ahead of the current buffer, dropping any entry

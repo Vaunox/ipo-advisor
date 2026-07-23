@@ -21,7 +21,9 @@ import {
   formatDetail,
   levelClass,
   levelCode,
+  levelParam,
   prependOlder,
+  resetForLevel,
   shortTs,
   shouldResetCursor,
 } from '../state/logview'
@@ -31,12 +33,15 @@ const PAGE = 500 // older-history page size fetched per scroll-up
 const LIVE_CAP = 4000 // trim the buffer front to this only while tailing at the bottom (constant mem)
 const AT_BOTTOM_PX = 40 // "stuck to bottom" tolerance for the tail-follow pause/resume
 const NEAR_TOP_PX = 140 // how close to the top triggers the next older-history page
+const BACKFILL_MIN = 200 // F8b: if the ring tail is thinner than this, back-fill one disk page on open
 
-const LEVELS: Array<'all' | LevelClass> = ['all', 'info', 'warn', 'err']
+// F8b: MIN-level chips. No `info` — under min-level "info and above" == "all", so an `info` chip would
+// be a button that does nothing (the F8c class of lie). `warn+` states that it includes ERROR.
+const LEVELS: Array<'all' | LevelClass> = ['all', 'warn', 'err']
 const LEVEL_LABEL: Record<'all' | LevelClass, string> = {
   all: 'all',
-  info: 'info',
-  warn: 'warn',
+  info: 'info', // unused (no info chip) — kept to satisfy the Record type
+  warn: 'warn+',
   err: 'error',
 }
 
@@ -56,44 +61,68 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
   const loadingOlderRef = useRef(false) // guard against overlapping older-history fetches
   const historyDoneRef = useRef(false) // reached the start of the disk history
   const restoreRef = useRef<number | null>(null) // scrollHeight before a prepend, to hold position
+  const levelRef = useRef<'all' | LevelClass>('all') // current level, so the poll (deps []) reads it live
+  const levelGenRef = useRef(0) // bumped on every level change — discards in-flight fetches from a prior level
 
-  // Initial load: the recent ring tail. The timeline opens here, at the bottom.
+  // Initial load AND every level change (F8b): re-pull the ring tail at the current MIN-level (the
+  // server filters across the WHOLE ring, so a level selection surfaces matching lines from all of
+  // history, not just the INFO-dominated window we hold). When the ring is THIN — a fresh engine's
+  // near-empty ring, or a rare level with few matches — back-fill one disk page so the console opens
+  // on a useful window instead of just this process's few lines. `gen` fences out any in-flight fetch
+  // from the prior level; `levelRef` lets the poll (deps []) read the current level.
   useEffect(() => {
     let cancelled = false
+    levelGenRef.current += 1 // bump the generation so any in-flight poll/older-load from the prior level is dropped
+    levelRef.current = level
+    loadingOlderRef.current = false
     void (async () => {
       try {
-        const r = await apiGet<LogsResponse>('/logs?since=0&limit=1000')
+        const lp = levelParam(level)
+        const tail = await apiGet<LogsResponse>(`/logs?since=0&limit=1000${lp}`)
         if (cancelled) return
-        sinceRef.current = r.last_seq
-        oldestTsRef.current = r.entries[0]?.ts ?? null
-        setEntries(r.entries)
+        let backfill: LogEntry[] | null = null
+        if (tail.entries.length < BACKFILL_MIN) {
+          const oldest = tail.entries[0]?.ts
+          const beforeParam = oldest ? `&before=${encodeURIComponent(oldest)}` : ''
+          const disk = await apiGet<LogsResponse>(`/logs?history=true&limit=${PAGE}${beforeParam}${lp}`)
+          if (cancelled) return
+          backfill = disk.entries
+        }
+        const s = resetForLevel(tail, backfill)
+        sinceRef.current = s.since
+        oldestTsRef.current = s.oldestTs
+        historyDoneRef.current = s.historyDone
+        pinnedRef.current = s.pinned
+        setEntries(s.entries)
         setFailed(false)
       } catch {
         if (!cancelled) setFailed(true)
       }
     })()
     return () => void (cancelled = true)
-  }, [])
+  }, [level])
 
   // Live tail: poll the ring `since` cursor and append new lines. Trim the front only while pinned
   // (don't yank away history the reader has scrolled back to).
   useEffect(() => {
     const id = window.setInterval(() => {
       void (async () => {
+        const gen = levelGenRef.current // fence: a level change mid-poll re-pulls; drop the stale result
+        const lp = levelParam(levelRef.current) // F8b: poll the ring at the CURRENT min-level
         try {
-          const r = await apiGet<LogsResponse>(`/logs?since=${sinceRef.current}&limit=1000`)
+          const r = await apiGet<LogsResponse>(`/logs?since=${sinceRef.current}&limit=1000${lp}`)
+          if (gen !== levelGenRef.current) return
           setFailed(false)
           const cap = pinnedRef.current ? LIVE_CAP : Number.MAX_SAFE_INTEGER
           if (shouldResetCursor(r.last_seq, sinceRef.current)) {
-            // Engine restarted: the ring's per-process `seq` regressed below our cursor, so a plain
-            // poll returns nothing forever (silent freeze). Reset to 0 and re-pull the fresh tail,
-            // appending the post-restart lines — they're strictly newer than anything we hold, so no
-            // duplication (the ring→disk seam that prependOlder de-dups can't arise here). Only the
-            // ring cursor is touched; the disk scroll-back cursors (oldestTsRef/historyDoneRef) are
-            // ts-based and stay valid across a restart (the rotated files persist). The re-pull sets
-            // `since` to the live ring's last_seq, so the next poll can't regress → at most one reset.
+            // Engine restarted (F8a): the ring's per-process `seq` regressed below our cursor, so a
+            // plain poll returns nothing forever (silent freeze). Reset to 0 and re-pull the fresh tail
+            // AT THE CURRENT LEVEL, appending the post-restart lines — strictly newer than anything we
+            // hold, so no duplication. Only the ring cursor is touched; the disk scroll-back cursors
+            // stay valid across a restart. The re-pull re-syncs `since`, so the next poll can't regress.
             sinceRef.current = 0
-            const fresh = await apiGet<LogsResponse>('/logs?since=0&limit=1000')
+            const fresh = await apiGet<LogsResponse>(`/logs?since=0&limit=1000${lp}`)
+            if (gen !== levelGenRef.current) return
             sinceRef.current = fresh.last_seq
             setEntries((prev) => appendCapped(prev, fresh.entries, cap))
             return
@@ -110,14 +139,17 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
     return () => window.clearInterval(id)
   }, [])
 
-  // Scroll-up → load the next older page from disk and stitch it on, seamlessly.
+  // Scroll-up → load the next older page from disk (at the current min-level) and stitch it on.
   const loadOlder = () => {
     if (loadingOlderRef.current || historyDoneRef.current || oldestTsRef.current == null) return
     loadingOlderRef.current = true
+    const gen = levelGenRef.current // fence: if the level changes mid-load, drop this prior-level page
     void (async () => {
       try {
         const before = encodeURIComponent(oldestTsRef.current as string)
-        const r = await apiGet<LogsResponse>(`/logs?history=true&before=${before}&limit=${PAGE}`)
+        const lp = levelParam(level)
+        const r = await apiGet<LogsResponse>(`/logs?history=true&before=${before}&limit=${PAGE}${lp}`)
+        if (gen !== levelGenRef.current) return // a level change re-pulled; this page is for the old level
         const el = bodyRef.current
         restoreRef.current = el ? el.scrollHeight : null // preserve the reader's position on prepend
         setEntries((prev) => {
@@ -129,7 +161,7 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
       } catch {
         /* transient — leave the buffer as-is, a later scroll retries */
       } finally {
-        loadingOlderRef.current = false
+        if (gen === levelGenRef.current) loadingOlderRef.current = false
       }
     })()
   }
