@@ -37,4 +37,7 @@ contextBridge.exposeInMainWorld('ipoDesktop', {
   // 'rhp'); nothing is navigated inside the app (no in-app webview).
   openExternal: (url: string, kind: 'registrar' | 'rhp'): Promise<boolean> =>
     ipcRenderer.invoke('shell:openExternal', url, kind),
+  // F7: copy a full console line to the OS clipboard via the main-process `clipboard` module —
+  // reliable in the file:// renderer where navigator.clipboard is not. Read-only text out; nothing in.
+  copyText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text),
 })
