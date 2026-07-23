@@ -40,6 +40,21 @@ test('formatDetail renders extras as key=val, omitting the columned/internal fie
   assert.match(formatDetail({ message: 'm', outcome: 'abstained', preserved: false }), /outcome=abstained/)
 })
 
+test('formatDetail keeps a multi-line exc_info traceback intact (F7 clamp is visual-only, data stays whole)', () => {
+  // The console clamps long detail to 4 lines with CSS and expands on click — but the DATA must never
+  // be truncated (the operator copies the full traceback). exc_info carries embedded newlines.
+  const tb =
+    'Traceback (most recent call last):\n' +
+    '  File "runner.py", line 216, in _run_cycle_guarded\n' +
+    '    return service.run_cycle()\n' +
+    'httpx.ConnectError: [Errno 111] Connection refused'
+  const d = formatDetail({
+    ts: 't', level: 'ERROR', logger: 'r', message: 'scheduler_cycle_failed', error: 'boom', exc_info: tb,
+  })
+  assert.ok(d.includes(tb)) // the whole traceback, every newline, survives formatDetail
+  assert.ok(d.includes('error=boom'))
+})
+
 test('filterEntries filters by level chip and by ipo_id/event query', () => {
   const es = [
     { level: 'INFO', message: 'scheduler_cycle_start', ipo_id: '' },

@@ -464,14 +464,22 @@ body.compact .meter { margin-top:6px; }
 .cl-grid { display:grid; grid-template-columns:98px 52px 236px 110px minmax(0,1fr); gap:0 16px; }
 .cl-head { position:sticky; top:0; z-index:2; align-items:center; padding:9px 16px; background:var(--panel2); border-bottom:1px solid var(--line2); font-family:'Fira Code', ui-monospace, monospace; font-size:10.5px; letter-spacing:.1em; color:var(--tx3); }
 .cl-head span { overflow:hidden; text-overflow:ellipsis; }
-.cl-ln { align-items:baseline; padding:2px 16px; font-family:'Fira Code', ui-monospace, monospace; font-size:12.5px; line-height:1.72; white-space:nowrap; }
+.cl-ln { align-items:start; position:relative; cursor:pointer; padding:2px 16px; font-family:'Fira Code', ui-monospace, monospace; font-size:12.5px; line-height:1.72; white-space:nowrap; }
 .cl-ln:hover { background:var(--panel2); }
 .cl-ln .ts { color:var(--tx3); font-variant-numeric:tabular-nums; }
 .cl-ln .lv { font-weight:600; }
 .cl-ln .ev { font-weight:500; overflow:hidden; text-overflow:ellipsis; }
 .cl-ln .id { color:var(--accent); overflow:hidden; text-overflow:ellipsis; }
 .cl-ln .id.none { color:var(--tx3); }
-.cl-ln .dt { color:var(--tx3); overflow:hidden; text-overflow:ellipsis; }
+/* F7: wrap the detail (arbitrary length — a full exc_info traceback runs to 1000s of chars), clamped
+   to 4 lines by default; click the row to expand it in full. pre-wrap keeps the traceback's embedded
+   newlines; overflow-wrap:anywhere breaks unbreakable tokens (long URLs/paths) so nothing overflows. */
+.cl-ln .dt { color:var(--tx3); white-space:pre-wrap; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; overflow:hidden; }
+.cl-ln.open .dt { display:block; -webkit-line-clamp:none; overflow:visible; cursor:text; user-select:text; }
+/* the copy affordance on an expanded row — drag-selecting a 1000-line traceback is exactly where
+   plain selection fails, so one click copies the whole line (bridge in the .exe, clipboard in a browser). */
+.cl-copy { position:absolute; top:3px; right:12px; z-index:1; font-family:'Fira Code', ui-monospace, monospace; font-size:10px; color:var(--tx2); background:var(--panel2); border:1px solid var(--line2); border-radius:6px; padding:2px 8px; cursor:pointer; }
+.cl-copy:hover { color:var(--tx); border-color:var(--accent); }
 .cl-ln.info .lv { color:var(--apply); } .cl-ln.info .ev { color:var(--tx); }
 .cl-ln.warn .lv { color:var(--marginal); } .cl-ln.warn .ev { color:var(--marginal); }
 .cl-ln.err .lv { color:var(--skip); } .cl-ln.err .ev { color:var(--skip); }

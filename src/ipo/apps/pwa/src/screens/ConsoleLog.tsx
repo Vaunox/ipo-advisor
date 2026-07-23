@@ -44,6 +44,9 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [failed, setFailed] = useState(false)
+  // F7: which row is expanded to its full detail. Bound to the row's STABLE key (r.key from the F8cd
+  // fix), NOT an index — so an older page prepending doesn't move the expansion to a different row.
+  const [openKey, setOpenKey] = useState<string | null>(null)
 
   const bodyRef = useRef<HTMLDivElement>(null)
   const sinceRef = useRef(0) // ring cursor for the live tail
@@ -123,6 +126,23 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
     if (el.scrollTop < NEAR_TOP_PX) loadOlder()
   }
 
+  // Click a row to expand/collapse its detail. Guard on an active text selection so a drag-select
+  // inside the row doesn't get swallowed as a toggle (a plain click clears the selection first, so it
+  // still toggles; a drag leaves a selection, so it doesn't).
+  const toggleRow = (key: string) => {
+    if (window.getSelection()?.toString()) return
+    setOpenKey((k) => (k === key ? null : key))
+  }
+
+  // Copy a full line. The .exe routes through the preload bridge (navigator.clipboard is unreliable in
+  // a file:// renderer); a browser/dev has no bridge and uses the Clipboard API directly.
+  const copyLine = (text: string) => {
+    const bridge = (window as unknown as { ipoDesktop?: { copyText?: (t: string) => Promise<void> } })
+      .ipoDesktop
+    if (bridge?.copyText) void bridge.copyText(text)
+    else void navigator.clipboard?.writeText(text)
+  }
+
   const rows = useMemo(
     () => collapse(filterEntries(entries, { level, query })),
     [entries, level, query],
@@ -195,7 +215,11 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
             <div className="cl-empty">no lines match the filter</div>
           ) : (
             rows.map((r) => (
-              <div key={r.key} className={`cl-ln cl-grid ${levelClass(r.entry.level)}`}>
+              <div
+                key={r.key}
+                className={`cl-ln cl-grid ${levelClass(r.entry.level)}${openKey === r.key ? ' open' : ''}`}
+                onClick={() => toggleRow(r.key)}
+              >
                 <span className="ts">{shortTs(r.entry.ts)}</span>
                 <span className="lv">{levelCode(r.entry.level)}</span>
                 <span className="ev">
@@ -204,6 +228,18 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
                 </span>
                 <span className={`id${r.entry.ipo_id ? '' : ' none'}`}>{r.entry.ipo_id || '·'}</span>
                 <span className="dt">{formatDetail(r.entry)}</span>
+                {openKey === r.key && (
+                  <button
+                    className="cl-copy"
+                    onClick={(e) => {
+                      e.stopPropagation() // don't collapse the row we're copying from
+                      copyLine(formatDetail(r.entry))
+                    }}
+                    title="Copy this line"
+                  >
+                    copy
+                  </button>
+                )}
               </div>
             ))
           )}

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { type ChildProcess } from 'node:child_process'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -342,6 +342,12 @@ ipcMain.handle('shell:openExternal', (_e, url: unknown, kind: unknown): boolean 
   if (!allowed) return false
   void shell.openExternal(url)
   return true
+})
+
+// F7: copy a console line to the OS clipboard (the debug console's expand+copy). Text OUT only —
+// read-only, no verdict/order surface (Inviolable Rule 6). Non-string is ignored.
+ipcMain.handle('clipboard:write', (_e, text: unknown): void => {
+  if (typeof text === 'string') clipboard.writeText(text)
 })
 
 // OP-5 single-instance lock: exactly one instance runs. Acquired synchronously HERE — before
