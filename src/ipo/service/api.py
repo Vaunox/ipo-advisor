@@ -36,7 +36,7 @@ from ipo.data.ingest.state import IngestStateStore
 from ipo.service.calibration import load_calibration_view
 from ipo.service.engine import VerdictEngine
 from ipo.service.ipo_context import ContextStore, build_allotment_view, build_ipo_context
-from ipo.service.logs import clamp_limit, file_history, ring_tail
+from ipo.service.logs import clamp_limit, file_history, min_rank_for, ring_tail
 from ipo.service.views import (
     AllotmentView,
     CalibrationView,
@@ -309,7 +309,11 @@ def create_app(
 
     @app.get("/logs", response_model=LogsView)
     def logs(
-        since: int = 0, limit: int = 500, history: bool = False, before: str | None = None
+        since: int = 0,
+        limit: int = 500,
+        history: bool = False,
+        before: str | None = None,
+        level: str | None = None,
     ) -> LogsView:
         """The debug console's read (v3 V3-16) — structured log entries (read-only).
 
@@ -321,17 +325,24 @@ def create_app(
           (the scroll-back cursor), newest ``limit`` — the client pages backward with this as it
           scrolls up, stitching disk onto the ring by timestamp.
 
+        ``level`` (F8b) applies a server-side MIN-level filter to BOTH ends (``warn`` -> WARN+ERROR,
+        ``err`` -> ERROR only; ``all``/absent -> no filter), so selecting a level surfaces matching
+        lines from the whole ring+disk — not just the INFO window the client already holds.
+
         Every entry was redacted at write time (``core.logging.redacted_payload``), so no
         token/PAN/auth-header can appear. GET-only — reading never triggers anything (Invariants 4 &
         6); a window, not a control surface.
         """
         capped = clamp_limit(limit)
+        rank = min_rank_for(level)
         if history:
             entries = (
-                file_history(log_dir, limit=capped, before=before) if log_dir is not None else []
+                file_history(log_dir, limit=capped, before=before, min_rank=rank)
+                if log_dir is not None
+                else []
             )
             return LogsView(entries=entries, last_seq=0, source="history")
-        entries, last_seq = ring_tail(since=since, limit=capped)
+        entries, last_seq = ring_tail(since=since, limit=capped, min_rank=rank)
         return LogsView(entries=entries, last_seq=last_seq, source="ring")
 
     return app

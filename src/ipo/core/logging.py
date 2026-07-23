@@ -131,6 +131,20 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(redacted_payload(record), default=str, ensure_ascii=False)
 
 
+def level_rank(levelname: str | None) -> int:
+    """Rank a level for the console's server-side MIN-level filter (F8b).
+
+    Mirrors the client's ``levelClass`` buckets exactly: ERROR/CRITICAL = 2, WARNING = 1, everything
+    else (INFO/DEBUG/unknown) = 0. ``min_rank`` on a read then means "this level and above".
+    """
+    lvl = (levelname or "").upper()
+    if lvl.startswith("ERR") or lvl == "CRITICAL":
+        return 2
+    if lvl.startswith("WARN"):
+        return 1
+    return 0
+
+
 class RingBufferHandler(logging.Handler):
     """In-memory ring of recent redacted log payloads — the debug console's live tail (V3-16).
 
@@ -160,10 +174,17 @@ class RingBufferHandler(logging.Handler):
             payload["seq"] = self._seq
             self._buf.append(payload)
 
-    def entries(self, *, since: int = 0, limit: int = 1000) -> list[dict[str, Any]]:
-        """Buffered payloads with ``seq > since`` (oldest→newest), newest ``limit`` kept."""
+    def entries(
+        self, *, since: int = 0, limit: int = 1000, min_rank: int = 0
+    ) -> list[dict[str, Any]]:
+        """Buffered payloads with ``seq > since`` and level rank >= ``min_rank``, newest ``limit``.
+
+        Oldest->newest. ``min_rank=0`` is no filter (F8b server-side MIN-level surfacing).
+        """
         with self._lock:
-            items = [e for e in self._buf if e["seq"] > since]
+            items = [
+                e for e in self._buf if e["seq"] > since and level_rank(e.get("level")) >= min_rank
+            ]
         return items[-limit:]
 
     def latest_seq(self) -> int:

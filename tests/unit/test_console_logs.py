@@ -14,9 +14,9 @@ import os
 import time
 from pathlib import Path
 
-from ipo.core.logging import RingBufferHandler, _expire_old_logs, redacted_payload
+from ipo.core.logging import RingBufferHandler, _expire_old_logs, level_rank, redacted_payload
 from ipo.service import logs as logs_mod
-from ipo.service.logs import clamp_limit, file_history, ring_tail
+from ipo.service.logs import clamp_limit, file_history, min_rank_for, ring_tail
 
 
 def _record(msg: str, level: str = "INFO", **extra: object) -> logging.LogRecord:
@@ -160,3 +160,61 @@ def test_clamp_limit_bounds() -> None:
     assert clamp_limit(0) == 500 and clamp_limit(-5) == 500  # non-positive → default
     assert clamp_limit(10) == 10
     assert clamp_limit(10_000_000) == 5000  # capped
+
+
+# --- F8b: server-side MIN-level filtering (surface old problems from the whole ring+disk) ---
+
+
+def test_level_rank_buckets_mirror_the_client() -> None:
+    assert level_rank("ERROR") == 2 and level_rank("CRITICAL") == 2
+    assert level_rank("WARNING") == 1 and level_rank("WARN") == 1
+    assert level_rank("INFO") == 0 and level_rank("DEBUG") == 0
+    assert (
+        level_rank(None) == 0 and level_rank("nonsense") == 0
+    )  # unknown → info floor, never dropped
+
+
+def test_min_rank_for_chip_selection() -> None:
+    assert min_rank_for("warn") == 1  # warn+ = WARNING and ERROR
+    assert min_rank_for("err") == 2  # error only
+    # 'all', 'info' (== all under min-level), and absent all mean no filter
+    assert min_rank_for("all") == 0 and min_rank_for("info") == 0 and min_rank_for(None) == 0
+
+
+def test_ring_entries_min_level_keeps_warn_and_error() -> None:
+    ring = RingBufferHandler()
+    ring.emit(_record("cycle", level="INFO"))
+    ring.emit(_record("overdue", level="WARNING"))
+    ring.emit(_record("failed", level="ERROR"))
+    # warn+ (rank 1) surfaces BOTH warn and error — it must never hide errors
+    assert [e["message"] for e in ring.entries(min_rank=1)] == ["overdue", "failed"]
+    assert [e["message"] for e in ring.entries(min_rank=2)] == ["failed"]  # error only
+    assert len(ring.entries(min_rank=0)) == 3  # no filter
+    assert (
+        ring.latest_seq() == 3
+    )  # the cursor stays GLOBAL under a filter (polling stays incremental)
+
+
+def test_ring_tail_threads_min_rank(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    ring = RingBufferHandler()
+    ring.emit(_record("info", level="INFO"))
+    ring.emit(_record("err", level="ERROR"))
+    monkeypatch.setattr(logs_mod, "get_ring_buffer", lambda: ring)
+    entries, last_seq = ring_tail(since=0, limit=10, min_rank=2)
+    assert [e["message"] for e in entries] == ["err"] and last_seq == 2  # last_seq stays global
+
+
+def test_file_history_min_level_filters_disk(tmp_path: Path) -> None:
+    (tmp_path / "engine.log").write_text(
+        '{"ts":"t1","message":"a","level":"INFO"}\n'
+        '{"ts":"t2","message":"b","level":"WARNING"}\n'
+        '{"ts":"t3","message":"c","level":"INFO"}\n'
+        '{"ts":"t4","message":"d","level":"ERROR"}\n',
+        encoding="utf-8",
+    )
+    # warn+ surfaces the WARNING and ERROR from the WHOLE file — symptom 1: old errors reachable
+    assert [e["message"] for e in file_history(tmp_path, limit=10, min_rank=1)] == ["b", "d"]
+    assert [e["message"] for e in file_history(tmp_path, limit=10, min_rank=2)] == [
+        "d"
+    ]  # error only
+    assert len(file_history(tmp_path, limit=10, min_rank=0)) == 4  # no filter
