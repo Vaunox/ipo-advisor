@@ -12,6 +12,7 @@ import {
   levelCode,
   prependOlder,
   shortTs,
+  shouldResetCursor,
 } from './logview.ts'
 
 test('levelClass buckets names into info/warn/err and never drops one', () => {
@@ -138,6 +139,22 @@ test('appendCapped appends new tail lines and keeps only the newest max', () => 
     appendCapped(prev, [{ message: 'c' }, { message: 'd' }], 3).map((e) => e.message),
     ['b', 'c', 'd'], // capped to newest 3 (oldest dropped) — constant memory
   )
+})
+
+test('shouldResetCursor fires only on a ring seq regression (engine restart), and cannot loop (F8a)', () => {
+  // steady state — the ring only grows within a process, so last_seq >= since -> never a reset
+  assert.equal(shouldResetCursor(2205, 2203), false) // new lines arrived this poll
+  assert.equal(shouldResetCursor(2203, 2203), false) // no new lines this poll
+  // RESTART — a fresh process reset seq to ~1 while the client still polls the old high cursor
+  assert.equal(shouldResetCursor(2, 2203), true)
+  // first poll / cold start — since=0, empty OR non-empty ring, never a reset (0 < 0 is false)
+  assert.equal(shouldResetCursor(0, 0), false)
+  assert.equal(shouldResetCursor(5, 0), false)
+  // anti-loop bound — after a reset the cursor re-syncs to the live ring's last_seq (say 2); the next
+  // poll's last_seq is >= that (seq is monotonic within a process), so it returns false and cannot
+  // re-trigger. At most ONE reset per actual restart — no thrash.
+  assert.equal(shouldResetCursor(2, 2), false) // immediately after the reset, no new lines yet
+  assert.equal(shouldResetCursor(7, 2), false) // ring grew normally afterward
 })
 
 test('collapse keys are unique across a mixed ring+disk buffer — a disk index must not collide with a ring seq (F8c/d fence)', () => {
