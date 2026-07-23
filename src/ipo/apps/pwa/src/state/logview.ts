@@ -130,6 +130,17 @@ export function appendCapped(prev: LogEntry[], next: LogEntry[], max: number): L
   return merged.length > max ? merged.slice(merged.length - max) : merged
 }
 
+// The ring's `seq` is per-process. An engine restart resets it to 1, so a client still polling at the
+// old high `since` gets zero rows forever — a SILENT freeze (no error, no cue), recoverable today only
+// by closing and reopening the console. When the reported `last_seq` is strictly BELOW our cursor the
+// ring has regressed → the engine restarted → the caller resets `since` to 0 and re-pulls the fresh
+// tail. Strict `<`: equal is the steady state (no new lines this poll), and after a reset the cursor
+// re-syncs to the live ring's monotonic `last_seq`, so the very next poll has `last_seq >= since` and
+// can never re-trigger — at most one reset per actual restart, so it cannot loop/thrash.
+export function shouldResetCursor(lastSeq: number, since: number): boolean {
+  return lastSeq < since
+}
+
 // Scroll-back stitch: prepend an older disk page ahead of the current buffer, dropping any entry
 // already shown (the boundary line overlaps because the `before` cursor is inclusive). De-dup is by
 // full `identity` (ts+logger+message+ipo_id + every extra, seq excluded) — NOT just

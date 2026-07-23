@@ -23,6 +23,7 @@ import {
   levelCode,
   prependOlder,
   shortTs,
+  shouldResetCursor,
 } from '../state/logview'
 
 const POLL_MS = 2500 // live-tail cadence — feels live on a local sidecar, doesn't hammer
@@ -82,9 +83,23 @@ export function ConsoleLog({ onClose }: { onClose: () => void }) {
         try {
           const r = await apiGet<LogsResponse>(`/logs?since=${sinceRef.current}&limit=1000`)
           setFailed(false)
+          const cap = pinnedRef.current ? LIVE_CAP : Number.MAX_SAFE_INTEGER
+          if (shouldResetCursor(r.last_seq, sinceRef.current)) {
+            // Engine restarted: the ring's per-process `seq` regressed below our cursor, so a plain
+            // poll returns nothing forever (silent freeze). Reset to 0 and re-pull the fresh tail,
+            // appending the post-restart lines — they're strictly newer than anything we hold, so no
+            // duplication (the ring→disk seam that prependOlder de-dups can't arise here). Only the
+            // ring cursor is touched; the disk scroll-back cursors (oldestTsRef/historyDoneRef) are
+            // ts-based and stay valid across a restart (the rotated files persist). The re-pull sets
+            // `since` to the live ring's last_seq, so the next poll can't regress → at most one reset.
+            sinceRef.current = 0
+            const fresh = await apiGet<LogsResponse>('/logs?since=0&limit=1000')
+            sinceRef.current = fresh.last_seq
+            setEntries((prev) => appendCapped(prev, fresh.entries, cap))
+            return
+          }
           if (r.entries.length > 0) {
             sinceRef.current = r.last_seq
-            const cap = pinnedRef.current ? LIVE_CAP : Number.MAX_SAFE_INTEGER
             setEntries((prev) => appendCapped(prev, r.entries, cap))
           }
         } catch {
