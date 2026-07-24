@@ -214,7 +214,9 @@ def create_app(
         """
         if context_store is None:
             return AllotmentView(available=False, refreshed_at=None, rows=[])
-        return build_allotment_view(engine.list_records(), context_store)
+        return build_allotment_view(
+            engine.list_records(), context_store, allotment=engine._config.allotment
+        )
 
     @app.get("/context/{ipo_id}", response_model=IpoContextView)
     def ipo_context(ipo_id: str) -> IpoContextView:
@@ -244,7 +246,7 @@ def create_app(
                 registrar=None,
                 registrar_state="not_loaded",
             )
-        return build_ipo_context(record, context_store)
+        return build_ipo_context(record, context_store, allotment=engine._config.allotment)
 
     @app.get("/subscription-series/{ipo_id}", response_model=SeriesView)
     def subscription_series(ipo_id: str) -> SeriesView:

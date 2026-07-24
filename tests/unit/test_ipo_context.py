@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from ipo.core.config import AllotmentConfig
 from ipo.core.types import IPORecord, Segment
 from ipo.service.ipo_context import ContextStore, build_allotment_view, build_ipo_context
 
@@ -129,6 +130,34 @@ def test_scope_drops_one_day_past_window(tmp_path: Path) -> None:
     store = _store_reg(tmp_path, {})
     records = [_rec("gone", close=date(2026, 7, 2), listing=date(2026, 7, 8))]  # listed 6d ago
     assert build_allotment_view(records, store, clock=_CLOCK).rows == []
+
+
+def test_windows_are_config_driven_not_hard_coded(tmp_path: Path) -> None:
+    """Ground Rule 2: BOTH windows thread from config — a non-default AllotmentConfig moves the
+    boundaries, proving the values come from config, not a module constant. The default arg keeps
+    the shipped 5 / 14 (which is what keeps the F10 boundary tests above green unchanged)."""
+    # listed_visible_days: default 5 SHOWS a card listed 4d ago; a tighter 3 DROPS it.
+    store = _store_reg(tmp_path, {})
+    listed_4d_ago = [
+        _rec("l4", close=date(2026, 7, 4), listing=date(2026, 7, 10))
+    ]  # 4d before today
+    assert [r.ipo_id for r in build_allotment_view(listed_4d_ago, store, clock=_CLOCK).rows] == [
+        "l4"
+    ]
+    tight = AllotmentConfig(listed_visible_days=3, cache_stale_days=14)
+    assert build_allotment_view(listed_4d_ago, store, clock=_CLOCK, allotment=tight).rows == []
+
+    # cache_stale_days: a cache 10d old reads "unpublished" at the default 14, but "stale" at 7.
+    store_10d = _store(tmp_path, "2026-07-04T09:00:00+05:30", {})  # 10 days before today, no entry
+    rec = [
+        _rec("noreg", close=date(2026, 7, 11))
+    ]  # open_date 2026-06-01 (after the refresh, so ≥ open)
+    assert (
+        build_allotment_view(rec, store_10d, clock=_CLOCK).rows[0].registrar_state == "unpublished"
+    )
+    tight7 = AllotmentConfig(listed_visible_days=5, cache_stale_days=7)
+    view7 = build_allotment_view(rec, store_10d, clock=_CLOCK, allotment=tight7)
+    assert view7.rows[0].registrar_state == "stale"
 
 
 def test_join_attaches_registrar_or_none(tmp_path: Path) -> None:

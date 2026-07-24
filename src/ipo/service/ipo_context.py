@@ -33,21 +33,18 @@ from pathlib import Path
 from pydantic import BaseModel, ValidationError
 
 from ipo.core.calendar import now_ist
+from ipo.core.config import AllotmentConfig
 from ipo.core.logging import get_logger
 from ipo.core.types import IPORecord
 from ipo.service.views import AllotmentRow, AllotmentView, IpoContextView, RegistrarInfo
 
 _log = get_logger("ipo.service.ipo_context")
 
-# How long after listing an IPO stays on the Allotment tab (allotment-status checking is only
-# relevant for a short window after listing; keeps the tab bounded). F10: 5 days. `_stage` uses
-# `days > _LISTED_VISIBLE_DAYS`, so a card listed EXACTLY N days ago is still shown and drops on day
-# N+1 — i.e. visible through day 5, gone on day 6.
-_LISTED_VISIBLE_DAYS = 5
-
-# Beyond this age the cache is "stale": an absent field is treated as unproven ("we haven't looked")
-# rather than "not published". One threshold for every field derived from the cache.
-_CACHE_STALE_DAYS = 14
+# The allotment display windows (how long a listed IPO stays on the tab; the context-cache staleness
+# threshold) are TUNABLES and live in config (Ground Rule 2) — `AllotmentConfig` in core/config.py,
+# `allotment:` in config/default.yaml. They thread into the builders below; the module holds no
+# hard-coded copy. `build_*` default to `AllotmentConfig()` (schema defaults, 5 / 14) when no config
+# is supplied, so a direct call (e.g. a test) gets identical behaviour without wiring config.
 
 
 class IpoContext(BaseModel):
@@ -229,6 +226,7 @@ def field_state(
     refreshed_at: datetime | None,
     open_date: date,
     today: date,
+    cache_stale_days: int,
 ) -> str:
     """The one store-level staleness rule (v3 V3-5/V3-6) — why a cached field is (un)available.
 
@@ -243,12 +241,12 @@ def field_state(
     if refreshed_at is None:
         return "stale"
     refreshed = refreshed_at.date()
-    if refreshed < open_date or (today - refreshed).days > _CACHE_STALE_DAYS:
+    if refreshed < open_date or (today - refreshed).days > cache_stale_days:
         return "stale"  # refreshed before this IPO existed, or too old to trust the absence
     return "unpublished"  # looked at/after it opened, recently, found nothing → not published yet
 
 
-def _stage(record: IPORecord, today: date) -> str | None:
+def _stage(record: IPORecord, today: date, listed_visible_days: int) -> str | None:
     """The allotment-lifecycle stage of ``record`` as of ``today``, or ``None`` if out of scope.
 
     In scope = the book has fully closed (allotment is only relevant after bidding ends) up to a
@@ -259,7 +257,7 @@ def _stage(record: IPORecord, today: date) -> str | None:
     listed = record.listing_date is not None and record.listing_date <= today
     if listed:
         assert record.listing_date is not None
-        if (today - record.listing_date).days > _LISTED_VISIBLE_DAYS:
+        if (today - record.listing_date).days > listed_visible_days:
             return None
         return "listed"
     return "awaiting allotment"
@@ -270,12 +268,15 @@ def build_allotment_view(
     store: ContextStore,
     *,
     clock: Callable[[], datetime] = now_ist,
+    allotment: AllotmentConfig | None = None,
 ) -> AllotmentView:
     """Join IPOs at/past the allotment stage with the registrar from the context cache (V3-6).
 
     The registrar is attached to the *view row* only — never back onto the ``IPORecord`` — so it
-    stays outside the scoring path by construction. Sorted most-recently-closed first.
+    stays outside the scoring path by construction. Sorted most-recently-closed first. ``allotment``
+    carries the display windows (Ground Rule 2); ``None`` → the schema defaults (5 / 14).
     """
+    cfg = allotment if allotment is not None else AllotmentConfig()
     today = clock().date()
     # ONE snapshot for the whole request: every row and the freshness line beside them describe the
     # same cache version, and a refresh landing mid-request cannot blend two versions into one
@@ -283,7 +284,7 @@ def build_allotment_view(
     snap = store.snapshot()
     rows: list[AllotmentRow] = []
     for record in records:
-        stage = _stage(record, today)
+        stage = _stage(record, today, cfg.listed_visible_days)
         if stage is None:
             continue
         ctx = snap.get(record.ipo_id)
@@ -302,6 +303,7 @@ def build_allotment_view(
                     refreshed_at=snap.refreshed_at,
                     open_date=record.open_date,
                     today=today,
+                    cache_stale_days=cfg.cache_stale_days,
                 ),
             )
         )
@@ -314,14 +316,17 @@ def build_ipo_context(
     store: ContextStore,
     *,
     clock: Callable[[], datetime] = now_ist,
+    allotment: AllotmentConfig | None = None,
 ) -> IpoContextView:
     """One IPO's display-only Upstox context for the detail page (v3 V3-5: the RHP link + state).
 
     Read-only join of the record with the context cache; the cached values are attached to the view
     only, never to the ``IPORecord``, so nothing here can reach the model. Each field carries its
     own freshness state from the single ``field_state`` rule, so a missing RHP distinguishes "not
-    filed yet" from "our cache predates the filing".
+    filed yet" from "our cache predates the filing". ``allotment`` carries the cache-staleness
+    window (Ground Rule 2); ``None`` → the schema defaults (5 / 14).
     """
+    cfg = allotment if allotment is not None else AllotmentConfig()
     today = clock().date()
     snap = store.snapshot()  # one snapshot per request — see build_allotment_view
     ctx = snap.get(record.ipo_id)
@@ -338,6 +343,7 @@ def build_ipo_context(
             refreshed_at=snap.refreshed_at,
             open_date=record.open_date,
             today=today,
+            cache_stale_days=cfg.cache_stale_days,
         )
 
     return IpoContextView(

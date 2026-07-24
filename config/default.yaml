@@ -58,6 +58,11 @@ sell_costs:
   sebi_rate: 0.000001        # Rs 10 per crore
   stamp_rate_sell: 0.0       # nil on the sell leg
 
+# Allotment tab (v3 V3-6 / F10) — DISPLAY-ONLY windows, never a scoring input.
+allotment:
+  listed_visible_days: 5     # a listed IPO stays on the tab through day 5, drops on day 6
+  cache_stale_days: 14       # beyond this the context cache is "stale" (absence = unproven, not "none")
+
 features:
   # Construction + normalization knobs (Deep Dive #2). Tuned empirically in Phase 4.
   gmp:
