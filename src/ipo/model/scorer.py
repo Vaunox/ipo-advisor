@@ -20,10 +20,6 @@ from ipo.core.config import FeaturesConfig
 from ipo.core.types import IPOFeatures
 from ipo.features.normalize import clamp, saturate, signed_saturate, winsorize
 
-# Max over-pricing (issue P/E vs peer median) that the valuation brake counts, so one
-# extreme ratio can't dominate. 1.0 == priced 100% above peers.
-_VALUATION_OVERPRICING_CAP = 1.0
-
 
 class WeightedScorer:
     """Weighted-sum scorer over normalized feature values (implements ScoringModel)."""
@@ -60,7 +56,8 @@ class WeightedScorer:
         if features.anchor_quality is not None:
             c["anchor_quality"] = self._weight("anchor_quality") * features.anchor_quality
         if features.relative_valuation is not None:
-            overpricing = clamp(features.relative_valuation - 1.0, 0.0, _VALUATION_OVERPRICING_CAP)
+            cap = self._cfg.valuation.overpricing_cap  # F-3: config-lift (was a module constant)
+            overpricing = clamp(features.relative_valuation - 1.0, 0.0, cap)
             c["relative_valuation"] = -self._weight("relative_valuation") * overpricing
         if features.ofs_fraction is not None:
             c["ofs_fraction"] = -self._weight("ofs_fraction") * features.ofs_fraction

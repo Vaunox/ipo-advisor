@@ -97,6 +97,7 @@ features:
     lockin_reference_days: 90    # lock-in at/above this scores full on that component
   valuation:
     peerless_policy: neutral_flag   # neutral_flag | mild_negative
+    overpricing_cap: 1.0            # F-3: valuation-brake clamp; 1.0 = priced 100% above peers
   regime:
     # Cold-market FLAG blend (v2 B2, weight 0 — never moves the probability). trend_weight 1.0
     # keeps the trend read at full weight (a neutral-VIX day = the old trend-only flag); vol_weight
@@ -105,6 +106,12 @@ features:
     vol_weight: 0.4
     vix_reference: 15.0   # India VIX ~15 = neutral volatility (vol_stress 0)
     vix_scale: 15.0       # VIX ~30 (ref+scale) = full stress (vol_stress +1)
+    # F-1: Nifty-trend side of the same flag. trend_days 63 ≈ 3 months of trading days (the caveat's
+    # horizon); trend_scale 0.08 = a ±8% quarterly swing maps to the ±1 regime extreme (Nifty twin of
+    # vix_scale); drawdown_floor -0.05 feeds is_cold (OFFLINE stress-test only). All weight-0.
+    trend_days: 63
+    trend_scale: 0.08
+    drawdown_floor: -0.05
   # Missing a critical feature (or an unclosed book) -> INSUFFICIENT_SIGNAL (Layer 3).
   # Phase 4 is the official-only model (no GMP yet), so QIB is the critical signal.
   # Phase 5 re-adds `gmp_level` here once the GMP scraper is integrated and recalibrated.

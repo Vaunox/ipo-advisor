@@ -24,10 +24,12 @@ from pathlib import Path
 
 from ipo.features.normalize import clamp
 
-_TRADING_DAYS_3M = 63  # ~3 months of trading days
-# A ±8% 3-month Nifty move maps to the ±1 regime extreme. Chosen a priori as a
-# typical quarterly index swing — NOT fit to listing outcomes (no tuning to the slice).
-_REGIME_FEATURE_SCALE = 0.08
+# The trend window (`trend_days`, ~3 months of trading days), the ±trend → ±1 regime scale
+# (`trend_scale`), and the cold-drawdown `drawdown_floor` are TUNABLES that live in config (Ground
+# Rule 2) — `RegimeFeatureConfig` in core/config.py, `features.regime:` in config/default.yaml. They
+# are passed into `NiftyRegime.__init__` below; runner.py threads them from config, exactly as
+# `VixSeries` takes `reference`/`scale`. The literal defaults here mirror the config defaults (like
+# VixSeries's `reference=15.0, scale=15.0`) so a direct construction (a test) behaves identically.
 
 
 @dataclass(frozen=True)
@@ -46,24 +48,33 @@ class NiftyRegime:
     the trailing 3-month high — a weak/correcting tape.
     """
 
-    def __init__(self, csv_path: Path, *, drawdown_floor: float = -0.05) -> None:
-        """Load the Nifty (date, close) series and set the cold drawdown threshold."""
+    def __init__(
+        self,
+        csv_path: Path,
+        *,
+        trend_days: int = 63,
+        trend_scale: float = 0.08,
+        drawdown_floor: float = -0.05,
+    ) -> None:
+        """Load the Nifty (date, close) series and set the trend window, scale, and cold floor."""
         self._dates: list[date] = []
         self._closes: list[float] = []
         with csv_path.open(newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
                 self._dates.append(date.fromisoformat(row["date"]))
                 self._closes.append(float(row["close"]))
+        self._trend_days = trend_days
+        self._trend_scale = trend_scale
         self._floor = drawdown_floor
 
     def regime_at(self, day: date) -> RegimeInfo:
         """Return the regime as of the last trading day at or before ``day``."""
         idx = bisect.bisect_right(self._dates, day) - 1
-        if idx < _TRADING_DAYS_3M:
+        if idx < self._trend_days:
             return RegimeInfo(trend_3m=None, drawdown=None, is_cold=False)
         now = self._closes[idx]
-        prior = self._closes[idx - _TRADING_DAYS_3M]
-        window_high = max(self._closes[idx - _TRADING_DAYS_3M : idx + 1])
+        prior = self._closes[idx - self._trend_days]
+        window_high = max(self._closes[idx - self._trend_days : idx + 1])
         trend = now / prior - 1.0
         drawdown = now / window_high - 1.0
         is_cold = trend < 0.0 or drawdown < self._floor
@@ -83,7 +94,7 @@ class NiftyRegime:
         trend = self.regime_at(asof).trend_3m
         if trend is None:
             return None
-        return clamp(trend / _REGIME_FEATURE_SCALE, -1.0, 1.0)
+        return clamp(trend / self._trend_scale, -1.0, 1.0)
 
 
 class VixSeries:
