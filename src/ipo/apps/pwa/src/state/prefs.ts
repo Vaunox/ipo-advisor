@@ -42,7 +42,11 @@ interface Prefs {
   devConsole: boolean
 }
 
-const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
+// Broker sell-cost display defaults (net-of-cost History column only — never a verdict/probability;
+// the engine's label uses config `sell_costs`). `oth` = exchange + SEBI + 18% GST as a % of sell
+// value: NSE cash txn 0.00297% + SEBI 0.0001% + GST on those ≈ 0.0036% (verified vs NSE/SEBI Oct-2024
+// rates). Was 0.05% — a ~14× overstatement that understated net gains.
+const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.0036 }
 const DEFAULT_NOTIF: NotifPrefs = { native: true, applyCrossing: true, anyChange: false, quiet: true }
 const DEFAULT_STARTUP: Startup = {
   launchOnStartup: false,

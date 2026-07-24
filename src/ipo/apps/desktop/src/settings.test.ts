@@ -15,6 +15,7 @@ import {
   DEFAULT_STARTUP,
   type StartupPrefs,
   PERSIST_BOUNDS_EVENTS,
+  boundsToPersist,
   buildWebPreferences,
   loadSeenState,
   loadSettings,
@@ -243,6 +244,24 @@ test('PERSIST_BOUNDS_EVENTS keeps bounds.maximized a live mirror (fixes the stal
   handlers.get('maximize')?.()
   handlers.get('unmaximize')?.()
   assert.equal(persisted, 2, 'maximize + unmaximize each run persistBounds')
+})
+
+test('boundsToPersist skips while minimized — preserves the pre-minimize maximized flag', () => {
+  const prev = { x: 1, y: 2, width: 900, height: 700, maximized: true }
+  const normal = { x: 5, y: 6, width: 400, height: 300 }
+  // Minimized: win.isMaximized() reads FALSE here — must NOT overwrite prev's maximized:true. Returns
+  // the SAME ref so persistBounds skips the write (the maximize→minimize→close clobber guard).
+  assert.equal(boundsToPersist({ minimized: true, maximized: false, normal }, prev), prev)
+  // Not minimized + maximized → capture maximized:true.
+  assert.deepEqual(boundsToPersist({ minimized: false, maximized: true, normal }, prev), {
+    ...normal,
+    maximized: true,
+  })
+  // Not minimized + normal → capture maximized:false.
+  assert.deepEqual(boundsToPersist({ minimized: false, maximized: false, normal }, prev), {
+    ...normal,
+    maximized: false,
+  })
 })
 
 // --- OP-6: the sealed-shell BrowserWindow posture (DevTools off in prod, on in dev) --------------

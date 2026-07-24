@@ -112,6 +112,19 @@ class SellCosts(_Section):
     stamp_rate_sell: float = 0.0
 
 
+class AllotmentConfig(_Section):
+    """Allotment-tab display windows (v3 V3-6 / F10) — DISPLAY-ONLY, never a scoring input.
+
+    ``listed_visible_days``: how long after listing an IPO stays on the tab. ``_stage`` drops on
+    ``days > listed_visible_days``, so a card listed EXACTLY N days ago is still shown and drops on
+    day N+1 (visible through day 5, gone on day 6). ``cache_stale_days``: beyond this age the cache
+    is "stale" — an absent field reads as unproven ("we haven't looked"), not "not published".
+    """
+
+    listed_visible_days: int = Field(default=5, ge=0)
+    cache_stale_days: int = Field(default=14, ge=0)
+
+
 class KillFlagConfig(_Section):
     """Hard-override thresholds (Deep Dive #3) — sanity bounds, not return-tuned."""
 
@@ -230,6 +243,7 @@ class AppConfig(BaseModel):
     verdict_thresholds: VerdictThresholds = Field(default_factory=VerdictThresholds)
     calibration: CalibrationConfig = Field(default_factory=CalibrationConfig)
     sell_costs: SellCosts = Field(default_factory=SellCosts)
+    allotment: AllotmentConfig = Field(default_factory=AllotmentConfig)
     feature_weights: dict[str, float] = Field(default_factory=dict)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     killflags: KillFlagConfig = Field(default_factory=KillFlagConfig)
