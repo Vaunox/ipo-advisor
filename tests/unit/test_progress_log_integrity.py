@@ -117,6 +117,14 @@ _SHIPPED_V3 = frozenset(
         "F7",
         "F8(a)",
         "F8(b)",
+        # The 2026-07-24 hygiene arc: the F12 AlertCenter overhaul, PR-A persistBounds, the 4-fix
+        # hygiene batch, the F-1/F-3 scoring-path config-lift, and the log-only audit follow-ups
+        # (F-4/F-5/F-6 + the GST-on-SEBI nit) whose row carries do-not-fix reasoning like L1/V3-7.
+        "F12",
+        "PR-A",
+        "Hygiene batch (4 fixes)",
+        "F-1 + F-3",
+        "Hygiene audit",
     }
 )
 
