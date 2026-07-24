@@ -164,7 +164,10 @@ export function buildWebPreferences(
   }
 }
 
-export const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.05 }
+// Broker sell-cost display defaults, mirrored from the renderer (net-of-cost display only, never a
+// verdict). `oth` = exchange + SEBI + 18% GST ≈ 0.0036% of sell value (NSE 0.00297% + SEBI 0.0001% +
+// GST, verified vs NSE/SEBI Oct-2024). Was 0.05% — a ~14× overstatement. Keep in sync with prefs.ts.
+export const DEFAULT_COSTS: Costs = { stt: 0.1, dp: 15.34, oth: 0.0036 }
 export const DEFAULT_NOTIF: NotifPrefs = {
   native: true,
   applyCrossing: true,
