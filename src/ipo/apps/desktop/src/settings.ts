@@ -136,6 +136,15 @@ export function startupWindowState(opts: {
   return opts.savedMaximized ? 'shown-maximized' : 'shown-normal'
 }
 
+/** The BrowserWindow events that must re-persist the window bounds so `bounds.maximized` is a LIVE
+ *  mirror, not a stale snapshot. `resized`/`moved` cover drags and size changes. `maximize`/
+ *  `unmaximize` are the gap this fixes: `win.maximize()`/`unmaximize()` fire ONLY those events, never
+ *  `resized` — so without them `bounds.maximized` only updated on a later drag or close, and a reopen
+ *  with no preceding close (a second-instance double-launch, made reachable by F1-rev's Decision 2)
+ *  could re-maximize a window the user had un-maximized. main.ts wires `persistBounds` to every event
+ *  in this list; the test fences the set so a future edit can't silently drop one. */
+export const PERSIST_BOUNDS_EVENTS = ['resized', 'moved', 'maximize', 'unmaximize'] as const
+
 /** The BrowserWindow security posture in ONE lockable place (the "sealed shell" family: OP-6 + review
  *  #5). Context-isolated, no node integration, and — OP-6 — Chromium DevTools OFF in the packaged
  *  build (``dev=false`` makes ``Ctrl+Shift+I`` / the default-menu accelerator / ``openDevTools()`` all
