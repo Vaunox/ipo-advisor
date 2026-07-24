@@ -249,12 +249,35 @@ test('seen-state round-trips through save/load (survives a simulated restart)', 
     const seen: SeenState = {
       alertsSeen: ['ipo-a', 'ipo-b'],
       notifiedCrossings: ['ipo-a@2026-07-20'],
+      dismissedCrossings: ['ipo-b@2026-07-21'], // F12: dismissals must survive the restart too
       notifSeeded: true,
       lastSeen: { 'ipo-a': 'APPLY', 'ipo-b': 'SKIP' },
     }
     saveSeenState(dir, seen)
     // Reload from the same dir = app close + reopen: the seen-sets come back, not empty.
     assert.deepEqual(loadSeenState(dir), seen)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('F12: an older seen-state.json (no dismissedCrossings) hydrates it as [] — never vanishes/crashes', () => {
+  const dir = tmpUserDataDir()
+  try {
+    // A file written before F12 has no dismissedCrossings key. loadSeenState parses field-by-field,
+    // so the missing field must default to [] (nothing dismissed yet), not undefined or a throw.
+    fs.writeFileSync(
+      path.join(dir, 'seen-state.json'),
+      JSON.stringify({
+        alertsSeen: ['ipo-a'],
+        notifiedCrossings: ['ipo-a@2026-07-20'],
+        notifSeeded: true,
+        lastSeen: { 'ipo-a': 'APPLY' },
+      }),
+      'utf-8',
+    )
+    assert.deepEqual(loadSeenState(dir)?.dismissedCrossings, [])
+    assert.deepEqual(loadSeenState(dir)?.alertsSeen, ['ipo-a']) // the pre-existing fields still load
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
@@ -268,6 +291,7 @@ test('a corrupt seen-state.json degrades to empty (never crashes boot/hydration)
     assert.deepEqual(loadSeenState(dir), {
       alertsSeen: [],
       notifiedCrossings: [],
+      dismissedCrossings: [],
       notifSeeded: false,
       lastSeen: {},
     })
@@ -279,7 +303,13 @@ test('a corrupt seen-state.json degrades to empty (never crashes boot/hydration)
 test('saveSeenState is ATOMIC: a failed rename leaves the last-good file intact (temp-then-rename)', () => {
   const dir = tmpUserDataDir()
   try {
-    saveSeenState(dir, { alertsSeen: ['keep'], notifiedCrossings: [], notifSeeded: true, lastSeen: {} })
+    saveSeenState(dir, {
+      alertsSeen: ['keep'],
+      notifiedCrossings: [],
+      dismissedCrossings: [],
+      notifSeeded: true,
+      lastSeen: {},
+    })
     // Force the rename to fail: a DIRECT writeFileSync(target) would have already truncated+replaced
     // the target (reintroducing OP-3's torn-write bug); the atomic temp-then-rename must NOT — so this
     // also fails loudly if a future refactor drops the atomic idiom back to a direct write.
@@ -287,7 +317,13 @@ test('saveSeenState is ATOMIC: a failed rename leaves the last-good file intact 
       throw new Error('EPERM: simulated external lock (AV/indexer) on rename')
     })
     try {
-      saveSeenState(dir, { alertsSeen: ['new'], notifiedCrossings: ['x'], notifSeeded: false, lastSeen: {} })
+      saveSeenState(dir, {
+        alertsSeen: ['new'],
+        notifiedCrossings: ['x'],
+        dismissedCrossings: ['x@2026-07-21'],
+        notifSeeded: false,
+        lastSeen: {},
+      })
     } finally {
       m.mock.restore()
     }

@@ -218,8 +218,7 @@ h3.sec { font-family:'Fira Code'; font-size:11.5px; letter-spacing:.085em; text-
 .vh-arrow { color:var(--tx3); }
 .vh-cross { color:var(--apply); font-size:11px; font-weight:600; }
 .vh-p { margin-left:auto; color:var(--tx2); font-weight:600; }
-.alertpanel .ah-sub { margin-top:4px; border-top:1px solid var(--line); }
-.alertitem.cross { opacity:.92; }
+.alertitem.event { opacity:.96; }
 .whatif { grid-column:1/-1; display:flex; gap:11px; align-items:flex-start; font-size:12.5px; color:var(--tx2); background:var(--panel); border:1px dashed var(--line2); border-radius:10px; padding:13px 16px; }
 .whatif svg { width:16px; height:16px; flex:none; stroke:var(--accent); fill:none; stroke-width:1.8; margin-top:1px; }
 .whatif b { color:var(--tx); }
@@ -312,15 +311,26 @@ h3.sec { font-family:'Fira Code'; font-size:11.5px; letter-spacing:.085em; text-
 .alertbtn:hover { color:var(--tx); }
 .alertbtn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; }
 .alertbtn .badge { position:absolute; top:-5px; right:-5px; min-width:16px; height:16px; border-radius:9px; background:var(--skip); color:#fff; font-family:'Fira Code'; font-size:9px; font-weight:600; display:grid; place-items:center; padding:0 4px; }
+/* F12: the "!" system-issue flag REPLACES the unread count — severity-coloured (red = broken, amber =
+   degraded but working). Slightly larger glyph than the numeric count so it reads as an exclamation. */
+.alertbtn .badge.flag { font-size:11px; padding:0 5px; }
+.alertbtn .badge.flag.red { background:var(--skip); }
+.alertbtn .badge.flag.amber { background:var(--marginal); color:#1a1205; }
 .refreshbtn { width:36px; height:36px; border-radius:8px; border:1px solid var(--line); background:var(--panel); display:grid; place-items:center; color:var(--tx2); }
 .refreshbtn:hover:not(:disabled) { color:var(--tx); }
 .refreshbtn:disabled { opacity:.6; cursor:default; }
 .refreshbtn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; }
 .refreshbtn svg.spin { animation:spin .7s linear infinite; transform-origin:center; }
 .alertpanel { position:absolute; top:48px; right:0; width:330px; background:var(--panel); border:1px solid var(--line2); border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,.5); z-index:40; overflow:hidden; }
-.alertpanel .ah { padding:13px 16px; border-bottom:1px solid var(--line); font-size:12px; font-weight:600; }
+/* F12: header row carries the title + the Clear control (dismiss events; conditions are left alone). */
+.alertpanel .ahrow { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; border-bottom:1px solid var(--line); }
+.alertpanel .ah { font-size:12px; font-weight:600; }
+.ah-clear { font-family:'Fira Code'; font-size:10.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--tx3); background:none; border:none; padding:2px 4px; cursor:pointer; }
+.ah-clear:hover { color:var(--tx); }
 .alertitem { display:flex; gap:11px; padding:12px 16px; border-bottom:1px solid var(--line); cursor:pointer; align-items:flex-start; }
 .alertitem:last-child { border:none; } .alertitem:hover { background:var(--panel2); }
+/* F12: a CONDITION is not clickable and not dismissible — it clears itself when the condition clears. */
+.alertitem.condition { cursor:default; }
 .alertitem .adot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex:none; }
 .alertitem .an { font-size:12.5px; font-weight:600; } .alertitem .am { font-size:11.5px; color:var(--tx2); margin-top:2px; }
 .alert-empty { padding:20px 16px; text-align:center; color:var(--tx3); font-size:12px; }
@@ -408,16 +418,15 @@ body.compact .meter { margin-top:6px; }
 .sync.err { background:var(--skip); opacity:1; animation:syncpulse 1s ease-in-out infinite; }
 .sync.warn { background:var(--marginal); opacity:1; animation:syncpulse 1s ease-in-out infinite; }
 @keyframes syncpulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
-/* min-width:0 lets this one chip absorb any header deficit by ellipsis-truncating its text (full
-   detail always in the title tooltip) instead of shoving Clock/Theme off-screen — the honest
-   worst case "Updated … · retrying · on local — context aging" overflows the 1040px min window. */
+/* min-width:0 lets this chip participate in the flex row without forcing a minimum; the text below
+   is width-capped so it never shoves Clock/Theme off-screen. */
 .syncstat { display:flex; align-items:center; gap:7px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; min-width:0; }
-/* OP-2: reserve width for the longest COMMON label ("Updated 10:29 AM") so the ok<->busy flip
-   ("Updated HH:MM" <-> "Refreshing…") never resizes the chip or nudges its neighbours. The rarer
-   degraded suffixes ("· retrying", the VM-fallback "· on local — context aging") are wider still and
-   will grow the chip when they occur — but those are stable states, not the 5s flicker, so they are
-   deliberately not reserved for here. */
-.syncstat-t { font-family:'Fira Code'; font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:16ch; }
+/* F12: the chip holds ONE FIXED width in every state. min==max==16ch fits the two longest RETAINED
+   labels exactly ("Checked 12:59 PM", "Couldn't refresh" — both 16ch) and every other label is
+   shorter, so there is no growth AND no truncation, ever. Every degraded state that used to compose a
+   wider suffix ("· retrying", the VM "· on local — context aging") now lives in the bell, so nothing
+   can exceed this width. (chip-gallery.ts fences it; status.test.ts asserts text.length <= 16.) */
+.syncstat-t { font-family:'Fira Code'; font-size:11px; color:var(--tx2); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:16ch; max-width:16ch; }
 .syncstat.err { border-color:color-mix(in srgb, var(--skip) 45%, transparent); }
 .syncstat.err .syncstat-t { color:var(--skip); }
 .syncstat.warn { border-color:color-mix(in srgb, var(--marginal) 45%, transparent); }

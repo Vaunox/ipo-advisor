@@ -1,20 +1,34 @@
-import { type MouseEvent, useEffect, useRef, useState } from 'react'
-import { currentApplyAlerts, pruneSeenIds, relevantApplyCrossings } from '../alerts'
-import { useTransitions } from '../api/hooks'
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { type AlertItem, buildAlertFeed, pruneDismissedKeys, pruneSeenIds } from '../alerts'
+import { useHealth, useStatus, useTransitions } from '../api/hooks'
 import type { IPOListRow } from '../api/types'
-import { getAlertsSeen, setAlertsSeen } from '../state/prefs'
-import { VMETA } from '../verdict'
+import {
+  getAlertsSeen,
+  getDismissedCrossings,
+  setAlertsSeen,
+  setDismissedCrossings,
+} from '../state/prefs'
 
 const fmtDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
-// The notifications surface: the current APPLY signals you'd be alerted about, plus the APPLY
-// crossings from the engine's transition log (recorded as the verdict crossed, never re-derived).
-//
-// v3 BUG 2 — relevance-scoped, not unbounded. Both lists show only IPOs whose outcome is still
-// UNRESOLVED (`alertRelevant`: not yet listed — see status.ts), and crossings are deduped to the
-// latest per IPO. The full transition log is untouched (it stays the permanent per-IPO audit trail
-// on the detail view + primes the scheduler); this is a filtered VIEW over it, not a prune of it.
+const dotColor = (i: AlertItem): string =>
+  i.kind === 'event'
+    ? 'var(--apply)'
+    : i.severity === 'red'
+      ? 'var(--skip)'
+      : 'var(--marginal)'
+
+// The notifications surface (F12). ONE list of items — dismissible EVENTS (an IPO crossed into APPLY,
+// happened once) and undismissible CONDITIONS (a degraded state that persists until it clears). The
+// discriminated union built by `buildAlertFeed` keeps the split structural, so the two interactions
+// stay clean:
+//   * Opening the panel MARKS READ — the unread badge clears; the items stay (standard bell pattern).
+//   * Clear DISMISSES the events — the events are removed (durably, per-crossing); conditions are left
+//     alone, because dismiss filters the events branch only.
+// The badge shows "!" (severity-coloured) whenever any condition is present, replacing the unread
+// count; the count returns once the condition clears. "Current APPLY signals" (which duplicated the
+// Live page) is gone; every degraded state that used to crowd the sync chip now lives here.
 export function AlertCenter({
   board,
   onOpenIpo,
@@ -23,27 +37,36 @@ export function AlertCenter({
   onOpenIpo: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  // Which APPLY signals have already been seen — persisted, so the unread badge survives a reload
-  // and only re-lights when a genuinely new IPO crosses into APPLY.
+  // Persisted so the badge and dismissals survive a reload/restart (durable seen-state — OP-3).
   const [seen, setSeen] = useState<Set<string>>(() => new Set(getAlertsSeen()))
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set(getDismissedCrossings()))
   const wrap = useRef<HTMLDivElement>(null)
-  const rows = board ?? []
-  // Current APPLY signals + latest-per-IPO crossings, both scoped to still-unresolved IPOs (v3 BUG 2).
-  const alerts = currentApplyAlerts(rows)
   const { data: transitions } = useTransitions()
-  const crossings = relevantApplyCrossings(transitions ?? [], rows)
-  const unread = alerts.filter((a) => !seen.has(a.ipo_id)).length
+  const status = useStatus()
+  const health = useHealth()
 
-  // Prune the persisted "seen" set to ids that are still relevant (on the board and not yet listed),
-  // so it can't grow without bound as IPOs list and leave (v3 BUG 2). Guarded against the cold-start
-  // empty board (see pruneSeenIds) — pruning against no data used to wipe the set and re-light the
-  // badge on every restart.
+  const feed = useMemo(
+    () => buildAlertFeed(transitions ?? [], board ?? [], status.data, health.isError, dismissed, seen),
+    [transitions, board, status.data, health.isError, dismissed, seen],
+  )
+
+  // Prune BOTH persisted sets to still-relevant ids so a durable set can't grow without bound: `seen`
+  // by ipo_id, `dismissed` by its crossing-key's ipo_id. Both cold-start-guarded (pruneSeenIds /
+  // pruneDismissedKeys never prune against an empty board — that would wipe the set and re-light /
+  // un-dismiss on the next restart).
   useEffect(() => {
-    const persisted = getAlertsSeen()
-    const pruned = pruneSeenIds(persisted, rows)
-    if (pruned.length !== persisted.length) {
-      setAlertsSeen(pruned)
-      setSeen(new Set(pruned))
+    const rows = board ?? []
+    const s = getAlertsSeen()
+    const ps = pruneSeenIds(s, rows)
+    if (ps.length !== s.length) {
+      setAlertsSeen(ps)
+      setSeen(new Set(ps))
+    }
+    const d = getDismissedCrossings()
+    const pd = pruneDismissedKeys(d, rows)
+    if (pd.length !== d.length) {
+      setDismissedCrossings(pd)
+      setDismissed(new Set(pd))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board])
@@ -59,80 +82,87 @@ export function AlertCenter({
   const toggle = (e: MouseEvent) => {
     e.stopPropagation()
     setOpen((o) => !o)
-    // Mark the current APPLY signals as seen (persisted) when the panel is opened.
-    const next = new Set([...seen, ...alerts.map((a) => a.ipo_id)])
-    setSeen(next)
-    setAlertsSeen([...next])
+    // Mark read: opening the panel marks the currently-shown EVENTS seen (badge clears; items stay).
+    const ids = feed.items.filter((i) => i.kind === 'event').map((i) => i.ipo_id)
+    if (ids.length) {
+      const next = new Set([...seen, ...ids])
+      setSeen(next)
+      setAlertsSeen([...next])
+    }
   }
+
+  const clearEvents = (e: MouseEvent) => {
+    e.stopPropagation()
+    // Dismiss: remove every currently-shown event (durable, per-crossing). Conditions are untouched.
+    const keys = feed.items.flatMap((i) => (i.kind === 'event' ? [i.key] : []))
+    if (!keys.length) return
+    const next = new Set([...dismissed, ...keys])
+    setDismissed(next)
+    setDismissedCrossings([...next])
+  }
+
+  const hasEvents = feed.items.some((i) => i.kind === 'event')
 
   return (
     <div className="alertwrap" ref={wrap}>
-      <button className="alertbtn" onClick={toggle} title="APPLY signals & crossing history">
+      <button className="alertbtn" onClick={toggle} title="APPLY signals & app status">
         <svg viewBox="0 0 24 24">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
         </svg>
-        {unread > 0 && <span className="badge">{unread}</span>}
+        {feed.flag ? (
+          <span className={`badge flag ${feed.flag}`}>!</span>
+        ) : feed.badge > 0 ? (
+          <span className="badge">{feed.badge}</span>
+        ) : null}
       </button>
       {open && (
         <div className="alertpanel">
-          <div className="ah">Current APPLY signals</div>
-          {alerts.length ? (
-            alerts.map((a) => (
-              <div
-                className="alertitem"
-                key={a.ipo_id}
-                onClick={() => {
-                  setOpen(false)
-                  onOpenIpo(a.ipo_id)
-                }}
-              >
-                <span className="adot" style={{ background: `var(--${VMETA[a.verdict].cls})` }} />
-                <div>
-                  <div className="an">
-                    {a.name}{' '}
-                    {a.probability != null && (
-                      <span style={{ color: 'var(--apply)', fontFamily: 'Fira Code' }}>
-                        {Math.round(a.probability * 100)}%
-                      </span>
-                    )}
-                  </div>
-                  <div className="am">{a.reason}</div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="alert-empty">No APPLY signals right now.</div>
-          )}
-
-          <div className="ah ah-sub">Recent APPLY crossings</div>
-          {crossings.length ? (
-            crossings.map((t, i) => (
-              <div
-                className="alertitem cross"
-                key={`${t.ipo_id}-${i}`}
-                onClick={() => {
-                  setOpen(false)
-                  onOpenIpo(t.ipo_id)
-                }}
-              >
-                <span className="adot" style={{ background: 'var(--apply)' }} />
-                <div>
-                  <div className="an">
-                    {t.name}{' '}
-                    {t.probability != null && (
-                      <span style={{ color: 'var(--apply)', fontFamily: 'Fira Code' }}>
-                        {Math.round(t.probability * 100)}%
-                      </span>
-                    )}
-                  </div>
-                  <div className="am">
-                    crossed into APPLY · <span className="mono">{fmtDate(t.asof)}</span>
+          <div className="ahrow">
+            <span className="ah">Alerts</span>
+            {hasEvents && (
+              <button className="ah-clear" onClick={clearEvents} title="Dismiss all alerts">
+                Clear
+              </button>
+            )}
+          </div>
+          {feed.items.length ? (
+            feed.items.map((item) =>
+              item.kind === 'condition' ? (
+                <div className={`alertitem condition ${item.severity}`} key={item.key}>
+                  <span className="adot" style={{ background: dotColor(item) }} />
+                  <div>
+                    <div className="an">{item.title}</div>
+                    <div className="am">{item.detail}</div>
                   </div>
                 </div>
-              </div>
-            ))
+              ) : (
+                <div
+                  className="alertitem event"
+                  key={item.key}
+                  onClick={() => {
+                    setOpen(false)
+                    onOpenIpo(item.ipo_id)
+                  }}
+                >
+                  <span className="adot" style={{ background: dotColor(item) }} />
+                  <div>
+                    <div className="an">
+                      {item.name}{' '}
+                      {item.probability != null && (
+                        <span style={{ color: 'var(--apply)', fontFamily: 'Fira Code' }}>
+                          {Math.round(item.probability * 100)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="am">
+                      crossed into APPLY · <span className="mono">{fmtDate(item.asof)}</span>
+                    </div>
+                  </div>
+                </div>
+              ),
+            )
           ) : (
-            <div className="alert-empty">No crossings recorded yet.</div>
+            <div className="alert-empty">You're all caught up.</div>
           )}
         </div>
       )}

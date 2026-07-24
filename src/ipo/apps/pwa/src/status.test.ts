@@ -9,12 +9,12 @@ import {
   DELAY_DISCLOSURE,
   REFRESH_MIN_VISIBLE_MS,
   awaitingLabel,
-  fallbackStatus,
+  degradedConditions,
   refreshAck,
   refreshHold,
   syncChip,
 } from './status.ts'
-import type { AckSnapshot } from './status.ts'
+import type { AckSnapshot, SyncChipInput } from './status.ts'
 
 function ymd(offsetDays: number): string {
   const d = new Date()
@@ -68,26 +68,43 @@ test('strand mode 2 (listed but never priced): names the missing outcome honestl
   assert.equal(r.overdue, true)
 })
 
-// v3 V3-1 — the three-state fallback indicator (must never look degraded in normal operation).
-test('dark-ship (no VM configured) → no indicator', () => {
-  assert.equal(fallbackStatus('local', null), null)
-  assert.equal(fallbackStatus(null, null), null)
+// F12 — the ONE degraded-state taxonomy, shared by the chip and the bell (replaced `fallbackStatus`).
+// `status()` is hoisted (function declaration below), so these read cleanly here.
+test('degradedConditions: a healthy status yields no conditions', () => {
+  assert.deepEqual(degradedConditions(status(), false), [])
 })
 
-test('both stores from the VM → no indicator (stays quiet)', () => {
-  assert.equal(fallbackStatus('vm', 'vm'), null)
+test('degradedConditions: dark-ship (no VM) never looks degraded', () => {
+  // context_source === null → no VM configured → no server/context conditions even if records read local.
+  assert.deepEqual(
+    degradedConditions(status({ records_source: 'local', context_source: null }), false),
+    [],
+  )
 })
 
-test('VM down → the honest per-store split (records fresh vs context aging)', () => {
-  const fb = fallbackStatus('local', 'local')
-  assert.equal(fb?.text, 'on local — context aging') // records freshness is the "Updated …" timestamp
-  assert.match(fb?.title ?? '', /records fresh from NSE/) // full per-store detail in the tooltip
-  assert.match(fb?.title ?? '', /aging/)
+test('degradedConditions: a failed pull → one amber "Refresh failed"', () => {
+  const c = degradedConditions(status({ last_attempt_ok: false }), false)
+  assert.deepEqual(c.map((x) => x.key), ['refresh-failed'])
+  assert.equal(c[0].severity, 'amber')
 })
 
-test('partial fallback names the one store that fell back', () => {
-  assert.equal(fallbackStatus('local', 'vm')?.text, 'records on local')
-  assert.equal(fallbackStatus('vm', 'local')?.text, 'context aging')
+test('degradedConditions: VM down → server-unreachable + context-aging (e: one entry per condition)', () => {
+  const c = degradedConditions(status({ records_source: 'local', context_source: 'local' }), false)
+  assert.deepEqual(c.map((x) => x.key).sort(), ['context-aging', 'server-unreachable'])
+  assert.ok(c.every((x) => x.severity === 'amber')) // degraded but working
+  assert.ok(c.every((x) => !/VM/.test(`${x.title} ${x.detail}`))) // "server", never "VM"
+})
+
+test('degradedConditions: only context on local → just context-aging', () => {
+  const c = degradedConditions(status({ records_source: 'vm', context_source: 'local' }), false)
+  assert.deepEqual(c.map((x) => x.key), ['context-aging'])
+})
+
+test('degradedConditions: engine unreachable is the SINGLE red condition and subsumes the rest', () => {
+  // isError → the (now stale) source fields can't be trusted; one red condition stands alone.
+  const c = degradedConditions(status({ records_source: 'local', context_source: 'local' }), true)
+  assert.deepEqual(c.map((x) => x.key), ['engine-down'])
+  assert.equal(c[0].severity, 'red')
 })
 
 // --- OP-2: the freshness chip shows "Refreshing…" ONLY for a genuine, client-knowable manual pull ---
@@ -139,18 +156,19 @@ test('engine unreachable reads Reconnecting (err), and error wins over manual st
   assert.equal(chip.state, 'err')
 })
 
-test('a failed newer pull reads Checked … · retrying (warn), NOT Refreshing', () => {
-  // The check clock (last successful pull) stays put — a failed pull never advances it — and the
-  // `· retrying` suffix fires off last_attempt_ok. Regression fence for the degraded suffix.
+test('F12: a failed newer pull no longer degrades the CHIP — plain "Checked", no suffix', () => {
+  // Was "Checked … · retrying". Now the chip stays plain "Checked HH:MM" (the last SUCCESSFUL check is
+  // still true) and the "Refresh failed" nuance is a bell condition — so the chip is width-stable.
   const chip = syncChip(
     { isError: false, refreshInFlight: false, status: status({ last_attempt_ok: false }) },
     FMT,
   )
-  assert.equal(chip.text, 'Checked 10:29 AM · retrying')
-  assert.equal(chip.state, 'warn')
+  assert.equal(chip.text, 'Checked 10:29 AM')
+  assert.equal(chip.state, 'ok')
+  assert.doesNotMatch(chip.text, /·|retrying/)
 })
 
-test('a VM fallback composes the honest per-store suffix and turns the dot amber', () => {
+test('F12: a VM fallback no longer composes a chip suffix — plain "Checked" (degradation is in the bell)', () => {
   const chip = syncChip(
     {
       isError: false,
@@ -159,8 +177,9 @@ test('a VM fallback composes the honest per-store suffix and turns the dot amber
     },
     FMT,
   )
-  assert.match(chip.text, /Checked 10:29 AM · on local — context aging/)
-  assert.equal(chip.state, 'warn') // an ok state degrades to warn on a local fallback
+  assert.equal(chip.text, 'Checked 10:29 AM')
+  assert.equal(chip.state, 'ok') // no longer degrades to warn — the chip holds one fixed width
+  assert.doesNotMatch(chip.text, /·|local|aging/)
 })
 
 test('review #6: a reachable VM with no fresh data reads "Checked", never "retrying" or "refreshed"', () => {
@@ -283,15 +302,52 @@ test('refreshAck: a debounced/coalesced press (nothing moved) → none — never
   assert.equal(refreshAck(null, snap()), 'none') // status not loaded yet → no ack
 })
 
-// --- OP-2 Phase 2: no-layout-shift — every new label fits the reserved 16ch chip floor ---
+// --- F12: the chip holds ONE fixed width (styles.css .syncstat-t min==max==16ch) in EVERY state ---
 
-test('no-shift: the new steady + ack labels all fit the reserved 16ch width (styles.css .syncstat-t)', () => {
-  // The chip reserves a 16ch floor so the common flip never resizes it or nudges neighbours. Every
-  // new label must fit within it. (The ✓ glyph's true visual width is a Fira-Code build check the
-  // operator owns; this keys on character count, the width contract we can assert headlessly.)
-  for (const label of ['Checked 10:29 AM', 'Refreshing…', 'New data ✓', 'Up to date ✓', "Couldn't refresh"]) {
-    assert.ok(label.length <= 16, `"${label}" is ${label.length} chars — overruns the 16ch floor`)
+test('F12: every chip state fits 16ch AND never carries a "·" suffix — one width, no truncation', () => {
+  // Drive the SHIPPED syncChip across every state, not hand-written labels, so the width contract is
+  // proven against real output. Fixed 16ch = the two longest retained labels exactly; every degraded
+  // suffix that used to overrun it now lives in the bell. (The ✓ glyph's true Fira-Code visual width
+  // is the operator's build check; this keys on character count, the contract we assert headlessly.)
+  const cases: SyncChipInput[] = [
+    { isError: false, refreshInFlight: false, status: status() }, // Checked 10:29 AM
+    { isError: false, refreshInFlight: true, status: status() }, // Refreshing…
+    { isError: false, refreshInFlight: false, ack: 'newdata', status: status() }, // New data ✓
+    { isError: false, refreshInFlight: false, ack: 'uptodate', status: status() }, // Up to date ✓
+    { isError: false, refreshInFlight: false, ack: 'failed', status: status() }, // Couldn't refresh
+    { isError: true, refreshInFlight: false, status: status() }, // Reconnecting…
+    { isError: false, refreshInFlight: false, status: status({ live_ingest: false }) }, // Live
+    {
+      isError: false,
+      refreshInFlight: false,
+      status: status({ checked_at: null, last_successful_ingest: null }),
+    }, // No data yet
+    // degraded inputs that USED to add a suffix — now plain and within width:
+    { isError: false, refreshInFlight: false, status: status({ last_attempt_ok: false }) },
+    {
+      isError: false,
+      refreshInFlight: false,
+      status: status({ records_source: 'local', context_source: 'local' }),
+    },
+  ]
+  for (const input of cases) {
+    const chip = syncChip(input, FMT)
+    assert.ok(chip.text.length <= 16, `"${chip.text}" is ${chip.text.length} chars — overruns 16ch`)
+    assert.doesNotMatch(chip.text, /·/, `"${chip.text}" must not carry a "·" suffix`)
   }
+})
+
+test('F12: cold start reads "No data yet" — honest at any duration, never a transient "Awaiting…"', () => {
+  const chip = syncChip(
+    {
+      isError: false,
+      refreshInFlight: false,
+      status: status({ checked_at: null, last_successful_ingest: null }),
+    },
+    FMT,
+  )
+  assert.equal(chip.text, 'No data yet')
+  assert.equal(chip.state, 'ok')
 })
 
 // --- OP-2: the manual-refresh min-duration hold (pure decision, no flaky timer test) ---

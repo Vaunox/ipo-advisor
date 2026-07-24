@@ -64,38 +64,76 @@ export function awaitingLabel(row: IPOListRow): { text: string; overdue: boolean
   }
 }
 
-// v3 V3-1 — the data-plane fallback indicator, composed into the ONE sync chip (never a second chip).
-// It speaks ONLY when degraded, and renders the per-store distinction rather than a blanket status:
-//   * no VM configured (context_source === null, "dark-ship") → null: normal operation, no indicator;
-//   * both stores from the VM → null: all good, stay quiet;
-//   * a store fell back to local → the honest split — records fresh (a real NSE re-scrape) vs context
-//     last-known-aging (the Upstox token is on the VM, so context can't refresh until it returns).
-// One shared, tested definition (status.test.ts) so the chip text can't drift from the truth.
-export function fallbackStatus(
-  recordsSource: string | null,
-  contextSource: string | null,
-): { text: string; title: string } | null {
-  if (contextSource == null) return null // dark-ship: no VM — must not look degraded
-  const recLocal = recordsSource === 'local'
-  const ctxLocal = contextSource === 'local'
-  if (!recLocal && !ctxLocal) return null // both served from the VM — stay quiet
-  // Kept short so it composes into the header chip without crowding it (min window 1040px). The
-  // "Updated …" timestamp already carries records freshness; the suffix flags only what the user
-  // can't infer — that we're on local and, distinctly, that context is aging (records aren't flagged,
-  // so they read as fine). The full per-store detail is in the title/tooltip.
-  const text = recLocal && ctxLocal
-    ? 'on local — context aging'
-    : recLocal
-      ? 'records on local'
-      : 'context aging'
-  const title =
-    'VM unreachable — ' +
-    (recLocal ? 'records fresh from NSE' : 'records still served from the VM') +
-    '; ' +
-    (ctxLocal
-      ? 'context is last-known and aging (cannot refresh without the VM)'
-      : 'context still served from the VM')
-  return { text, title }
+// F12 — the ONE degraded-state taxonomy, shared by the sync chip and the alert bell so the two can
+// never drift (formerly `fallbackStatus`, which composed the VM split onto the chip as a suffix).
+// The chip now holds only "Checked HH:MM" + acks and every degraded state surfaces HERE as its own
+// bell entry — one per condition (F12 e), plain-English, severity-coloured (amber = degraded but
+// working, red = broken). `isError` (the local engine unreachable) is the sole red condition AND the
+// one degraded state the chip keeps its own presence for ("Reconnecting…"), because there the chip's
+// own "I checked at…" claim can no longer be verified — the most serious condition gets the most
+// prominence (one taxonomy, two presentations; not an inconsistency, proportionality).
+//
+// "server" is the user-facing word for the VM everywhere here; the internal source slugs the engine
+// reports (`records_source`/`context_source` = 'vm' | 'local' | null) are unchanged.
+export interface AlertCondition {
+  kind: 'condition'
+  key: string // stable slug — never a per-event id; a condition is never dismissible (F12 f)
+  severity: 'amber' | 'red'
+  title: string
+  detail: string
+}
+
+export function degradedConditions(
+  status: StatusView | undefined,
+  isError: boolean,
+): AlertCondition[] {
+  // Engine unreachable SUBSUMES the source-derived states: the (now stale) status fields can't be
+  // trusted and nothing works, so it stands alone as the single red condition rather than stacking
+  // amber suffixes under it.
+  if (isError) {
+    return [
+      {
+        kind: 'condition',
+        key: 'engine-down',
+        severity: 'red',
+        title: 'App not responding',
+        detail: "The app's data service isn't answering. It's reconnecting automatically.",
+      },
+    ]
+  }
+  if (!status) return []
+  const out: AlertCondition[] = []
+  if (status.last_attempt_ok === false) {
+    out.push({
+      kind: 'condition',
+      key: 'refresh-failed',
+      severity: 'amber',
+      title: 'Refresh failed',
+      detail: "The last update didn't go through. It will retry on the next cycle — or refresh now.",
+    })
+  }
+  // Dark-ship (no VM configured) must never look degraded: context_source === null means no VM at all.
+  if (status.context_source != null) {
+    if (status.records_source === 'local') {
+      out.push({
+        kind: 'condition',
+        key: 'server-unreachable',
+        severity: 'amber',
+        title: 'Server unreachable',
+        detail: 'Live data is coming from a local backup source and stays current.',
+      })
+    }
+    if (status.context_source === 'local') {
+      out.push({
+        kind: 'condition',
+        key: 'context-aging',
+        severity: 'amber',
+        title: 'Market context aging',
+        detail: "Valuation context can't refresh until the server is back.",
+      })
+    }
+  }
+  return out
 }
 
 // v3 BUG 1 / OP-2 — the ONE data-state chip's state+text+title, as a PURE decision so it is
@@ -194,32 +232,27 @@ export function syncChip(
     state = 'ok'
     text = 'Live'
     title = 'No live NSE feed configured in this build'
-  } else if (checked && s?.last_attempt_ok === false) {
-    state = 'warn'
-    text = `Checked ${checked} · retrying`
-    title = 'A newer pull failed — retrying automatically'
   } else if (checked) {
+    // F12: `last_attempt_ok === false` no longer degrades the chip — the "Refresh failed" nuance is a
+    // bell condition now (degradedConditions). "Checked HH:MM" is the last SUCCESSFUL check and stays
+    // true regardless of a later failed attempt, so the chip is honest with no suffix.
     state = 'ok'
     text = `Checked ${checked}`
     title = DELAY_DISCLOSURE
   } else {
-    state = s?.last_attempt_ok === false ? 'warn' : 'ok'
-    text = 'Awaiting first update…'
-    title = 'No successful pull yet — fetching'
+    // F12: honest at ANY duration — a working engine clears this in seconds; a persistent no-data
+    // state means fetches are failing, which is itself a bell condition. So never wording that
+    // implies it's about to resolve ("Awaiting…"/"fetching…"): just the fact.
+    state = 'ok'
+    text = 'No data yet'
+    title = 'No successful pull yet'
   }
 
-  // Compose the data-plane fallback into THIS one chip (never a second, contradicting chip): silent
-  // unless a store fell back from a configured VM, then the honest per-store suffix + amber dot. NOT
-  // composed onto a transient ack — the ack is a brief, clean confirmation, and the steady chip it
-  // settles back to already carries the per-store detail.
+  // F12: every degraded state (the VM data-plane split AND the failed-pull nuance) moved to the bell
+  // (degradedConditions), so nothing composes a suffix onto the chip — it holds ONE fixed width in
+  // every state (styles.css `.syncstat-t` max-width:16ch). Only the next-refresh hint remains, and it
+  // is TOOLTIP-only (never the visible text), so it can't widen the chip.
   const isAck = ack !== 'none' && !isError && !refreshInFlight
-  const fb = s && !isAck ? fallbackStatus(s.records_source, s.context_source) : null
-  if (fb) {
-    if (state === 'ok') state = 'warn'
-    text = `${text} · ${fb.text}`
-    title = `${title} · ${fb.title}`
-  }
-  // Tooltip-only next-refresh hint (only when the engine can honestly predict it; never over an ack).
   if (s?.next_refresh_at && !isAck) title = `${title} · next refresh ~${fmt(s.next_refresh_at)} IST`
 
   const dot =

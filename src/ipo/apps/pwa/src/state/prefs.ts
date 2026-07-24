@@ -36,6 +36,7 @@ interface Prefs {
   notifications: NotifPrefs
   alertsSeen: string[]
   notifiedCrossings: string[]
+  dismissedCrossings: string[]
   notifSeeded: boolean
   awaitingCollapsed: boolean
   devConsole: boolean
@@ -68,6 +69,7 @@ function load(): Prefs {
           : { ...DEFAULT_NOTIF },
       alertsSeen: Array.isArray(p.alertsSeen) ? p.alertsSeen : [],
       notifiedCrossings: Array.isArray(p.notifiedCrossings) ? p.notifiedCrossings : [],
+      dismissedCrossings: Array.isArray(p.dismissedCrossings) ? p.dismissedCrossings : [],
       notifSeeded: p.notifSeeded === true,
       awaitingCollapsed: p.awaitingCollapsed === true,
       devConsole: p.devConsole === true, // v3 V3-16: default OFF — a fresh install ships it off
@@ -83,6 +85,7 @@ function load(): Prefs {
       notifications: { ...DEFAULT_NOTIF },
       alertsSeen: [],
       notifiedCrossings: [],
+      dismissedCrossings: [],
       notifSeeded: false,
       awaitingCollapsed: false,
       devConsole: false,
@@ -131,6 +134,7 @@ interface UiPrefs {
 interface SeenState {
   alertsSeen: string[]
   notifiedCrossings: string[]
+  dismissedCrossings: string[]
   notifSeeded: boolean
   lastSeen: Record<string, VerdictType>
 }
@@ -160,6 +164,7 @@ function seenSnapshot(): SeenState {
   return {
     alertsSeen: prefs.alertsSeen,
     notifiedCrossings: prefs.notifiedCrossings,
+    dismissedCrossings: prefs.dismissedCrossings,
     notifSeeded: prefs.notifSeeded,
     lastSeen: prefs.lastSeen,
   }
@@ -255,6 +260,9 @@ async function hydrateSeenState(): Promise<void> {
       notifiedCrossings: Array.isArray(seen.notifiedCrossings)
         ? seen.notifiedCrossings
         : prefs.notifiedCrossings,
+      dismissedCrossings: Array.isArray(seen.dismissedCrossings)
+        ? seen.dismissedCrossings
+        : prefs.dismissedCrossings,
       notifSeeded: typeof seen.notifSeeded === 'boolean' ? seen.notifSeeded : prefs.notifSeeded,
       lastSeen: seen.lastSeen && typeof seen.lastSeen === 'object' ? seen.lastSeen : prefs.lastSeen,
     }
@@ -492,6 +500,16 @@ export function setAlertsSeen(ids: string[]): void {
 export const getNotifiedCrossings = (): string[] => prefs.notifiedCrossings
 export function setNotifiedCrossings(keys: string[]): void {
   prefs = { ...prefs, notifiedCrossings: keys }
+  saveSeen() // OP-3: durable seen-state store (survives restart), not localStorage-only
+}
+
+/* ---- dismissed crossings (F12) — which APPLY crossings the user has cleared from the bell ---- */
+// A SEPARATE set from notifiedCrossings (which the native notifier auto-advances every cycle; reusing
+// it would make dismissals evaporate). Keyed per-crossing `ipo_id@asof` (alerts.ts `crossingKey`),
+// bounded by pruneDismissedKeys. Durable via the OP-3 seen-state store so a dismissal survives restart.
+export const getDismissedCrossings = (): string[] => prefs.dismissedCrossings
+export function setDismissedCrossings(keys: string[]): void {
+  prefs = { ...prefs, dismissedCrossings: keys }
   saveSeen() // OP-3: durable seen-state store (survives restart), not localStorage-only
 }
 export const isNotifSeeded = (): boolean => prefs.notifSeeded

@@ -54,8 +54,8 @@ const cases: Case[] = [
     input: { isError: false, refreshInFlight: true, ack: 'none', status: base },
   },
   {
-    group: 'Degraded suffix (steady state, composed onto "Checked HH:MM")',
-    name: '· retrying — a newer pull failed',
+    group: 'Formerly a chip suffix — now PLAIN "Checked" (F12: the degradation moved to the bell)',
+    name: 'a newer pull failed → plain "Checked" (bell: "Refresh failed")',
     input: {
       isError: false,
       refreshInFlight: false,
@@ -64,8 +64,8 @@ const cases: Case[] = [
     },
   },
   {
-    group: 'Degraded suffix (steady state, composed onto "Checked HH:MM")',
-    name: '· records on local — VM down, records re-scraped locally (fresh)',
+    group: 'Formerly a chip suffix — now PLAIN "Checked" (F12: the degradation moved to the bell)',
+    name: 'records on local → plain "Checked" (bell: "Server unreachable")',
     input: {
       isError: false,
       refreshInFlight: false,
@@ -74,8 +74,8 @@ const cases: Case[] = [
     },
   },
   {
-    group: 'Degraded suffix (steady state, composed onto "Checked HH:MM")',
-    name: '· context aging — VM down, context is last-known',
+    group: 'Formerly a chip suffix — now PLAIN "Checked" (F12: the degradation moved to the bell)',
+    name: 'context on local → plain "Checked" (bell: "Market context aging")',
     input: {
       isError: false,
       refreshInFlight: false,
@@ -84,8 +84,8 @@ const cases: Case[] = [
     },
   },
   {
-    group: 'Degraded suffix (steady state, composed onto "Checked HH:MM")',
-    name: '· on local — context aging — both stores fell back',
+    group: 'Formerly a chip suffix — now PLAIN "Checked" (F12: the degradation moved to the bell)',
+    name: 'both stores fell back → plain "Checked" (bell: two entries)',
     input: {
       isError: false,
       refreshInFlight: false,
@@ -94,13 +94,18 @@ const cases: Case[] = [
     },
   },
   {
-    group: 'Other states (unchanged by Phase 2)',
-    name: 'engine unreachable',
+    group: 'Other states',
+    name: 'engine unreachable — STAYS on the chip ("Reconnecting…") AND is a red bell condition',
     input: { isError: true, refreshInFlight: false, ack: 'none', status: base },
   },
   {
-    group: 'Other states (unchanged by Phase 2)',
-    name: 'cold start — no successful pull yet',
+    group: 'Other states',
+    name: 'no live feed configured (dark-ship)',
+    input: { isError: false, refreshInFlight: false, ack: 'none', status: { ...base, live_ingest: false } },
+  },
+  {
+    group: 'Other states',
+    name: 'cold start — "No data yet" (honest at any duration, not a transient "Awaiting…")',
     input: {
       isError: false,
       refreshInFlight: false,
@@ -131,7 +136,7 @@ root.style.cssText =
   'padding:28px 32px; max-width:1100px; margin:0 auto; font-family:"Fira Sans", system-ui, sans-serif;'
 
 const h1 = document.createElement('h1')
-h1.textContent = 'OP-2 Phase 2 — sync chip states (rendered by the shipped syncChip)'
+h1.textContent = 'F12 — sync chip: ONE fixed 16ch width in every state (rendered by the shipped syncChip)'
 h1.style.cssText = 'font-size:18px; margin:0 0 4px;'
 const sub = document.createElement('div')
 sub.textContent = `Tooltip on every chip = the static disclosure "${DELAY_DISCLOSURE}" (hover to confirm); degraded/error states carry their own title.`
@@ -161,10 +166,11 @@ for (const c of cases) {
   root.append(row)
 }
 
-// --- Width / no-shift check: the labels that share the 16ch reserved floor, stacked left-aligned so
-// their right edges must line up on the dashed guide. Any that poke past it would shift the layout.
+// --- Width / no-shift check: EVERY retained state, stacked left-aligned so their right edges must
+// line up on the dashed guide. The chip is now fixed at 16ch (min==max), so none can poke past it —
+// every degraded suffix that used to overrun it lives in the bell (F12).
 const shiftHead = document.createElement('div')
-shiftHead.textContent = 'Width / no-shift check — these five share the 16ch floor; right edges must align'
+shiftHead.textContent = 'Width / no-shift check — every state shares the FIXED 16ch width; right edges must align'
 shiftHead.style.cssText =
   'font-family:"Fira Code"; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--tx3); margin:30px 0 10px; border-bottom:1px solid var(--line); padding-bottom:6px;'
 root.append(shiftHead)
@@ -177,6 +183,9 @@ const noShift: SyncChipInput[] = [
   { isError: false, refreshInFlight: false, ack: 'newdata', status: base }, // New data ✓
   { isError: false, refreshInFlight: false, ack: 'uptodate', status: base }, // Up to date ✓
   { isError: false, refreshInFlight: false, ack: 'failed', status: base }, // Couldn't refresh
+  { isError: true, refreshInFlight: false, ack: 'none', status: base }, // Reconnecting…
+  { isError: false, refreshInFlight: false, ack: 'none', status: { ...base, live_ingest: false } }, // Live
+  { isError: false, refreshInFlight: false, ack: 'none', status: { ...base, checked_at: null, last_successful_ingest: null } }, // No data yet
 ]
 for (const i of noShift) stack.append(chipEl(i))
 // A dashed guide at the right edge of the (equal-width) chips.
