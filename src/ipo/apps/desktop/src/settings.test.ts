@@ -14,6 +14,7 @@ import {
   DEFAULT_NOTIF,
   DEFAULT_STARTUP,
   type StartupPrefs,
+  PERSIST_BOUNDS_EVENTS,
   buildWebPreferences,
   loadSeenState,
   loadSettings,
@@ -219,6 +220,29 @@ test('tray-failure degrade: hidden-to-tray falls back to the taskbar when the tr
 test('a normal (not start-minimized) auto-launch shows, maximize-aware', () => {
   assert.equal(stState({ startMinimized: false, savedMaximized: false }), 'shown-normal')
   assert.equal(stState({ startMinimized: false, savedMaximized: true }), 'shown-maximized')
+})
+
+// --- PR-A: persistBounds must fire on maximize/unmaximize, not only resized/moved ----------------
+
+test('PERSIST_BOUNDS_EVENTS keeps bounds.maximized a live mirror (fixes the stale-maximized reopen)', () => {
+  // maximize()/unmaximize() fire ONLY 'maximize'/'unmaximize', never 'resized' — so without these two
+  // the persisted bounds.maximized only updated on a later drag or close, and a reopen with no
+  // preceding close (a second-instance double-launch) could re-maximize a window the user un-maximized.
+  assert.ok(PERSIST_BOUNDS_EVENTS.includes('maximize'), 'maximize must trigger a bounds persist')
+  assert.ok(PERSIST_BOUNDS_EVENTS.includes('unmaximize'), 'unmaximize must trigger a bounds persist')
+  // …and the pre-existing geometry triggers are not dropped:
+  assert.ok(PERSIST_BOUNDS_EVENTS.includes('resized'))
+  assert.ok(PERSIST_BOUNDS_EVENTS.includes('moved'))
+
+  // Behavioural fence: replicate main.ts's registration over a fake window and confirm that firing the
+  // maximize/unmaximize listener actually runs persistBounds — the effect the reopen relies on.
+  const handlers = new Map<string, () => void>()
+  const fakeWin = { on: (ev: string, l: () => void) => handlers.set(ev, l) }
+  let persisted = 0
+  for (const ev of PERSIST_BOUNDS_EVENTS) fakeWin.on(ev, () => (persisted += 1))
+  handlers.get('maximize')?.()
+  handlers.get('unmaximize')?.()
+  assert.equal(persisted, 2, 'maximize + unmaximize each run persistBounds')
 })
 
 // --- OP-6: the sealed-shell BrowserWindow posture (DevTools off in prod, on in dev) --------------

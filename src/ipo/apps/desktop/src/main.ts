@@ -16,6 +16,7 @@ import {
   type SeenState,
   type StartupPrefs,
   type UiPrefs,
+  PERSIST_BOUNDS_EVENTS,
   buildWebPreferences,
   loadSeenState,
   loadSettings,
@@ -216,8 +217,11 @@ async function boot(): Promise<void> {
       win?.hide()
     }
   })
-  win.on('resized', persistBounds)
-  win.on('moved', persistBounds)
+  // Persist bounds on every geometry change. maximize/unmaximize are essential: they fire ONLY those
+  // events (never 'resized'), so without them bounds.maximized went stale — see PERSIST_BOUNDS_EVENTS.
+  // All four events carry the same no-arg listener, so `ev as 'resized'` just selects one of Electron's
+  // per-event overloads (which reject a union arg); the runtime handler is identical for each.
+  for (const ev of PERSIST_BOUNDS_EVENTS) win.on(ev as 'resized', persistBounds)
 
   // v3 BUG 1 / Defect 1: opening or returning to the window asks the engine for a REAL NSE pull, so
   // the verdicts you see on open are current — not a stale snapshot under a fresh-looking timestamp.
