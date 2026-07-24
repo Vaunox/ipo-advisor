@@ -145,6 +145,24 @@ export function startupWindowState(opts: {
  *  in this list; the test fences the set so a future edit can't silently drop one. */
 export const PERSIST_BOUNDS_EVENTS = ['resized', 'moved', 'maximize', 'unmaximize'] as const
 
+/** The bounds to persist for the window's current state, or `prev` UNCHANGED when the window is
+ *  minimized. `win.isMaximized()` returns FALSE while minimized, so snapshotting then would overwrite
+ *  a maximized flag with false — the maximize→minimize→close bug (the `close` handler runs
+ *  persistBounds unconditionally, and a minimized window reports not-maximized). Returning `prev` (the
+ *  SAME ref) lets the caller skip the write and keep the last non-minimized state, so a maximized
+ *  window minimized then closed reopens maximized. Pure so node --test fences the skip and the capture. */
+export function boundsToPersist(
+  state: {
+    minimized: boolean
+    maximized: boolean
+    normal: { x: number; y: number; width: number; height: number }
+  },
+  prev: WindowBounds | undefined,
+): WindowBounds | undefined {
+  if (state.minimized) return prev
+  return { ...state.normal, maximized: state.maximized }
+}
+
 /** The BrowserWindow security posture in ONE lockable place (the "sealed shell" family: OP-6 + review
  *  #5). Context-isolated, no node integration, and — OP-6 — Chromium DevTools OFF in the packaged
  *  build (``dev=false`` makes ``Ctrl+Shift+I`` / the default-menu accelerator / ``openDevTools()`` all

@@ -17,6 +17,7 @@ import {
   type StartupPrefs,
   type UiPrefs,
   PERSIST_BOUNDS_EVENTS,
+  boundsToPersist,
   buildWebPreferences,
   loadSeenState,
   loadSettings,
@@ -95,8 +96,15 @@ function showWindow(): void {
 
 function persistBounds(): void {
   if (!win || win.isDestroyed()) return
-  const b = win.getNormalBounds()
-  settings.bounds = { x: b.x, y: b.y, width: b.width, height: b.height, maximized: win.isMaximized() }
+  // Skip while minimized: isMaximized() reads false then, so persisting would clobber a maximized
+  // flag with false (the maximize→minimize→close bug). boundsToPersist returns the prior bounds
+  // UNCHANGED (same ref) when minimized, so we keep the last non-minimized state.
+  const next = boundsToPersist(
+    { minimized: win.isMinimized(), maximized: win.isMaximized(), normal: win.getNormalBounds() },
+    settings.bounds,
+  )
+  if (next === settings.bounds) return
+  settings.bounds = next
   saveSettings(userDataDir, settings)
 }
 
