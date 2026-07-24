@@ -264,9 +264,14 @@ def build_service(
     only ever reflects a real, successful NSE pull.
     """
     scorer = WeightedScorer(config.feature_weights, config.features)
-    regime = NiftyRegime(nifty_path)
-    # v2 B2: layer India VIX onto the cold-market flag when present (flag-only, weight 0).
     rc = config.features.regime
+    regime = NiftyRegime(
+        nifty_path,
+        trend_days=rc.trend_days,
+        trend_scale=rc.trend_scale,
+        drawdown_floor=rc.drawdown_floor,
+    )
+    # v2 B2: layer India VIX onto the cold-market flag when present (flag-only, weight 0).
     vix = (
         VixSeries(vix_path, reference=rc.vix_reference, scale=rc.vix_scale)
         if vix_path is not None and vix_path.is_file()

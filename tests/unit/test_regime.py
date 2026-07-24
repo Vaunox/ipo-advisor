@@ -64,6 +64,52 @@ def test_market_regime_feature_sign_and_bounds(tmp_path: Path) -> None:
     assert NiftyRegime(short).market_regime_feature(date(2020, 1, 1) + timedelta(days=20)) is None
 
 
+def test_trend_scale_moves_the_regime(tmp_path: Path) -> None:
+    """F-1 threading: `trend_scale` (was the constant `_REGIME_FEATURE_SCALE`) now parameterises
+    NiftyRegime. A non-default scale MOVES market_regime for the same trend (tighter scale = larger
+    magnitude), so a mis-wire that fell back to a hardcoded scale fails this."""
+    path = tmp_path / "nifty.csv"
+    _write_nifty(path, [100.0 + 0.03 * i for i in range(130)])  # gentle rise → non-saturating
+    day = date(2020, 1, 1) + timedelta(days=120)
+    default = NiftyRegime(path).market_regime_feature(day)  # trend_scale 0.08
+    tighter = NiftyRegime(path, trend_scale=0.04).market_regime_feature(day)  # half the scale
+    assert default is not None and tighter is not None
+    assert 0.0 < default < 1.0 and 0.0 < tighter < 1.0  # neither clamps — the difference is genuine
+    assert tighter != default and abs(tighter) > abs(
+        default
+    )  # the non-default scale MOVED the output
+
+
+def test_trend_days_moves_the_regime(tmp_path: Path) -> None:
+    """F-1 threading: `trend_days` (was `_TRADING_DAYS_3M`) parameterises the trend window. A
+    rose-then-fell tape trends UP over a long window but DOWN over a short one, so a non-default
+    window flips the regime sign — a hardcoded-window fallback fails this."""
+    path = tmp_path / "nifty.csv"
+    _write_nifty(path, [100.0 + i for i in range(90)] + [190.0 - i for i in range(40)])
+    day = date(2020, 1, 1) + timedelta(days=120)
+    long_win = NiftyRegime(path).market_regime_feature(day)  # 63d → spans rise+fall, net up
+    short_win = NiftyRegime(path, trend_days=20).market_regime_feature(day)  # last 20d → falling
+    assert long_win is not None and short_win is not None
+    assert long_win > 0.0 and short_win < 0.0  # opposite signs → the non-default window MOVED it
+
+
+def test_drawdown_floor_moves_is_cold(tmp_path: Path) -> None:
+    """F-1 threading: `drawdown_floor` parameterises the cold-drawdown rule (feeds `is_cold`, the
+    OFFLINE stress-test read — no live consumer). A tape that pulled ~2.3% off its high while still
+    trending UP is cold ONLY by the drawdown rule, so a non-default floor MOVES is_cold."""
+    path = tmp_path / "nifty.csv"
+    _write_nifty(
+        path, [100.0 + i / 3 for i in range(91)] + [130.0 - (i + 1) * 0.1 for i in range(39)]
+    )
+    day = date(2020, 1, 1) + timedelta(days=120)
+    info = NiftyRegime(path).regime_at(
+        day
+    )  # floor -0.05: drawdown -0.023 not past it, trend up → hot
+    assert info.trend_3m is not None and info.trend_3m > 0.0 and info.is_cold is False
+    shallow = NiftyRegime(path, drawdown_floor=-0.001).is_cold(day)  # -0.023 < -0.001 → cold
+    assert shallow is True  # the non-default floor MOVED is_cold
+
+
 def test_merge_nifty_closes_is_append_only() -> None:
     existing = [(date(2020, 1, 1), 100.0), (date(2020, 1, 2), 101.0)]
     new = [

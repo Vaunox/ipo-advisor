@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ipo.core.config import FeaturesConfig
+from ipo.core.config import FeaturesConfig, ValuationFeatureConfig
 from ipo.core.constants import IST
 from ipo.core.types import IPOFeatures
 from ipo.model.scorer import WeightedScorer
@@ -56,6 +56,22 @@ def test_valuation_is_a_brake_only() -> None:
     inline = _scorer().contributions(_feats(relative_valuation=1.0))
     assert pricey["relative_valuation"] < 0  # priced above peers -> negative
     assert inline["relative_valuation"] == 0  # in line -> neutral, never positive
+
+
+def test_overpricing_cap_is_config_driven_and_moves_the_brake() -> None:
+    """F-3 threading: the valuation-brake cap (was the constant `_VALUATION_OVERPRICING_CAP`) now
+    comes from config.features.valuation. An issue priced 200% above peers is beyond the default 1.0
+    cap, so a wider cap admits more over-pricing -> a bigger brake. Driven THROUGH the config, so a
+    mis-wire that ignored config (hardcoded the cap) fails this. `relative_valuation` weight here is
+    a non-zero 0.10, so the contribution is genuinely exercised (not the shipped weight-0)."""
+    feats = _feats(relative_valuation=3.0)  # overpricing 2.0, past the default 1.0 cap
+    default = WeightedScorer(_WEIGHTS, FeaturesConfig()).contributions(feats)["relative_valuation"]
+    wider = WeightedScorer(
+        _WEIGHTS, FeaturesConfig(valuation=ValuationFeatureConfig(overpricing_cap=2.0))
+    ).contributions(feats)["relative_valuation"]
+    assert default == -0.10 * 1.0  # -weight * clamp(2.0, 0, 1.0) — the shipped cap
+    assert wider == -0.10 * 2.0  # -weight * clamp(2.0, 0, 2.0) — the non-default cap MOVED it
+    assert abs(wider) > abs(default)
 
 
 def test_ofs_contribution_is_negative() -> None:

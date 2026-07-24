@@ -199,6 +199,10 @@ class ValuationFeatureConfig(_Section):
     """Relative-valuation policy, including the 'no listed peers' case."""
 
     peerless_policy: str = "neutral_flag"  # neutral_flag | mild_negative
+    # F-3 config-lift: the max over-pricing (issue P/E vs peer median) the valuation brake counts,
+    # so one extreme ratio can't dominate. 1.0 == priced 100% above peers. Inert while
+    # `relative_valuation` is weight 0; governs the brake's clamp if it is ever re-weighted.
+    overpricing_cap: float = Field(default=1.0, ge=0)
 
 
 class RegimeFeatureConfig(_Section):
@@ -217,6 +221,16 @@ class RegimeFeatureConfig(_Section):
     # stress (vol_stress +1 at reference + scale, i.e. VIX ~30). a-priori round numbers.
     vix_reference: float = 15.0
     vix_scale: float = 15.0
+    # Nifty-trend side of the same flag (F-1 config-lift). `trend_days` is the trailing window the
+    # trend is read over — 63 ≈ 3 months of trading days; CHANGING IT CHANGES THE HORIZON the
+    # cold-market caveat describes (the field name is value-free — no "3M" — so it can't lie if
+    # retuned). `trend_scale`: the ±trend mapping to the ±1 regime extreme (a ±8% quarterly swing →
+    # ±1); the direct Nifty analogue of `vix_scale`. NOT fit to outcomes. `drawdown_floor`:
+    # the trailing-3M drawdown below which a tape counts as cold — feeds `is_cold`, used ONLY by the
+    # OFFLINE regime stress-test (no live-scoring/caveat consumer). All weight-0.
+    trend_days: int = Field(default=63, ge=1)
+    trend_scale: float = Field(default=0.08, gt=0)
+    drawdown_floor: float = Field(default=-0.05, le=0)
 
 
 class FeaturesConfig(_Section):
