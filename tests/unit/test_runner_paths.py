@@ -10,6 +10,7 @@ build ships no seed, so a mismatch just clears the store and live ingestion refi
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from pathlib import Path
 
@@ -113,6 +114,33 @@ def test_clearing_the_store_on_a_version_bump_is_logged(
     ]
     assert len(cleared) == 1
     assert "ipo_records.parquet" in cleared[0].__dict__["cleared"]
+
+
+def test_marker_write_is_atomic_last_good_survives_a_failed_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-2: the seed_version marker is written atomically (tmp + os.replace), like every other
+    durable writer. A failed swap must leave the last-good marker INTACT — a direct write truncates
+    in place, so a crash mid-write leaves an empty marker → next boot reads "" != _SEED_VERSION →
+    the destructive clear wipes ipo_records.parquet AND verdict_transitions.json (lost history).
+    """
+    res = tmp_path / "bundle"  # no _seed/ → the seeding step is skipped
+    res.mkdir()
+    data_dir = tmp_path / "userdata"
+    data_dir.mkdir()
+    (data_dir / "seed_version").write_text(_SEED_VERSION, encoding="utf-8")  # last-good, up to date
+
+    def boom(*_a: object, **_k: object) -> None:
+        raise OSError("simulated crash during the atomic marker swap")
+
+    monkeypatch.setattr(os, "replace", boom)
+    with pytest.raises(OSError):
+        _provision_data_dir(data_dir, res, manage=True)
+
+    # Intact — never truncated/empty, so a torn write can't trigger the destructive clear next boot.
+    # (A failed swap may leave an inert `.tmp` orphan, as the other atomic writers do; the live
+    # marker is the only authoritative file and it is untouched.)
+    assert (data_dir / "seed_version").read_text(encoding="utf-8") == _SEED_VERSION
 
 
 # --- B1/B2: the scheduler loop survives a raising cycle instead of dying silently ----------------

@@ -14,6 +14,7 @@ inherited and re-proven end-to-end at GATE 6:
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from collections.abc import Callable
@@ -156,7 +157,14 @@ def _provision_data_dir(data_dir: Path, resource_root: Path, *, manage: bool) ->
                 copied.append(name)
         if copied:
             _log.info("data_store_seeded", extra={"copied": copied})
-    marker.write_text(_SEED_VERSION, encoding="utf-8")
+    # Atomic marker write (tmp + os.replace), the idiom used by every other durable writer here. A
+    # DIRECT write_text truncates the marker in place, so a crash mid-write leaves it empty → next
+    # boot reads "" != _SEED_VERSION → the destructive clear above wipes ipo_records.parquet AND
+    # verdict_transitions.json (runtime-accumulated verdict/crossing history, unrecoverable). The
+    # swap leaves the last-good marker intact on failure, so a torn write can't trigger that clear.
+    tmp = marker.with_suffix(".tmp")
+    tmp.write_text(_SEED_VERSION, encoding="utf-8")
+    os.replace(tmp, marker)
 
 
 @dataclass
