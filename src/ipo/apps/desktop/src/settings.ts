@@ -229,6 +229,7 @@ export function saveSettings(userDataDir: string, settings: AppSettings): void {
 export interface SeenState {
   alertsSeen: string[]
   notifiedCrossings: string[]
+  dismissedCrossings: string[]
   notifSeeded: boolean
   lastSeen: Record<string, string>
 }
@@ -248,6 +249,10 @@ export function loadSeenState(userDataDir: string): SeenState | null {
     return {
       alertsSeen: Array.isArray(raw.alertsSeen) ? raw.alertsSeen : [],
       notifiedCrossings: Array.isArray(raw.notifiedCrossings) ? raw.notifiedCrossings : [],
+      // F12: a new seen-set field. loadSeenState parses field-by-field, so this MUST be added here or
+      // a persisted dismissal silently vanishes on hydrate (saveSeenState stringifies the whole object,
+      // so the write side needs nothing). Missing (older file) → [] (nothing dismissed yet).
+      dismissedCrossings: Array.isArray(raw.dismissedCrossings) ? raw.dismissedCrossings : [],
       notifSeeded: raw.notifSeeded === true,
       lastSeen:
         raw.lastSeen && typeof raw.lastSeen === 'object' && !Array.isArray(raw.lastSeen)
@@ -255,7 +260,13 @@ export function loadSeenState(userDataDir: string): SeenState | null {
           : {},
     }
   } catch {
-    return { alertsSeen: [], notifiedCrossings: [], notifSeeded: false, lastSeen: {} }
+    return {
+      alertsSeen: [],
+      notifiedCrossings: [],
+      dismissedCrossings: [],
+      notifSeeded: false,
+      lastSeen: {},
+    }
   }
 }
 
